@@ -2,11 +2,10 @@ import os
 import pygame
 from math import sin, radians, degrees, copysign
 from pygame.math import Vector2
-
-
+import time
+import numpy as np
 
 breaks = True
-
 
 class Car:
     def __init__(self, x, y, angle=0.0, length=4, max_steering=30, max_acceleration=5.0):
@@ -35,12 +34,17 @@ class Car:
 
         self.position += self.velocity.rotate(-self.angle) * dt
         self.angle += degrees(angular_velocity) * dt
+        
+        
+class Cone:
+    def __init__(self, x, y):
+        self.position = Vector2(x, y)
 
 
 class Game:
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("Car tutorial")
+        pygame.display.set_caption("Car")
         width = 1280
         height = 720
         self.screen = pygame.display.set_mode((width, height))
@@ -52,10 +56,20 @@ class Game:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         image_path = os.path.join(current_dir, "car_r.png")
         car_image = pygame.image.load(image_path)
-        car = Car(0, 0)
+        
+        image_path1 = os.path.join(current_dir, "cone.png")
+        cone_image = pygame.image.load(image_path1)
+        
+        car = Car(10,10)
         ppu = 32
+        time_start = time.time()
 
+        cone1 = Cone(25,8)
+        
         while not self.exit:
+            
+            
+            
             dt = self.clock.get_time() / 500
 
             # Event queue
@@ -88,16 +102,37 @@ class Game:
                     if dt != 0:
                         car.acceleration = -car.velocity.x / dt
                         
-            #deceleration
-                        
-            car.acceleration = max(-car.max_acceleration, min(car.acceleration, car.max_acceleration))
-
+    
+            #manual steering
             if pressed[pygame.K_RIGHT]:
                 car.steering -= 50 * dt
             elif pressed[pygame.K_LEFT]:
                 car.steering += 50 * dt
             else:
                 car.steering = 0
+                
+                        
+            
+            #self driving part
+            time_running = time.time() - time_start
+# =============================================================================
+#             if time_running < 1:
+#                 car.velocity.x = 5
+#                 car.steering += 10
+#             else:
+#                 pass
+# =============================================================================
+            
+            if np.linalg.norm(cone1.position-car.position) < 500/ppu and np.linalg.norm(cone1.position-car.position) > 50/ppu and time_running > 2:
+                
+                car.velocity.x = 1
+                car.steering += 5         
+            
+            
+            
+            
+            #deceleration
+            car.acceleration = max(-car.max_acceleration, min(car.acceleration, car.max_acceleration))
             car.steering = max(-car.max_steering, min(car.steering, car.max_steering))
 
             # Logic
@@ -107,10 +142,21 @@ class Game:
             self.screen.fill((0, 0, 0))
             rotated = pygame.transform.rotate(car_image, car.angle)
             rect = rotated.get_rect()
+            self.screen.blit(cone_image, cone1.position * ppu - (rect.width / 2, rect.height / 2))
             self.screen.blit(rotated, car.position * ppu - (rect.width / 2, rect.height / 2))
+            
+            pos_temp = car.position * ppu - (rect.width / 2, rect.height / 2)
+            pos_1 = int(pos_temp.x + 50)
+            pos_2 = int(pos_temp.y + 30)
+            pygame.draw.circle(self.screen,(255,255,255), (pos_1,pos_2), 500, 1)
+            
+            
             pygame.display.flip()
 
             self.clock.tick(self.ticks)
+            
+            
+            
         pygame.quit()
 
 
