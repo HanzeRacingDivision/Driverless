@@ -21,6 +21,7 @@ class Car:
 
         self.acceleration = 0.0
         self.steering = 0.0
+        self.fov = 500
 
     def update(self, dt):
         self.velocity += (self.acceleration * dt, 0)
@@ -64,11 +65,28 @@ class Game:
         ppu = 32
         time_start = time.time()
 
-        cone1 = Cone(25,8)
+        cone1 = Cone(25,7)
+        
+        a_b = cone1.position-car.position
+        a = a_b.x
+        b = a_b.y
+        if b != 0:
+            r = ((a**2)/(2*b)) + b/2
+
+        
+        
+        def arc_func(x,b):
+            if b < 0:
+                steer = r**2/(r**2-x**2)**(3/2)
+            elif b > 0:
+                steer = (-1)*(r**2/(r**2-x**2)**(3/2))
+            else:
+                steer = 0
+            return np.mod(steer*180,360)
+        
+        
         
         while not self.exit:
-            
-            
             
             dt = self.clock.get_time() / 500
 
@@ -122,11 +140,22 @@ class Game:
 #             else:
 #                 pass
 # =============================================================================
-            
-            if np.linalg.norm(cone1.position-car.position) < 500/ppu and np.linalg.norm(cone1.position-car.position) > 50/ppu and time_running > 2:
+
+
+            if np.linalg.norm(cone1.position-car.position) < car.fov/ppu and np.linalg.norm(cone1.position-car.position) > 100/ppu and time_running > 2:
                 
-                car.velocity.x = 1
-                car.steering += 5         
+                #print('car pos : ', car.position)
+                #print()
+               # print('distance : ', np.linalg.norm(cone1.position-car.position))
+              #  print()
+                
+                
+                car.velocity.x = 2
+                car.steering += arc_func(np.array(car.position.x),b)
+                print(car.steering)
+                print()
+                print(car.angle)
+                
             
             
             
@@ -148,7 +177,7 @@ class Game:
             pos_temp = car.position * ppu - (rect.width / 2, rect.height / 2)
             pos_1 = int(pos_temp.x + 50)
             pos_2 = int(pos_temp.y + 30)
-            pygame.draw.circle(self.screen,(255,255,255), (pos_1,pos_2), 500, 1)
+            pygame.draw.circle(self.screen,(255,255,255), (pos_1,pos_2), car.fov, 1)
             
             
             pygame.display.flip()
