@@ -1,3 +1,3 @@
 # AH_Pygame_Code
 Python code for a car sim <br/>
-Anyone can run the code (given that a few packages are installed).
+Code is instantly runnable (given that a few packages are installed).
