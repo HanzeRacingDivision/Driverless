@@ -239,7 +239,7 @@ class Game:
             score_pos = [10, 90]
             self.screen.blit(score_surf, score_pos)
             
-            score_surf = score_font.render(f'Cone passed: {cone1_passed}', 1, (255, 255, 255))
+            score_surf = score_font.render(f'Cone1 passed: {cone1.passed}', 1, (255, 255, 255))
             score_pos = [10, 110]
             self.screen.blit(score_surf, score_pos)
 
