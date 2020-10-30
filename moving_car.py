@@ -25,6 +25,7 @@ class Car:
         self.acceleration = 0.0
         self.steering = 0.0
         self.fov = 500 #150
+        self.turning_sharpness = 1.4
 
     def update(self, dt):
         self.velocity += (self.acceleration * dt, 0)
@@ -71,15 +72,17 @@ class Game:
         ppu = 32
         time_start = time.time()
 
-        cone1 = Cone(23,13)
-      #  cone2 = Cone(15,8)
-        cone3 = Cone(35,7)
+        cone1 = Cone(20,2)
+        cone2 = Cone(30,13)
+        cone3 = Cone(17,19)
         #cone4 = Cone(20,6)
         
         alpha = 0
         beta = 0
         circles = []
         dist = 0
+        a = 0
+        b = 0
         
         while not self.exit:
             
@@ -130,11 +133,14 @@ class Game:
             if car_angle < 0:
                 car_angle = -180 - car_angle
                 
-                
-            if np.linalg.norm(cone1.position-car.position) <= 50/ppu and time_running > 2: 
+            if cone1.passed == False and np.linalg.norm(cone1.position-car.position) <= 50/ppu and time_running > 2: 
                 cone1.passed = True
                 
-            if np.linalg.norm(cone3.position-car.position) <= 50/ppu and time_running > 2: 
+            if cone2.passed == False and np.linalg.norm(cone2.position-car.position) <= 50/ppu and time_running > 2: 
+                cone2.passed = True
+                
+                
+            if cone3.passed == False and np.linalg.norm(cone3.position-car.position) <= 50/ppu and time_running > 2: 
                 cone3.passed = True
                 
                 
@@ -144,6 +150,7 @@ class Game:
             elif pressed[pygame.K_LEFT]:
                 car.steering += 50 * dt
                 
+            
             elif np.linalg.norm(cone1.position-car.position) < car.fov/ppu and np.linalg.norm(cone1.position-car.position) > 50/ppu and time_running > 2 and cone1.passed == False:
              
                 a_b = cone1.position-car.position
@@ -154,14 +161,26 @@ class Game:
                 beta = np.arctan(b/a)*(180/np.pi)
                 beta = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
 
-                alpha = beta - car_angle
+                alpha = beta - car_angle - (np.floor(-a/(2*np.abs(a)))+1)*(b/np.abs(b))*np.abs(np.floor((car_angle+90)/180))*(np.abs(((b*car_angle)/(np.abs(b)*np.abs(car_angle)))-1))*180
                 
-                if alpha > -90 and alpha < 90:  #if alpha is 'behind car' move on
-                    car.steering = (120/np.pi)*np.arctan(alpha/dist**1.5)
-                    car.velocity.x = 1
-                   # continue
-                #car.steering = 0
+                car.steering = (120/np.pi)*np.arctan(alpha/dist**car.turning_sharpness)
+                car.velocity.x = 2
 
+            elif np.linalg.norm(cone2.position-car.position) < car.fov/ppu and np.linalg.norm(cone2.position-car.position) > 50/ppu and time_running > 2 and cone2.passed == False:
+             
+                a_b = cone2.position-car.position
+                dist = np.linalg.norm(cone2.position-car.position)
+                a = a_b.x
+                b = -1*a_b.y      
+                
+                beta = np.arctan(b/a)*(180/np.pi)
+                beta = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
+
+                alpha = beta - car_angle - (np.floor(-a/(2*np.abs(a)))+1)*(b/np.abs(b))*np.abs(np.floor((car_angle+90)/180))*(np.abs(((b*car_angle)/(np.abs(b)*np.abs(car_angle)))-1))*180
+                
+                car.steering = (120/np.pi)*np.arctan(alpha/dist**car.turning_sharpness)
+                car.velocity.x = 2
+        
             elif np.linalg.norm(cone3.position-car.position) < car.fov/ppu and np.linalg.norm(cone3.position-car.position) > 50/ppu and time_running > 2 and cone3.passed == False:
                
                 a_b = cone3.position-car.position
@@ -172,11 +191,10 @@ class Game:
                 beta = np.arctan(b/a)*(180/np.pi)
                 beta = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
                         
-                alpha = beta - car.angle
+                alpha = beta - car_angle - (np.floor(-a/(2*np.abs(a)))+1)*(b/np.abs(b))*np.abs(np.floor((car_angle+90)/180))*(np.abs(((b*car_angle)/(np.abs(b)*np.abs(car_angle)))-1))*180
                 
-                if alpha > -90 and alpha < 90:
-                   car.steering = (120/np.pi)*np.arctan(alpha/dist**1.5)
-                   car.velocity.x = 1
+                car.steering = (120/np.pi)*np.arctan(alpha/dist**car.turning_sharpness)
+                car.velocity.x = 2
                 
             else:
                 car.steering = 0
@@ -209,7 +227,7 @@ class Game:
                 pygame.draw.circle(self.screen,(155,155,155), circles[i], 1, 1)
             
             self.screen.blit(cone_image, cone1.position * ppu - (rect.width / 2, rect.height / 2))
-      #      self.screen.blit(cone_image, cone2.position * ppu - (rect.width / 2, rect.height / 2))
+            self.screen.blit(cone_image, cone2.position * ppu - (rect.width / 2, rect.height / 2))
             self.screen.blit(cone_image, cone3.position * ppu - (rect.width / 2, rect.height / 2))
         #    self.screen.blit(cone_image, cone4.position * ppu - (rect.width / 2, rect.height / 2))
             self.screen.blit(rotated, car.position * ppu - ((rect.width / 2)+ round(img.shape[1]/2),( rect.height / 2) + round(img.shape[0]/2)))
@@ -240,15 +258,16 @@ class Game:
             self.screen.blit(score_surf, score_pos)
             
             score_surf = score_font.render(f'Cone1 passed: {cone1.passed}', 1, (255, 255, 255))
-            score_pos = [10, 110]
+            score_pos = [10, 130]
             self.screen.blit(score_surf, score_pos)
-
-# =============================================================================
-#             score_surf = score_font.render(f'a : {a}, b : {b}', 1, (255, 255, 255))
-#             score_pos = [10, 50]
-#             self.screen.blit(score_surf, score_pos)
-# =============================================================================
-                        
+            
+            score_surf = score_font.render(f'Cone2 passed: {cone2.passed}', 1, (255, 255, 255))
+            score_pos = [10, 150]
+            self.screen.blit(score_surf, score_pos)
+            
+            score_surf = score_font.render(f'Cone3 passed: {cone3.passed}', 1, (255, 255, 255))
+            score_pos = [10, 170]
+            self.screen.blit(score_surf, score_pos)
 
             pygame.display.flip()
             
@@ -262,16 +281,3 @@ if __name__ == '__main__':
     game = Game()
     game.run()
     
-
-# =============================================================================
-#                 if a > 0:
-#                     if b > 0:
-#                         continue
-#                     else:
-#                         beta = -1*beta
-#                 else:
-#                     if b > 0:
-#                         beta = 180 - beta
-#                     else:
-#                         beta = beta - 180
-# =============================================================================
