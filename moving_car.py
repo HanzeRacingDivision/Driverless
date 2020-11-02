@@ -28,7 +28,7 @@ def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length 
 
 
 class Car:
-    def __init__(self, x, y, angle=-180.0, length=3, max_steering=70, max_acceleration=6.0):
+    def __init__(self, x, y, angle=-180.0, length=4, max_steering=70, max_acceleration=6.0):
         self.position = Vector2(x, y)
         self.velocity = Vector2(0.0, 0.0)
         self.angle = angle
@@ -107,13 +107,13 @@ class Game:
 
         
         cones = [Cone(22,4),
-                 Cone(8,17),
-                 Cone(15,20),
+                 Cone(8.5,16.5),
+                 Cone(16,20),
                  Cone(26,19),
                  Cone(13,4),
                  Cone(29,5),
                  Cone(36,8),
-                 Cone(6.5,10.5)]
+                 Cone(6.5,10)]
         
         non_passed_cones = cones.copy()
         
@@ -215,11 +215,12 @@ class Game:
                 alpha = beta - car_angle - (np.floor(-a/(2*np.abs(a)))+1)*(b/np.abs(b))*np.abs(np.floor((car_angle+90)/180))*(np.abs(((b*car_angle)/(np.abs(b)*np.abs(car_angle)))-1))*180
                 
                 car.steering = (140/np.pi)*np.arctan(alpha/dist**car.turning_sharpness)
-                car.velocity.x = 4
+                car.velocity.x = 3.5
+                
                 
             elif len(non_passed_cones) == 0:
                 car.steering = -30
-                car.free_deceleration = 2
+                car.free_deceleration = 1
             else:
                 car.steering = 0
 
