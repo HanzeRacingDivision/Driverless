@@ -17,6 +17,8 @@ if(len(pgs.sys.argv) > 1):
             if(pgs.sys.argv[1].endswith('.csv')):
                 print("found sys.argv[1] with a '.csv' extesion, attempting to import:", pgs.sys.argv[1])
                 fileToImport = pgs.sys.argv[1]
+            else:
+                print("found sys.argv[1] but does not have '.csv' extension, so NOT importing that shit")
 
 for i in range(numberOfSimsRoot):
     multiSims.append([])

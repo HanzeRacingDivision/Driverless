@@ -275,7 +275,6 @@ class pygamesim:
                 highestImportedConeID = 0
                 for line in readFile:
                     lineArray = line.strip().split(',')
-                    print("lineArray", lineArray)
                     lineData = [0, False, 0.0, 0.0, -1, -1, []] #init var
                     if(len(lineArray) >= 7):
                         if(lineArray[0].isnumeric() and ((lineArray[1].upper() == 'LEFT') or (lineArray[1].upper() == 'RIGHT')) and (lineArray[4].isnumeric() or (lineArray[4]=='-1')) and (lineArray[5].isnumeric() or (lineArray[5]=='-1'))): #note: cant check floats
@@ -547,8 +546,8 @@ class pygamesim:
                     print("it seems no suitible candidates for cone connection were found at all... bummer.", len(nearbyConeList), candidatesDiscarded, bestCandidateIndex, highestStrength)
                     return(False, [])
                 ## else (because it didnt return() and stop the function)
-                print("cone connection made between (ID):", coneToConnectID, "and (ID):", nearbyConeList[bestCandidateIndex][0])
-                #make the connection:
+                #print("cone connection made between (ID):", coneToConnectID, "and (ID):", nearbyConeList[bestCandidateIndex][0])
+                ## make the connection:
                 coneListToUpdate = (self.rightConeList if leftOrRight else self.leftConeList)
                 if(updateInputConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
                     ## input cone
@@ -825,7 +824,7 @@ class pygamesim:
             strengths[2] *= 1.5-(min(abs(radDiff(pathAngles[2], prospectLeftConePerpAngle)), self.pathConnectionMaxAngleDelta)/self.pathConnectionMaxAngleDelta)
             strengths[2] *= 1.5-(min(abs(radDiff(radInv(pathAngles[2]), prospectRightConePerpAngle)), self.pathConnectionMaxAngleDelta)/self.pathConnectionMaxAngleDelta)
             maxStrengthIndex, maxStrengthVal = maxIndex(strengths)
-            print("we have a path winner:", maxStrengthIndex, "at strength:", round(maxStrengthVal, 2))
+            print("path found:", maxStrengthIndex, "at strength:", round(maxStrengthVal, 2))
             carAngle = radRoll(pathAngles[maxStrengthIndex] + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
             ## the next section could especially benefit from a forloop, as none of these values are in lists/arrays and they absolutely could be. At least it is slightly legible, i guess
             if(maxStrengthIndex == 0):
@@ -873,7 +872,7 @@ class pygamesim:
                     returnConnections[newConnectionData[5]] = newConnectionData[0:5]
             ## now append the list
             listToAppend = (self.rightConeList if leftOrRight else self.leftConeList) #this saves a simgle line of code, totally worth it
-            listToAppend.append([returnConeID, pos, returnConnections, coneData])
+            listToAppend.append([returnConeID, pos, returnConnections, returnConeData])
             indexInLRlist = len(listToAppend)-1
             if(self.logging):
                 self.logCone(leftOrRight, returnConeID, pos, returnConnections, coneData)
@@ -1255,6 +1254,9 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
                     pygamesimInput.updateWindowSize(localNewSize[0], localNewSize[1], localNewDrawPos[0], localNewDrawPos[1], autoMatchSizeScale=False)
             oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
+    elif(eventToHandle.type == pygame.DROPFILE): #drag and drop files to import them
+        currentPygamesimInput(pygamesimInputList).importConeLog(eventToHandle.file, True)
+    
     elif((eventToHandle.type == pygame.MOUSEBUTTONDOWN) or (eventToHandle.type == pygame.MOUSEBUTTONUP)):
         #print("mouse press", eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos)
         handleMousePress(currentPygamesimInput(pygamesimInputList, eventToHandle.pos), eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos, eventToHandle)
@@ -1296,6 +1298,8 @@ if __name__ == '__main__':
             if(sys.argv[1].endswith('.csv')):
                 print("found sys.argv[1] with a '.csv' extesion, attempting to import:", sys.argv[1])
                 sim1.importConeLog(sys.argv[1])
+            else:
+                print("found sys.argv[1] but does not have '.csv' extension, so NOT importing that shit")
     # ## manual import
     # sim1 = pygamesim(window, importConeLogFilename='fixed problem.csv', logging=False)
     # ## alt
