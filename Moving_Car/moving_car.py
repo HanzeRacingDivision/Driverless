@@ -43,6 +43,7 @@ class Car:
         self.steering = 0.0
         self.fov = 500 #150
         self.turning_sharpness = 1.6
+        
 
     def update(self, dt):
         self.velocity += (self.acceleration * dt, 0)
@@ -100,7 +101,7 @@ class Game:
         
         image_path2 = os.path.join(current_dir, "fin.png")
         fin_image = pygame.image.load(image_path2)
-        
+
         car = Car(36,19)
         ppu = 32
         time_start = time.time()
@@ -195,7 +196,10 @@ class Game:
                     
             if len(non_passed_cones) > 0:
                 closest_cone = non_passed_cones[np.array(non_passed_dists).argmin()]
-                
+            else:
+                non_passed_cones = cones.copy()
+                for cone in cones:
+                    cone.passed = False
 
             #manual steering
             if pressed[pygame.K_RIGHT]:
@@ -206,16 +210,23 @@ class Game:
             elif np.linalg.norm(closest_cone.position-car.position) < car.fov/ppu and np.linalg.norm(closest_cone.position-car.position) > 30/ppu and time_running > 2 and closest_cone.passed == False:
                 a_b = closest_cone.position-car.position
                 dist = closest_cone.dist_car
-                a = a_b.x
-                b = -1*a_b.y      
+                a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
+                
+                rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
+                                    [np.sin(-car_angle*np.pi/180),np.cos(-car_angle*np.pi/180)]])
+                
+                
+                a_b = rotate*a_b
+                
+                a = a_b[0]
+                b = a_b[1]
                 
                 beta = np.arctan(b/a)*(180/np.pi)
-                beta = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
+                alpha = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
+                alpha = alpha[0,0]
 
-                alpha = beta - car_angle - (np.floor(-a/(2*np.abs(a)))+1)*(b/np.abs(b))*np.abs(np.floor((car_angle+90)/180))*(np.abs(((b*car_angle)/(np.abs(b)*np.abs(car_angle)))-1))*180
-                
                 car.steering = (140/np.pi)*np.arctan(alpha/dist**car.turning_sharpness)
-                car.velocity.x = 3.5
+                car.velocity.x = 3
                 
                 
             elif len(non_passed_cones) == 0:
