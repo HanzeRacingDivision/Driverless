@@ -1225,12 +1225,12 @@ def currentPygamesimInput(pygamesimInputList, mousePos=None): #if no pos is spec
         return(pygamesimInputLast)
 
 def handleWindowEvent(pygamesimInputList, eventToHandle):
+    global window, oldWindowSize
     if(eventToHandle.type == pygame.QUIT):
         global windowKeepRunning
         windowKeepRunning = False #stop program (soon)
     
     elif(eventToHandle.type == pygame.VIDEORESIZE):
-        global window, oldWindowSize
         newSize = eventToHandle.size
         if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
             print("video resize from", oldWindowSize, "to", newSize)
@@ -1256,7 +1256,6 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
     
     elif(eventToHandle.type == pygame.WINDOWEVENT):
         if(eventToHandle.event == 6): #in SDL, SDL_WINDOWEVENT_SIZE_CHANGED is 6
-            global window, oldWindowSize
             newSize = window.get_size()
             if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
                 print("video resize from", oldWindowSize, "to", newSize)
