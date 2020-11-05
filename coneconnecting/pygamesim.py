@@ -1229,6 +1229,31 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
         global windowKeepRunning
         windowKeepRunning = False #stop program (soon)
     
+    elif(eventToHandle.type == pygame.VIDEORESIZE):
+        global window, oldWindowSize
+        newSize = eventToHandle.size
+        if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
+            print("video resize from", oldWindowSize, "to", newSize)
+            correctedSize = [newSize[0], newSize[1]]
+            # aspectRatio = round(oldWindowSize[0]/oldWindowSize[1],2) #easier than grabbing a global var
+            # if(oldWindowSize[0] == newSize[0]): # only height changed
+            #     correctedSize[0] = int(newSize[1] * aspectRatio) # new height * ratio = matching width
+            #     correctedSize[1] = newSize[1]
+            # elif(oldWindowSize[1] == newSize[1]): # only width changed
+            #     correctedSize[0] = int(newSize[0] - (newSize[0] % aspectRatio))
+            #     correctedSize[1] = int(correctedSize[0] / aspectRatio) # new width / ratio = matching height
+            # else:
+            #     correctedSize[0] = int(min(newSize[0], newSize[1]*aspectRatio))
+            #     correctedSize[1] = int(min(newSize[1], correctedSize[0]/aspectRatio))
+            window = pygame.display.set_mode(correctedSize, pygame.RESIZABLE)
+            for pygamesimInput in pygamesimInputList:
+                localOldSize = [pygamesimInput.drawWidth, pygamesimInput.drawHeight]
+                localOldDrawPos = [pygamesimInput.drawPosX, pygamesimInput.drawPosY]
+                localNewSize = [int((localOldSize[0]*correctedSize[0])/oldWindowSize[0]), int((localOldSize[1]*correctedSize[1])/oldWindowSize[1])]
+                localNewDrawPos = [int((localOldDrawPos[0]*correctedSize[0])/oldWindowSize[0]), int((localOldDrawPos[1]*correctedSize[1])/oldWindowSize[1])]
+                pygamesimInput.updateWindowSize(localNewSize[0], localNewSize[1], localNewDrawPos[0], localNewDrawPos[1], autoMatchSizeScale=False)
+        oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
+    
     elif(eventToHandle.type == pygame.WINDOWEVENT):
         if(eventToHandle.event == 6): #in SDL, SDL_WINDOWEVENT_SIZE_CHANGED is 6
             global window, oldWindowSize
