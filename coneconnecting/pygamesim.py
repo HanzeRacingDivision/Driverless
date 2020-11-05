@@ -15,15 +15,15 @@ ASA = lambda scalar, inputArray : [scalar + entry for entry in inputArray]
 intBoolInv = lambda inputInt : (0 if (inputInt>0) else 1)
 
 #angle rollover functions (for 2d positioning systems, given that arctan2 outputs between (-pi, pi))
-degRollTwo = lambda angle : ((angle % 360) if (angle > 360) else ((angle % -360) if (angle < -360) else angle))
+degRollTwo = lambda angle : ((angle % -360) if (angle < 0) else (angle % 360))
 degRollOne = lambda angle : ((angle % -180) if (angle > 180) else ((angle % 180) if (angle < -180) else angle))
 degRoll = lambda angle : degRollOne(degRollTwo(angle))
-radRollTwo = lambda angle : ((angle % (2*np.pi)) if (angle > (2*np.pi)) else ((angle % (-2*np.pi)) if (angle < (-2*np.pi)) else angle))
+radRollTwo = lambda angle : ((angle % (-2*np.pi)) if (angle < 0) else (angle % (2*np.pi)))
 radRollOne = lambda angle : ((angle % -np.pi) if (angle > np.pi) else ((angle % np.pi) if (angle < -np.pi) else angle))
 radRoll = lambda angle : radRollOne(radRollTwo(angle))
 #angle math funcitons, that incorporate rollover
-degDiff = lambda angleOne, angleTwo : degRoll(degRoll(angleTwo)-degRoll(angleOne))  #recommend using abs(degDiff(angles)), but currently, it returns the value required to get from angleOne to angleTwo, so (90, -45) = -135
-radDiff = lambda angleOne, angleTwo : radRoll(radRoll(angleTwo)-radRoll(angleOne))  #recommend using abs(radDiff(angles)), but currently, it returns the value required to get from angleOne to angleTwo, so (90, -45) = -135
+degDiff = lambda angleOne, angleTwo : degRoll(angleTwo-angleOne)  #recommend using abs(degDiff()), but currently, it returns the value required to get from angleOne to angleTwo, so (90, -45) = -135
+radDiff = lambda angleOne, angleTwo : radRoll(angleTwo-angleOne)  #recommend using abs(radDiff()), but currently, it returns the value required to get from angleOne to angleTwo, so (pi/2, -pi/4) = -3pi/4
 degMiddOne = lambda lowBound, upBound : (degRoll(lowBound) + (degDiff(lowBound, upBound)/2) + (180 if (degDiff(lowBound, upBound) < 0) else 0))
 degMidd = lambda lowBound, upBound : degRoll(degMiddOne(lowBound, upBound))
 radMiddOne = lambda lowBound, upBound : (radRoll(lowBound) + (radDiff(lowBound, upBound)/2) + (np.pi if (radDiff(lowBound, upBound) < 0) else 0))
@@ -100,6 +100,7 @@ def maxIndex(inputList):
     else:
         return(-1, 0)
 
+global CD_FINISH, coneLogTableColumnDef
 CD_FINISH = 'finish'
 coneLogTableColumnDef = "cone ID,leftOrRight,Xpos,Ypos,prev ID,next ID,coneData\n"
 
@@ -153,61 +154,64 @@ class pygamesim:
         self.drawPosY = int(drawPosY) #draw position offset, 0 is top
         self.sizeScale = sizeScale #pixels per meter
         self.invertYaxis = invertYaxis
-        if((len(importConeLogFilename) > 0) and (importConeLogFilename != '') and (importConeLogFilename != "")):
-            self.importConeLog(importConeLogFilename, False)
         self.logging = logging
         if(logging):
             timeString = datetime.datetime.now().strftime("%Y-%m-%d_%H;%M;%S")
             self.logfilename = (logname + "_" + timeString)
             self.logfile = open(self.logfilename + ".csv", "w")
+            global coneLogTableColumnDef
             self.logfile.write(coneLogTableColumnDef)
             self.rewriteLogTimer = pygame.time.get_ticks() + 2000
-    
-    bgColor = [50,50,50] #grey
-    
-    finishLineColor = [255,40,0]
-    finishLineWidth = 2 #pixels wide
-    finishLinePos = [] #[ [cone ID, [x, y], left/right], [cone ID, [x, y], left/right]]
-    
-    leftConeColor = [255,255,0] #yellow
-    rightConeColor = [0,50,255] #dark blue
-    coneLineWidth = 2 #pixels wide
-    
-    pathColor = [0,220,255] #light blue
-    pathLineWidth = 2 #pixels wide
-    #pathCenterPixelDiam = 
-    
-    coneDiam = 0.2 #meters
-    #conePixelDiam = coneDiam * sizeScale #might make math faster, but will require re-calculating on change
-    
-    coneConnectionThreshold = 5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
-    coneConnectionThresholdSquared = coneConnectionThreshold**2
-    coneConnectionHighAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
-    coneConnectionMaxAngleDelta = np.deg2rad(120) #if the angle difference is larger than this, it just doesnt make sense to connect them. (this IS a hard threshold)
-    
-    pathConnectionThreshold = 10 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
-    pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
-    
-    pathFirstLineCarAngleDeltaMax = np.deg2rad(45) #if the radDiff() between car (.orient) and the first line's connections is bigger than this, switch conneections or stop
-    
-    leftConeList = []  #[ [cone ID, [x,y], [[cone ID, index (left), angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)], ]     #note: 3rd argument is for drawing a line (track boundy) through the cones, every cone can connect to 2 (or less) cones in this way
-    rightConeList = [] #[ [cone ID, [x,y], [[cone ID, index (right), angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)], ]     #note: 3rd argument is for drawing a line (track boundy) through the cones, every cone can connect to 2 (or less) cones in this way
-    pathList = [] #[[center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength], ]
-    # #the pathList is a (properly ordered) list of points/lines for the car to travel through. It (like most lists here) prioratizes math efficiency over RAM usage, so several stored parameters are redundant (can be recalculated given other elements), which should save time when calculating optimal path.
-    newConeID = 0 #add 1 after adding a cone
-    
-    #leftConesFullCircle = False  #TBD: no checking function yet, and because connectCone() can connect a cone to the 0th cone at any time without completing the circle, a special function this is required
-    #rightConesFullCircle = False
-    pathFullCircle = False
-    
-    floatingCone = [] #[ [[xpixel,ypixel], color] ] #note: x and y are in pixels, not meters. Translation to meters happens on final placement
-    
-    rewriteLogTimer = 0
-    logFileChanged = False
-    
-    debugLines = [] #[[lineType, pos, pos/angles, color_index (0-2)], ] #third entry is: (lineType==0: straight line from two positions), (lineType==1: straight line from pos and [radius, angle]), (lineType==2: arc from pos and [radius, startAngle, endAngle])
-    debugLineColors = [[255,0,255],[255,255,255],[0,255,0]] #purple, white, green
-    debugLineWidth = 3
+        ## now init all other variables/lists
+        self.bgColor = [50,50,50] #grey
+        
+        self.finishLineColor = [255,40,0]
+        self.finishLineWidth = 2 #pixels wide
+        self.finishLinePos = [] #[ [cone ID, [x, y], left/right], [cone ID, [x, y], left/right]]
+        
+        self.leftConeColor = [255,255,0] #yellow
+        self.rightConeColor = [0,50,255] #dark blue
+        self.coneLineWidth = 2 #pixels wide
+        
+        self.pathColor = [0,220,255] #light blue
+        self.pathLineWidth = 2 #pixels wide
+        #self.pathCenterPixelDiam = 
+        
+        self.coneDiam = 0.2 #meters
+        #self.conePixelDiam = coneDiam * sizeScale #might make math faster, but will require re-calculating on change
+        
+        self.coneConnectionThreshold = 5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
+        self.coneConnectionThresholdSquared = self.coneConnectionThreshold**2
+        self.coneConnectionHighAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
+        self.coneConnectionMaxAngleDelta = np.deg2rad(120) #if the angle difference is larger than this, it just doesnt make sense to connect them. (this IS a hard threshold)
+        
+        self.pathConnectionThreshold = 10 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
+        self.pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
+        
+        self.pathFirstLineCarAngleDeltaMax = np.deg2rad(45) #if the radDiff() between car (.orient) and the first line's connections is bigger than this, switch conneections or stop
+        
+        self.leftConeList = []  #[ [cone ID, [x,y], [[cone ID, index (left), angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)], ]     #note: 3rd argument is for drawing a line (track boundy) through the cones, every cone can connect to 2 (or less) cones in this way
+        self.rightConeList = [] #[ [cone ID, [x,y], [[cone ID, index (right), angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)], ]     #note: 3rd argument is for drawing a line (track boundy) through the cones, every cone can connect to 2 (or less) cones in this way
+        self.pathList = [] #[[center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength], ]
+        # #the pathList is a (properly ordered) list of points/lines for the car to travel through. It (like most lists here) prioratizes math efficiency over RAM usage, so several stored parameters are redundant (can be recalculated given other elements), which should save time when calculating optimal path.
+        self.newConeID = 0 #add 1 after adding a cone
+        
+        #self.leftConesFullCircle = False  #TBD: no checking function yet, and because connectCone() can connect a cone to the 0th cone at any time without completing the circle, a special function this is required
+        #self.rightConesFullCircle = False
+        self.pathFullCircle = False
+        
+        self.floatingCone = [] #[ [[xpixel,ypixel], color] ] #note: x and y are in pixels, not meters. Translation to meters happens on final placement
+        
+        self.rewriteLogTimer = 0
+        self.logFileChanged = False
+        
+        self.debugLines = [] #[[lineType, pos, pos/angles, color_index (0-2)], ] #third entry is: (lineType==0: straight line from two positions), (lineType==1: straight line from pos and [radius, angle]), (lineType==2: arc from pos and [radius, startAngle, endAngle])
+        self.debugLineColors = [[255,0,255],[255,255,255],[0,255,0]] #purple, white, green
+        self.debugLineWidth = 3
+        
+        #this has to happen AFTER variables/lists are initialized, (becuase it's hard to append to nonexistant conelists)
+        if((len(importConeLogFilename) > 0) and (importConeLogFilename != '') and (importConeLogFilename != "")):
+            self.importConeLog(importConeLogFilename, True)
     
     def closeLog(self):
         if(self.logging): #just a safety check
@@ -243,15 +247,16 @@ class pygamesim:
     
     def rewriteLogfile(self):
         if(self.logging): #just a safety check
-            print("rewriting log file")
+            #print("rewriting log file")
             self.logfile.close() #close last file (because if anything goes wrong, that data is not lost
             self.logfile = open(self.logfilename + ".csv", "w")
+            global coneLogTableColumnDef
             self.logfile.write(coneLogTableColumnDef)
             combinedConeList = (self.rightConeList + self.leftConeList)
             rightListLength = len(self.rightConeList)
             for i in range(len(combinedConeList)):
                 self.logCone((i < rightListLength), combinedConeList[i][0], combinedConeList[i][1], combinedConeList[i][2], combinedConeList[i][3]) #rewrite all data (some of which is updated)
-            self.rewriteLogTimer = pygame.time.get_ticks() + 2000
+            self.rewriteLogTimer = pygame.time.get_ticks() + 1000
             self.logFileChanged = False #reset flag
     
     def importConeLog(self, filename, keepExistingData=False):
@@ -264,11 +269,13 @@ class pygamesim:
                 print("(importConeLog) filename doesn't contain a '.', so i'm adding '.csv' to the end")
                 filename += '.csv'
             readFile = open(filename, 'r')
+            global coneLogTableColumnDef
             if(readFile.readline() == coneLogTableColumnDef): #alternatively, you could try to find columns (column names) in the first line and determine the indexes of data in lineArray
                 discardedLines = 0
                 highestImportedConeID = 0
                 for line in readFile:
                     lineArray = line.strip().split(',')
+                    print("lineArray", lineArray)
                     lineData = [0, False, 0.0, 0.0, -1, -1, []] #init var
                     if(len(lineArray) >= 7):
                         if(lineArray[0].isnumeric() and ((lineArray[1].upper() == 'LEFT') or (lineArray[1].upper() == 'RIGHT')) and (lineArray[4].isnumeric() or (lineArray[4]=='-1')) and (lineArray[5].isnumeric() or (lineArray[5]=='-1'))): #note: cant check floats
@@ -341,7 +348,9 @@ class pygamesim:
     def isInsideWindowReal(self, realPos):
         return((realPos[0] < (self.drawWidth/self.sizeScale)) and (realPos[0] > 0.0) and (realPos[1] < (self.drawHeight/self.sizeScale)) and (realPos[1] > 0.0)) #not changed by inverting Y because it doesnt care WHERE inside the Y-axis it is, just that it IS
     
-    def distanceToConeSquared(self, pos, listsToCheck=[leftConeList, rightConeList], sortByDistance=False, mergeLists=True, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, excludeDoublyConnectedCones=False, ignoreLinkedConeIDs=[]):
+    def distanceToConeSquared(self, pos, listsToCheck=[], sortByDistance=False, mergeLists=True, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, excludeDoublyConnectedCones=False, ignoreLinkedConeIDs=[]):
+        if(len(listsToCheck) < 1):
+            listsToCheck = [self.leftConeList, self.rightConeList] #cant be default parameter
         returnList = []  #[[ [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], squaredDist, index in left/right array, cone data (certainty, time spotted, etc)], ], ]  #note: coneID of first cone in first conelist is array[0][0][0]
         for conelist in range(len(listsToCheck)):
             if(not mergeLists):
@@ -395,7 +404,9 @@ class pygamesim:
                                 returnList[conelist].append(returnCone)
         return(returnList)
     
-    def distanceToCone(self, pos, listsToCheck=[leftConeList, rightConeList], sortBySomething=DONT_SORT, mergeLists=True, ignoreConeIDs=[], simpleThreshold=-1.0, excludeDoublyConnectedCones=False, ignoreLinkedConeIDs=[], angleDeltaTarget=0.0, angleThreshRange=[]): #note: angleThreshRange is [lowBound, upBound]
+    def distanceToCone(self, pos, listsToCheck=[], sortBySomething=DONT_SORT, mergeLists=True, ignoreConeIDs=[], simpleThreshold=-1.0, excludeDoublyConnectedCones=False, ignoreLinkedConeIDs=[], angleDeltaTarget=0.0, angleThreshRange=[]): #note: angleThreshRange is [lowBound, upBound]
+        if(len(listsToCheck) < 1):
+            listsToCheck = [self.leftConeList, self.rightConeList] #cant be default parameter    
         returnList = []  #[[ [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], [dist, angle], index in left/right array, cone data (certainty, time spotted, etc)], ], ]  #note: coneID of first cone in first conelist is array[0][0][0]
         for conelist in range(len(listsToCheck)):
             returnListPointer = returnList
@@ -559,7 +570,7 @@ class pygamesim:
                 newConnectionData = [nearbyConeList[bestCandidateIndex][0], nearbyConeList[bestCandidateIndex][4], nearbyConeList[bestCandidateIndex][3][1], nearbyConeList[bestCandidateIndex][3][0], highestStrength, currentFrontOrBack, otherfrontOrBack]
                 return(True, newConnectionData) # newConnectionData = [ID, index, angle, dist, strength, connection_index_inputCone, connection_index_winnerCone]
             else:
-                print("nearbyConeList empty")
+                #print("nearbyConeList empty")
                 return(False, [])
     
     # def connectConeSuperSimple(self, coneToConnectID, coneToConnectPos, leftOrRight, coneToConnectIndex, currentConeConnections=[[-1,-1,0.0,0.0,0.0],[-1,-1,0.0,0.0,0.0]], coneToConnectPreferredConnection=1, updateInputConeInList=True, updateWinnerConeInList=True):
@@ -626,16 +637,20 @@ class pygamesim:
             print("not gonna make path, already full circle")
             return(False)
         if(len(self.pathList) == 0):
-            #TBD !
-            #delete this:
-            firstLineLeftCone = self.leftConeList[0];   firstLineRightCone = self.rightConeList[0]
-            
-            ## if firstLine___Cone is connected to something, make sure those connections are angled similarly to the car itself, maybe
-            
-            pathWidth, lineAngle = distAngleBetwPos(firstLineLeftCone[1], firstLineRightCone[1])
-            carAngle = radRoll(lineAngle + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
-            centerPoint = [firstLineRightCone[1][0] + (firstLineLeftCone[1][0]-firstLineRightCone[1][0])/2, firstLineRightCone[1][1] + (firstLineLeftCone[1][1]-firstLineRightCone[1][1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
-            self.pathList.append([centerPoint, [lineAngle, carAngle], pathWidth, [firstLineLeftCone[0], firstLineLeftCone[1], 0], [firstLineRightCone[0], firstLineRightCone[1], 0], 69.420])
+            if((len(self.rightConeList) > 0) and (len(self.leftConeList) > 0)):
+                #TBD !
+                #delete this:
+                firstLineLeftCone = self.leftConeList[0];   firstLineRightCone = self.rightConeList[0]
+                
+                ## if firstLine___Cone is connected to something, make sure those connections are angled similarly to the car itself, maybe
+                
+                pathWidth, lineAngle = distAngleBetwPos(firstLineLeftCone[1], firstLineRightCone[1])
+                carAngle = radRoll(lineAngle + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
+                centerPoint = [firstLineRightCone[1][0] + (firstLineLeftCone[1][0]-firstLineRightCone[1][0])/2, firstLineRightCone[1][1] + (firstLineLeftCone[1][1]-firstLineRightCone[1][1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
+                self.pathList.append([centerPoint, [lineAngle, carAngle], pathWidth, [firstLineLeftCone[0], firstLineLeftCone[1], 0], [firstLineRightCone[0], firstLineRightCone[1], 0], 69.420])
+            else:
+                print("one or more of the coneLists is empty, cant place first pathLine")
+                return(False)
         else:
             lastPathLine = self.pathList[-1] # -1 gets the last item in list, you could also use (len(pathList)-1)
             lastLeftCone = self.leftConeList[lastPathLine[3][2]]
@@ -835,7 +850,7 @@ class pygamesim:
         return(True)
     
     def addCone(self, leftOrRight, pos, coneData=[], connections=[[-1,-1,0.0,0.0,0.0],[-1,-1,0.0,0.0,0.0]], connectNewCone=True, reconnectOverlappingCone=False): #note: left=False, right=True
-        isNewCone = True; returnConeID = 0; indexInLRlist=0; returnLeftOrRight=leftOrRight; returnPos=pos; returnConnections=[[subItem for subItem in item] for item in connections]; returnConeData=coneData #init vars
+        isNewCone = True; returnConeID = 0; indexInLRlist=0; returnLeftOrRight=leftOrRight; returnPos=pos; returnConnections=[[subItem for subItem in item] for item in connections]; returnConeData=self.coneDataCopy(coneData) #init vars
         overlapsCone, overlappingConeLeftOrRight, overlappingConeIndex, overlappingConeData = self.overlapConeCheck(pos) #check if the new cone overlaps with an existing cone
         if(overlapsCone): #if the new cone overlaps an existing cone
             isNewCone = False
@@ -865,11 +880,14 @@ class pygamesim:
             self.newConeID += 1
         return(isNewCone, returnConeID, indexInLRlist, returnLeftOrRight, returnPos, returnConnections, returnConeData) #return some useful data
     
-    def addCar(self, pos=[4.0, 8.0], orient=0.0, color=[50,200,50]):
+    def addCar(self, pos=[12.0, 4.0], orient=0.0, color=[50,200,50]):
         self.cars.append(raceCar(pos, orient, color))
         return(len(self.cars)-1) #return the length of the cars list minus 1, because that is the list index of this new car
     
-    def setFinishCone(self, leftOrRight, pos, coneData=[CD_FINISH]): #note: left=False, right=True
+    def setFinishCone(self, leftOrRight, pos, coneDataInput=[CD_FINISH]): #note: left=False, right=True
+        coneData = self.coneDataCopy(coneDataInput)
+        # global CD_FINISH
+        # coneData.append(CD_FINISH)
         #check if the requested position already has a cone
         addConeResult = self.addCone(leftOrRight, pos, coneData, connectNewCone=True, reconnectOverlappingCone=False) #attempt to add new cone, if a cone is already at that position, addCone() will return that info
         if((addConeResult[3] != self.finishLinePos[0][2]) if (len(self.finishLinePos) > 0) else True): #cant have two finish cones that are one-sided (left/right)
@@ -1112,6 +1130,10 @@ global windowKeepRunning, windowStarted
 windowStarted = False
 windowKeepRunning = False
 
+global pygamesimInputLast, oldWindowSize
+pygamesimInputLast = None #to be filled
+oldWindowSize = [1200,600]
+
 def shouldKeepRunning():
     global windowKeepRunning
     return(windowKeepRunning)
@@ -1119,8 +1141,9 @@ def shouldKeepRunning():
 def pygameInit():
     pygame.init()
     pygame.font.init()
-    global window
+    global window, oldWindowSize
     window = pygame.display.set_mode([1200, 600], pygame.RESIZABLE)
+    oldWindowSize = [pygame.display.Info().current_w, pygame.display.Info().current_h]
     pygame.display.set_caption("(pygame) selfdriving sim")
     global windowKeepRunning, windowStarted
     windowStarted = True
@@ -1179,46 +1202,87 @@ def handleKeyPress(pygamesimInput, keyDown, key, keyName, eventToHandle):
     elif(key==114): # r
         if(keyDown):
             pygamesimInput.makePath()
-            #pygamesimInput.cars[0].orient += 0.1 #turn first (only) car 0.1 radians
+            # doesNothing = 0
+            # while(pygamesimInput.makePath()): #stops when path can no longer be advanced
+            #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
     elif(key==108): # l
         if(keyDown):
             pygamesimInput.rewriteLogfile()
 
-def handleWindowEvent(pygamesimInput, eventToHandle):
+def currentPygamesimInput(pygamesimInputList, mousePos=None): #if no pos is specified, retrieve it using get_pos()
+    if(mousePos is None):
+        mousePos = pygame.mouse.get_pos()
+    global pygamesimInputLast
+    if(pygame.mouse.get_focused()):
+        for pygamesimInput in pygamesimInputList:
+            # localBoundries = [[pygamesimInput.drawPosX, pygamesimInput.drawPosY], [pygamesimInput.drawWidth, pygamesimInput.drawHeight]]
+            # if(((mousePos[0]>=localBoundries[0][0]) and (mousePos[0]<(localBoundries[0][0]+localBoundries[1][0]))) and ((mousePos[1]>=localBoundries[0][1]) and (mousePos[0]<(localBoundries[0][1]+localBoundries[1][1])))):
+            if(pygamesimInput.isInsideWindowPixels(mousePos)):
+                pygamesimInputLast = pygamesimInput
+                return(pygamesimInput)
+    else:
+        if(type(pygamesimInputLast) is not pygamesim): #if this is the first interaction
+            pygamesimInputLast = pygamesimInputList[0]
+        return(pygamesimInputLast)
+
+def handleWindowEvent(pygamesimInputList, eventToHandle):
     if(eventToHandle.type == pygame.QUIT):
         global windowKeepRunning
         windowKeepRunning = False #stop program (soon)
-        
-    elif(eventToHandle.type == pygame.VIDEORESIZE):
-        if not ((pygame.display.Info().current_w == eventToHandle.size[0]) and (pygame.display.Info().current_h == eventToHandle.size[1])): #if new size is actually different
-            newWidth = pygame.display.Info().current_w #init var
-            newHeight = pygame.display.Info().current_h#init var
-            aspectRatio = round(newWidth/newHeight,2) #easier than grabbing a global var
-            print("video resize from", [newWidth, newHeight], "to", eventToHandle.size)
-            if(newWidth == eventToHandle.size[0]): # only width changed
-                newWidth = int(eventToHandle.size[1] * aspectRatio) # new height * ratio = matching width
-                newHeight = eventToHandle.size[1]
-            elif(newHeight == eventToHandle.size[1]):
-                newWidth = int(eventToHandle.size[0] - (eventToHandle.size[0] % aspectRatio))
-                newHeight = int(newWidth / aspectRatio) # new width / ratio = matching height
-            else:
-                newWidth = int(min(eventToHandle.size[0], eventToHandle.size[1]*2))
-                newHeight = int(min(eventToHandle.size[1], newWidth/2))
-            global window
-            window = pygame.display.set_mode([newWidth, newHeight], pygame.RESIZABLE)
-            pygamesimInput.updateWindowSize(newWidth, newHeight, autoMatchSizeScale=True)
+    
+    elif(eventToHandle.type == pygame.WINDOWEVENT):
+        if(eventToHandle.event == 6): #in SDL, SDL_WINDOWEVENT_SIZE_CHANGED is 6
+            global window, oldWindowSize
+            newSize = window.get_size()
+            if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
+                print("video resize from", oldWindowSize, "to", newSize)
+                correctedSize = [newSize[0], newSize[1]]
+                # aspectRatio = round(oldWindowSize[0]/oldWindowSize[1],2) #easier than grabbing a global var
+                # if(oldWindowSize[0] == newSize[0]): # only height changed
+                #     correctedSize[0] = int(newSize[1] * aspectRatio) # new height * ratio = matching width
+                #     correctedSize[1] = newSize[1]
+                # elif(oldWindowSize[1] == newSize[1]): # only width changed
+                #     correctedSize[0] = int(newSize[0] - (newSize[0] % aspectRatio))
+                #     correctedSize[1] = int(correctedSize[0] / aspectRatio) # new width / ratio = matching height
+                # else:
+                #     correctedSize[0] = int(min(newSize[0], newSize[1]*aspectRatio))
+                #     correctedSize[1] = int(min(newSize[1], correctedSize[0]/aspectRatio))
+                for pygamesimInput in pygamesimInputList:
+                    localOldSize = [pygamesimInput.drawWidth, pygamesimInput.drawHeight]
+                    localOldDrawPos = [pygamesimInput.drawPosX, pygamesimInput.drawPosY]
+                    localNewSize = [int((localOldSize[0]*correctedSize[0])/oldWindowSize[0]), int((localOldSize[1]*correctedSize[1])/oldWindowSize[1])]
+                    localNewDrawPos = [int((localOldDrawPos[0]*correctedSize[0])/oldWindowSize[0]), int((localOldDrawPos[1]*correctedSize[1])/oldWindowSize[1])]
+                    pygamesimInput.updateWindowSize(localNewSize[0], localNewSize[1], localNewDrawPos[0], localNewDrawPos[1], autoMatchSizeScale=False)
+            oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
     elif((eventToHandle.type == pygame.MOUSEBUTTONDOWN) or (eventToHandle.type == pygame.MOUSEBUTTONUP)):
         #print("mouse press", eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos)
-        handleMousePress(pygamesimInput, eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos, eventToHandle)
+        handleMousePress(currentPygamesimInput(pygamesimInputList, eventToHandle.pos), eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos, eventToHandle)
         
     elif((eventToHandle.type == pygame.KEYDOWN) or (eventToHandle.type == pygame.KEYUP)):
         #print("keypress:", eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key))
-        handleKeyPress(pygamesimInput, eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key), eventToHandle)
+        handleKeyPress(currentPygamesimInput(pygamesimInputList), eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key), eventToHandle)
 
-def handleAllWindowEvents(pygamesimInput):
-    for eventToHandle in pygame.event.get():
-        handleWindowEvent(pygamesimInput, eventToHandle)
+def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D list of pygamesim objects or 2D list of pygamesim objects
+    pygamesimInputList = []
+    if(type(pygamesimInput) is pygamesim): #if it's actually a single input, not a list
+        pygamesimInputList = [pygamesimInput] #convert to 1-sizes array
+    elif(type(pygamesimInput) is list):
+        if(len(pygamesimInput) > 0):
+            for entry in pygamesimInput:
+                if(type(entry) is list):
+                    for subEntry in entry:
+                        pygamesimInputList.append(subEntry) #2D lists
+                else:
+                    pygamesimInputList.append(entry) #1D lists
+    #pygamesimInputList = pygamesimInput #assume input is list of pygamesims
+    if(len(pygamesimInputList) < 1):
+        print("len(pygamesimInputList) < 1")
+        global windowKeepRunning
+        windowKeepRunning = False
+        return()
+    for eventToHandle in pygame.event.get(): #handle all events
+        handleWindowEvent(pygamesimInputList, eventToHandle)
 
 
 
@@ -1234,9 +1298,10 @@ if __name__ == '__main__':
                 sim1.importConeLog(sys.argv[1])
     # ## manual import
     # sim1 = pygamesim(window, importConeLogFilename='fixed problem.csv', logging=False)
+    # ## alt
+    # sim1.importConeLog('pygamesim_2020-11-04_15;38;48.csv')
     
-    #sim1.importConeLog('pygamesim_2020-11-04_15;38;48.csv')
-    sim1.addCar()
+    sim1.addCar() #add a default car
     
     while windowKeepRunning:
         handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
