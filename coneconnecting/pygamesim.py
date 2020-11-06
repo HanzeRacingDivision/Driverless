@@ -1123,7 +1123,7 @@ flagCurs16  =  ("oooooooooooooooo", #1
 global flagCurs24Data, flagCurs16Data, flagCursorSet
 flagCurs24Data = ((24,24),(0,23)) + pygame.cursors.compile(flagCurs, 'X', '.', 'o')
 flagCurs16Data = ((16,16),(0,15)) + pygame.cursors.compile(flagCurs16, 'X', '.', 'o')
-flagCursorSet = True
+flagCursorSet = False
 
 global windowKeepRunning, windowStarted
 windowStarted = False
@@ -1142,7 +1142,7 @@ def pygameInit():
     pygame.font.init()
     global window, oldWindowSize
     window = pygame.display.set_mode([1200, 600], pygame.RESIZABLE)
-    oldWindowSize = [pygame.display.Info().current_w, pygame.display.Info().current_h]
+    oldWindowSize = window.get_size()
     pygame.display.set_caption("(pygame) selfdriving sim")
     global windowKeepRunning, windowStarted
     windowStarted = True
@@ -1193,9 +1193,11 @@ def handleKeyPress(pygamesimInput, keyDown, key, keyName, eventToHandle):
         global flagCursorSet
         if(keyDown):
             if(not flagCursorSet): #in pygame SDL2, holding a button makes it act like a keyboard button, and event gets spammed.
+                pygame.event.set_grab(1)
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
                 flagCursorSet = True
         else:
+            pygame.event.set_grab(0)
             pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_ARROW)
             flagCursorSet = False
     elif(key==114): # r
@@ -1208,21 +1210,26 @@ def handleKeyPress(pygamesimInput, keyDown, key, keyName, eventToHandle):
         if(keyDown):
             pygamesimInput.rewriteLogfile()
 
-def currentPygamesimInput(pygamesimInputList, mousePos=None): #if no pos is specified, retrieve it using get_pos()
-    if(mousePos is None):
-        mousePos = pygame.mouse.get_pos()
-    global pygamesimInputLast
-    if(pygame.mouse.get_focused()):
-        for pygamesimInput in pygamesimInputList:
-            # localBoundries = [[pygamesimInput.drawPosX, pygamesimInput.drawPosY], [pygamesimInput.drawWidth, pygamesimInput.drawHeight]]
-            # if(((mousePos[0]>=localBoundries[0][0]) and (mousePos[0]<(localBoundries[0][0]+localBoundries[1][0]))) and ((mousePos[1]>=localBoundries[0][1]) and (mousePos[0]<(localBoundries[0][1]+localBoundries[1][1])))):
-            if(pygamesimInput.isInsideWindowPixels(mousePos)):
-                pygamesimInputLast = pygamesimInput
-                return(pygamesimInput)
-    else:
+def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
+    if(len(pygamesimInputList) > 1):
+        if(mousePos is None):
+            mousePos = pygame.mouse.get_pos()
+        global pygamesimInputLast
+        if(pygame.mouse.get_focused() or (not demandMouseFocus)):
+            print("now"); inputCount = 0
+            for pygamesimInput in pygamesimInputList:
+                # localBoundries = [[pygamesimInput.drawPosX, pygamesimInput.drawPosY], [pygamesimInput.drawWidth, pygamesimInput.drawHeight]]
+                # if(((mousePos[0]>=localBoundries[0][0]) and (mousePos[0]<(localBoundries[0][0]+localBoundries[1][0]))) and ((mousePos[1]>=localBoundries[0][1]) and (mousePos[0]<(localBoundries[0][1]+localBoundries[1][1])))):
+                if(pygamesimInput.isInsideWindowPixels(mousePos)):
+                    print("found input", inputCount)
+                    pygamesimInputLast = pygamesimInput
+                    return(pygamesimInput)
+                inputCount += 1
         if(type(pygamesimInputLast) is not pygamesim): #if this is the first interaction
             pygamesimInputLast = pygamesimInputList[0]
         return(pygamesimInputLast)
+    else:
+        return(pygamesimInputList[0])
 
 def handleWindowEvent(pygamesimInputList, eventToHandle):
     global window, oldWindowSize
@@ -1235,16 +1242,6 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
         if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
             print("video resize from", oldWindowSize, "to", newSize)
             correctedSize = [newSize[0], newSize[1]]
-            # aspectRatio = round(oldWindowSize[0]/oldWindowSize[1],2) #easier than grabbing a global var
-            # if(oldWindowSize[0] == newSize[0]): # only height changed
-            #     correctedSize[0] = int(newSize[1] * aspectRatio) # new height * ratio = matching width
-            #     correctedSize[1] = newSize[1]
-            # elif(oldWindowSize[1] == newSize[1]): # only width changed
-            #     correctedSize[0] = int(newSize[0] - (newSize[0] % aspectRatio))
-            #     correctedSize[1] = int(correctedSize[0] / aspectRatio) # new width / ratio = matching height
-            # else:
-            #     correctedSize[0] = int(min(newSize[0], newSize[1]*aspectRatio))
-            #     correctedSize[1] = int(min(newSize[1], correctedSize[0]/aspectRatio))
             window = pygame.display.set_mode(correctedSize, pygame.RESIZABLE)
             for pygamesimInput in pygamesimInputList:
                 localOldSize = [pygamesimInput.drawWidth, pygamesimInput.drawHeight]
@@ -1260,16 +1257,6 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
             if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
                 print("video resize from", oldWindowSize, "to", newSize)
                 correctedSize = [newSize[0], newSize[1]]
-                # aspectRatio = round(oldWindowSize[0]/oldWindowSize[1],2) #easier than grabbing a global var
-                # if(oldWindowSize[0] == newSize[0]): # only height changed
-                #     correctedSize[0] = int(newSize[1] * aspectRatio) # new height * ratio = matching width
-                #     correctedSize[1] = newSize[1]
-                # elif(oldWindowSize[1] == newSize[1]): # only width changed
-                #     correctedSize[0] = int(newSize[0] - (newSize[0] % aspectRatio))
-                #     correctedSize[1] = int(correctedSize[0] / aspectRatio) # new width / ratio = matching height
-                # else:
-                #     correctedSize[0] = int(min(newSize[0], newSize[1]*aspectRatio))
-                #     correctedSize[1] = int(min(newSize[1], correctedSize[0]/aspectRatio))
                 for pygamesimInput in pygamesimInputList:
                     localOldSize = [pygamesimInput.drawWidth, pygamesimInput.drawHeight]
                     localOldDrawPos = [pygamesimInput.drawPosX, pygamesimInput.drawPosY]
@@ -1279,15 +1266,18 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
             oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
     elif(eventToHandle.type == pygame.DROPFILE): #drag and drop files to import them
-        currentPygamesimInput(pygamesimInputList).importConeLog(eventToHandle.file, True)
+        if((pygame.mouse.get_pos()[0] == 0) and (pygame.mouse.get_pos()[1] == 0) and (len(pygamesimInputList) > 1)):
+            print("skipping file import, please make sure to select the pygame window beforehand or something")
+        else:
+            currentPygamesimInput(pygamesimInputList, None, False).importConeLog(eventToHandle.file, True) #note: drag and drop functionality is a little iffy for multisim applications
     
     elif((eventToHandle.type == pygame.MOUSEBUTTONDOWN) or (eventToHandle.type == pygame.MOUSEBUTTONUP)):
         #print("mouse press", eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos)
-        handleMousePress(currentPygamesimInput(pygamesimInputList, eventToHandle.pos), eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos, eventToHandle)
+        handleMousePress(currentPygamesimInput(pygamesimInputList, eventToHandle.pos, True), eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos, eventToHandle)
         
     elif((eventToHandle.type == pygame.KEYDOWN) or (eventToHandle.type == pygame.KEYUP)):
         #print("keypress:", eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key))
-        handleKeyPress(currentPygamesimInput(pygamesimInputList), eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key), eventToHandle)
+        handleKeyPress(currentPygamesimInput(pygamesimInputList, None, True), eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key), eventToHandle)
 
 def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D list of pygamesim objects or 2D list of pygamesim objects
     pygamesimInputList = []
@@ -1306,10 +1296,11 @@ def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D li
         print("len(pygamesimInputList) < 1")
         global windowKeepRunning
         windowKeepRunning = False
+        pygame.event.pump()
         return()
     for eventToHandle in pygame.event.get(): #handle all events
         handleWindowEvent(pygamesimInputList, eventToHandle)
-
+    
 
 
 if __name__ == '__main__':
