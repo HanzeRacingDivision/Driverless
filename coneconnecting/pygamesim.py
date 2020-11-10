@@ -217,6 +217,8 @@ class pygamesim:
         self.coneConnectionThresholdSquared = self.coneConnectionThreshold**2
         self.coneConnectionHighAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         self.coneConnectionMaxAngleDelta = np.deg2rad(120) #if the angle difference is larger than this, it just doesnt make sense to connect them. (this IS a hard threshold)
+        self.coneConnectionRestrictiveAngleChangeThreshold = np.deg2rad(20) # the most-restrictive-angle code only switches if angle is this much more restrictive
+        self.coneConnectionRestrictiveAngleStrengthThreshold = 0.5 # the strength of the more restrictive cone needs to be at least this proportion of the old (less restrictive angle) strength
         
         self.pathConnectionThreshold = 10 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         self.pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
@@ -225,7 +227,6 @@ class pygamesim:
         self.pathFirstLineCarSideAngleDelta = np.deg2rad(80) #left cones should be within +- pathFirstLineCarSideAngleDelta radians of the side of the car (asin, car.orient + or - pi/2, depending on left/right side)
         self.pathFirstLinePosDist = 4 # simple center to center distance, hard threshold, used to filter out very far cones
         self.pathFirstLineCarDist = 3 # real distance, not hard threshold, just distance at which lowest strength-score is given
-        
         
         self.leftConeList = []  #[ [cone ID, [x,y], [[cone ID, index (left), angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)], ]     #note: 3rd argument is for drawing a line (track boundy) through the cones, every cone can connect to 2 (or less) cones in this way
         self.rightConeList = [] #[ [cone ID, [x,y], [[cone ID, index (right), angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)], ]     #note: 3rd argument is for drawing a line (track boundy) through the cones, every cone can connect to 2 (or less) cones in this way
@@ -545,69 +546,87 @@ class pygamesim:
             currentExistingAngle = radRoll(radInv(currentConeConnections[intBoolInv(currentFrontOrBack)][2])) #if there is not existing connection, this will return radRoll(radInv(0.0)), which is pi (or -pi). only make use of this value if(currentConnectionsFilled[0] or currentConnectionsFilled[1])
             nearbyConeList = self.distanceToCone(coneToConnectPos, [self.rightConeList if leftOrRight else self.leftConeList], SORTBY_DIST, True, [coneToConnectID], self.coneConnectionThreshold, EXCL_DUBL_CONN, [coneToConnectID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
             # nearbyConeList structure: [[dist, angle], index in left/right array, [[cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]]]
-            if(len(nearbyConeList) > 0):
-                bestCandidateIndex = -1;   highestStrength = 0;   otherfrontOrBack = -1;  candidatesDiscarded = 0
-                for i in range(len(nearbyConeList)):
-                    cone = nearbyConeList[i][2] #not strictly needed, just for legibility
-                    #cone data structure: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]  (regular cone structure)
-                    connectionsFilled = [(cone[2][0][1] >= 0), (cone[2][1][1] >= 0)] #2-size list of booleans
-                    if(connectionsFilled[0] and connectionsFilled[1]): #cone already doubly connected
-                        print("cone already doubly connected, but that was supposed to be filtered out in distanceToCone()!?!")
-                        candidatesDiscarded += 1
-                    elif((cone[2][0][0] == coneToConnectID) or (cone[2][1][0] == coneToConnectID)): #cone already connected to coneToConnect
-                        print("cone connection already exists, but that was supposed to be filtered out in distanceToCone()!?!")
-                        candidatesDiscarded += 1
-                    else:
-                        frontOrBack = (coneToConnectPreferredConnection if (connectionsFilled[intBoolInv(coneToConnectPreferredConnection)]) else intBoolInv(coneToConnectPreferredConnection)) # default to the inverse of coneToConnectPreferredConnection
-                        coneCandidateStrength = 1 #init var
-                        coneCandidateStrength *= 1.5-(nearbyConeList[i][0][0]/self.coneConnectionThreshold)  #high distance, low strength. Linear. worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
-                        angleToCone = nearbyConeList[i][0][1]
-                        #hard no's: if the angle difference is above the max (like 135 degrees), the prospect cone is just too damn weird, just dont connect to this one
-                        #note: this can be partially achieved by using angleThreshRange in distanceToCone() to preventatively discard cones like  angleThreshRange=([currentExistingAngle - self.coneConnectionMaxAngleDelta, currentExistingAngle + self.coneConnectionMaxAngleDelta] if (currentConnectionsFilled[0] or currentConnectionsFilled[1]) else [])
-                        if(((connectionsFilled[0] or connectionsFilled[1]) and (abs(radDiff(angleToCone, cone[2][intBoolInv(frontOrBack)][2])) > self.coneConnectionMaxAngleDelta)) or ((currentConnectionsFilled[0] or currentConnectionsFilled[1]) and (abs(radDiff(angleToCone, currentExistingAngle)) > self.coneConnectionMaxAngleDelta))):
-                            #print("very large angle delta")
-                            candidatesDiscarded += 1
-                        else:
-                            if(connectionsFilled[0] or connectionsFilled[1]): #if cone already has a connection, check the angle delta
-                                coneExistingAngle = cone[2][intBoolInv(frontOrBack)][2] #note: intBoolInv() is used to grab the existing connection
-                                coneCandidateStrength *= 1.5- min(abs(radDiff(angleToCone, coneExistingAngle))/self.coneConnectionHighAngleDelta, 1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
-                            if(currentConnectionsFilled[0] or currentConnectionsFilled[1]):
-                                coneCandidateStrength *= 1.5- min(abs(radDiff(angleToCone, currentExistingAngle))/self.coneConnectionHighAngleDelta, 1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
-                            #if(idk yet
-                            #(Vincent's) most-restrictive angle could be implemented here, or at the end, by using SORTBY_ANGL_DELT and scrolling through the list from bestCandidateIndex to one of the ends of the list (based on left/right-edness), however, this does require a previous connection (preferably a connection that is in, or leads to, the pathList) to get angleDeltaTarget
-                            if(coneCandidateStrength > highestStrength):
-                                highestStrength = coneCandidateStrength
-                                bestCandidateIndex = i
-                                otherfrontOrBack = frontOrBack
-                if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(nearbyConeList) == candidatesDiscarded)):
-                    print("it seems no suitible candidates for cone connection were found at all... bummer.", len(nearbyConeList), candidatesDiscarded, bestCandidateIndex, highestStrength)
-                    return(False, [])
-                ## else (because it didnt return() and stop the function)
-                #print("cone connection made between (ID):", coneToConnectID, "and (ID):", nearbyConeList[bestCandidateIndex][0])
-                ## make the connection:
-                coneListToUpdate = (self.rightConeList if leftOrRight else self.leftConeList)
-                if(updateInputConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
-                    ## input cone
-                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][0] = nearbyConeList[bestCandidateIndex][2][0] #save coneID
-                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][1] = nearbyConeList[bestCandidateIndex][1] #save index
-                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][2] = nearbyConeList[bestCandidateIndex][0][1] #save angle (from perspective of coneToConnect)
-                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][3] = nearbyConeList[bestCandidateIndex][0][0] #save distance
-                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][4] = highestStrength
-                    self.logFileChanged = True #set flag
-                if(updateWinnerConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
-                    ## and the other cone
-                    winnerConeIndexInList = nearbyConeList[bestCandidateIndex][1]
-                    coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][0] = coneToConnectID #save coneID
-                    coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][1] = coneToConnectIndex #save index
-                    coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][2] = radInv(nearbyConeList[bestCandidateIndex][0][1]) #save angle (from perspective of that cone)
-                    coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][3] = nearbyConeList[bestCandidateIndex][0][0] #save distance
-                    coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][4] = highestStrength
-                    self.logFileChanged = True #set flag
-                newConnectionData = [nearbyConeList[bestCandidateIndex][2][0], nearbyConeList[bestCandidateIndex][1], nearbyConeList[bestCandidateIndex][0][1], nearbyConeList[bestCandidateIndex][0][0], highestStrength, currentFrontOrBack, otherfrontOrBack]
-                return(True, newConnectionData) # newConnectionData = [ID, index, angle, dist, strength, connection_index_inputCone, connection_index_winnerCone]
-            else:
+            if(len(nearbyConeList) < 1):
                 #print("nearbyConeList empty")
                 return(False, [])
+            bestCandidateIndex = -1;   highestStrength = 0;   otherfrontOrBack = -1;  candidatesDiscarded = 0
+            candidateList = []
+            for i in range(len(nearbyConeList)):
+                cone = nearbyConeList[i][2] #not strictly needed, just for legibility
+                #cone data structure: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]  (regular cone structure)
+                connectionsFilled = [(cone[2][0][1] >= 0), (cone[2][1][1] >= 0)] #2-size list of booleans
+                if(connectionsFilled[0] and connectionsFilled[1]): #cone already doubly connected
+                    print("cone already doubly connected, but that was supposed to be filtered out in distanceToCone()!?!")
+                    candidatesDiscarded += 1
+                elif((cone[2][0][0] == coneToConnectID) or (cone[2][1][0] == coneToConnectID)): #cone already connected to coneToConnect
+                    print("cone connection already exists, but that was supposed to be filtered out in distanceToCone()!?!")
+                    candidatesDiscarded += 1
+                else:
+                    frontOrBack = (coneToConnectPreferredConnection if (connectionsFilled[intBoolInv(coneToConnectPreferredConnection)]) else intBoolInv(coneToConnectPreferredConnection)) # default to the inverse of coneToConnectPreferredConnection
+                    coneCandidateStrength = 1 #init var
+                    coneCandidateStrength *= 1.5-(nearbyConeList[i][0][0]/self.coneConnectionThreshold)  #high distance, low strength. Linear. worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
+                    angleToCone = nearbyConeList[i][0][1]
+                    #hard no's: if the angle difference is above the max (like 135 degrees), the prospect cone is just too damn weird, just dont connect to this one
+                    #note: this can be partially achieved by using angleThreshRange in distanceToCone() to preventatively discard cones like  angleThreshRange=([currentExistingAngle - self.coneConnectionMaxAngleDelta, currentExistingAngle + self.coneConnectionMaxAngleDelta] if (currentConnectionsFilled[0] or currentConnectionsFilled[1]) else [])
+                    if(((connectionsFilled[0] or connectionsFilled[1]) and (abs(radDiff(angleToCone, cone[2][intBoolInv(frontOrBack)][2])) > self.coneConnectionMaxAngleDelta)) or ((currentConnectionsFilled[0] or currentConnectionsFilled[1]) and (abs(radDiff(angleToCone, currentExistingAngle)) > self.coneConnectionMaxAngleDelta))):
+                        #print("very large angle delta")
+                        candidatesDiscarded += 1
+                    else:
+                        if(connectionsFilled[0] or connectionsFilled[1]): #if cone already has a connection, check the angle delta
+                            coneExistingAngle = cone[2][intBoolInv(frontOrBack)][2] #note: intBoolInv() is used to grab the existing connection
+                            coneCandidateStrength *= 1.5- min(abs(radDiff(coneExistingAngle, angleToCone))/self.coneConnectionHighAngleDelta, 1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                        if(currentConnectionsFilled[0] or currentConnectionsFilled[1]):
+                            angleDif = radDiff(currentExistingAngle, angleToCone) #radians to add to currentExistingAngle to get to angleToCone (abs value is most interesting)
+                            coneCandidateStrength *= 1.5- min(abs(angleDif)/self.coneConnectionHighAngleDelta, 1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                            ## (Vincent's) most-restrictive angle could be implemented here, or at the end, by using SORTBY_ANGL_DELT and scrolling through the list from bestCandidateIndex to one of the ends of the list (based on left/right-edness), however, this does require a previous connection (preferably a connection that is in, or leads to, the pathList) to get angleDeltaTarget
+                            coneCandidateStrength *= 1 + (0.5 if leftOrRight else -0.5)*max(min(angleDif/self.coneConnectionHighAngleDelta, 1), -1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                            ## if most-restrictive angle is applied at the end, when all candidates have been reviewed
+                            candidateList.append([i, angleDif, coneCandidateStrength])
+                        #if(idk yet
+                        if(coneCandidateStrength > highestStrength):
+                            highestStrength = coneCandidateStrength
+                            bestCandidateIndex = i
+                            otherfrontOrBack = frontOrBack
+            if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(nearbyConeList) == candidatesDiscarded)):
+                print("it seems no suitible candidates for cone connection were found at all... bummer.", len(nearbyConeList), candidatesDiscarded, bestCandidateIndex, highestStrength)
+                return(False, [])
+            
+            ## most restrictive angle check
+            if(currentConnectionsFilled[0] or currentConnectionsFilled[1]): #most restrictive angle can only be applied if there is a reference angle (you could also check len(candidateList)
+                print()
+                bestCandidateListIndex = findIndexBy2DEntry(candidateList, 0, bestCandidateIndex)
+                for i in range(len(candidateList)):
+                    if((candidateList[i][1] > candidateList[bestCandidateListIndex][1]) if leftOrRight else (candidateList[i][1] < candidateList[bestCandidateListIndex][1])): #most restrictive angle is lowest angle
+                        print("more restrictive angle found:", candidateList[i][1], "is better than", candidateList[bestCandidateListIndex][1])
+                        #if((abs(radDiff(candidateList[i][1], candidateList[bestCandidateListIndex][1])) > self.coneConnectionRestrictiveAngleChangeThreshold) and ((candidateList[i][2]/highestStrength) > self.coneConnectionRestrictiveAngleStrengthThreshold)):
+                        if(abs(radDiff(candidateList[i][1], candidateList[bestCandidateListIndex][1])) > self.coneConnectionRestrictiveAngleChangeThreshold):
+                            print("old highestStrength:", round(highestStrength, 2), " new highestStrength:", round(candidateList[i][2], 2), " ratio:", round(candidateList[i][2]/highestStrength, 2))
+                            bestCandidateListIndex = i
+                            bestCandidateIndex = candidateList[i][0]
+                            highestStrength = candidateList[i][2]
+            
+            #print("cone connection made between (ID):", coneToConnectID, "and (ID):", nearbyConeList[bestCandidateIndex][0])
+            ## make the connection:
+            coneListToUpdate = (self.rightConeList if leftOrRight else self.leftConeList)
+            if(updateInputConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
+                ## input cone
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][0] = nearbyConeList[bestCandidateIndex][2][0] #save coneID
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][1] = nearbyConeList[bestCandidateIndex][1] #save index
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][2] = nearbyConeList[bestCandidateIndex][0][1] #save angle (from perspective of coneToConnect)
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][3] = nearbyConeList[bestCandidateIndex][0][0] #save distance
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][4] = highestStrength
+                self.logFileChanged = True #set flag
+            if(updateWinnerConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
+                ## and the other cone
+                winnerConeIndexInList = nearbyConeList[bestCandidateIndex][1]
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][0] = coneToConnectID #save coneID
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][1] = coneToConnectIndex #save index
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][2] = radInv(nearbyConeList[bestCandidateIndex][0][1]) #save angle (from perspective of that cone)
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][3] = nearbyConeList[bestCandidateIndex][0][0] #save distance
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][4] = highestStrength
+                self.logFileChanged = True #set flag
+            newConnectionData = [nearbyConeList[bestCandidateIndex][2][0], nearbyConeList[bestCandidateIndex][1], nearbyConeList[bestCandidateIndex][0][1], nearbyConeList[bestCandidateIndex][0][0], highestStrength, currentFrontOrBack, otherfrontOrBack]
+            return(True, newConnectionData) # newConnectionData = [ID, index, angle, dist, strength, connection_index_inputCone, connection_index_winnerCone]
     
     def connectConeSuperSimple(self, coneToConnectID, coneToConnectPos, leftOrRight, coneToConnectIndex, currentConeConnections=[[-1,-1,0.0,0.0,0.0],[-1,-1,0.0,0.0,0.0]], coneToConnectPreferredConnection=1, updateInputConeInList=True, updateWinnerConeInList=True):
         currentConnectionsFilled = [(currentConeConnections[0][1] >= 0), (currentConeConnections[1][1] >= 0)] #2-size list of booleans
@@ -1056,6 +1075,9 @@ class pygamesim:
         self.drawCars()
         self.drawFloatingCone(True, False)
         self.drawDebugLines()
+        if(self.logging):
+            textimg = pygame.font.Font(None, 21).render(self.logfilename, 1, [255-self.bgColor[0], 255-self.bgColor[1], 255-self.bgColor[2]], self.bgColor)
+            self.window.blit(textimg, [self.drawPosX + 5,self.drawPosY + 5])
         if(self.logging and (pygame.time.get_ticks() > self.rewriteLogTimer) and self.logFileChanged):
             self.rewriteLogfile()
     
@@ -1184,6 +1206,9 @@ def pygameEnd():
         print("quitting pygame window...")
         pygame.quit()
 
+def frameRefresh():
+    pygame.display.flip() #send (finished) frame to display
+
 def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
     if(button==1): #left mouse button
         if(buttonDown): #mouse pressed down
@@ -1198,7 +1223,7 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                 pygamesimInput.setFinishCone(False, pygamesimInput.pixelsToRealPos(pos))
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
             else:
-                pygamesimInput.addCone(False, pygamesimInput.pixelsToRealPos(pos), connectNewCone=True, reconnectOverlappingCone=True)
+                pygamesimInput.addCone(False, pygamesimInput.pixelsToRealPos(pos), connectNewCone=False, reconnectOverlappingCone=True)
     if(button==3): #left mouse button
         if(buttonDown): #mouse pressed down
             pygamesimInput.floatingCone = [pos, True]
@@ -1212,7 +1237,7 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                 pygamesimInput.setFinishCone(True, pygamesimInput.pixelsToRealPos(pos))
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
             else:
-                pygamesimInput.addCone(True, pygamesimInput.pixelsToRealPos(pos), connectNewCone=True, reconnectOverlappingCone=True)
+                pygamesimInput.addCone(True, pygamesimInput.pixelsToRealPos(pos), connectNewCone=False, reconnectOverlappingCone=True)
 
 def handleKeyPress(pygamesimInput, keyDown, key, keyName, eventToHandle):
     if(key==102): # f
@@ -1242,15 +1267,12 @@ def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=Tr
             mousePos = pygame.mouse.get_pos()
         global pygamesimInputLast
         if(pygame.mouse.get_focused() or (not demandMouseFocus)):
-            print("now"); inputCount = 0
             for pygamesimInput in pygamesimInputList:
                 # localBoundries = [[pygamesimInput.drawPosX, pygamesimInput.drawPosY], [pygamesimInput.drawWidth, pygamesimInput.drawHeight]]
                 # if(((mousePos[0]>=localBoundries[0][0]) and (mousePos[0]<(localBoundries[0][0]+localBoundries[1][0]))) and ((mousePos[1]>=localBoundries[0][1]) and (mousePos[0]<(localBoundries[0][1]+localBoundries[1][1])))):
                 if(pygamesimInput.isInsideWindowPixels(mousePos)):
-                    print("found input", inputCount)
                     pygamesimInputLast = pygamesimInput
                     return(pygamesimInput)
-                inputCount += 1
         if(type(pygamesimInputLast) is not pygamesim): #if this is the first interaction
             pygamesimInputLast = pygamesimInputList[0]
         return(pygamesimInputLast)
