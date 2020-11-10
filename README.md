@@ -1,3 +1,4 @@
 # Overview
 Python code for a car sim <br/>
-Anyone can run the code (given that a few packages are installed).
+Moving_car: Code that simulates a self-driving car, aiming to travel along a line of cones <br/>
+
