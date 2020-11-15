@@ -58,11 +58,14 @@ def distPowBetwPos(posOne, posTwo):
 def distAnglePosToPos(funcRadius, funcAngle, funcPos):
     return([funcPos[0] + funcRadius * np.cos(funcAngle), funcPos[1] + funcRadius * np.sin(funcAngle)])
 
-DONT_SORT = 0
-SORTBY_DIST = 1
-SORTBY_ANGL = 2
-SORTBY_ANGL_DELT = 3
-SORTBY_ANGL_DELT_ABS = 4
+def vectorProjectDist(posOne, posTwo, angleToProjectOnto):
+    #approach (loosely) derived from vector math (not my area of maximum expertise)
+    posDeltas = [posTwo[0] - posOne[0], posTwo[1] - posOne[1]]
+    cosAndSin = [np.cos(angleToProjectOnto), np.sin(angleToProjectOnto)]
+    return(posDeltas[0]*cosAndSin[0] + posDeltas[1]*cosAndSin[1], posDeltas[1]*cosAndSin[0] - posDeltas[0]*cosAndSin[1])
+    # # system shifting approach
+    # hypotenuse, oldAngle = distAngleBetwPos(posOne, posTwo)
+    # return(np.cos(oldAngle-angleToProjectOnto)*hypotenuse, np.sin(oldAngle-angleToProjectOnto)*hypotenuse)
 
 def findIndexBy2DEntry(listToSearch, indexToCompare, valueToFind):
     for i in range(len(listToSearch)):
@@ -100,6 +103,18 @@ def maxIndex(inputList):
     else:
         return(-1, 0)
 
+global DONT_SORT, SORTBY_DIST, SORTBY_ANGL, SORTBY_ANGL_DELT, SORTBY_ANGL_DELT_ABS
+DONT_SORT = 0
+SORTBY_DIST = 1
+SORTBY_ANGL = 2
+SORTBY_ANGL_DELT = 3
+SORTBY_ANGL_DELT_ABS = 4
+global NO_CONN_EXCL, EXCL_UNCONN, EXCL_SING_CONN, EXCL_DUBL_CONN
+NO_CONN_EXCL = 0
+EXCL_UNCONN = 1
+EXCL_SING_CONN = 2
+EXCL_DUBL_CONN = 3
+
 global CD_FINISH, coneLogTableColumnDef
 CD_FINISH = 'finish'
 coneLogTableColumnDef = "cone ID,leftOrRight,Xpos,Ypos,prev ID,next ID,coneData\n"
@@ -109,11 +124,37 @@ class raceCar:
         self.pos = pos
         self.orient = orient
         self.color = color
+        self.width = 1.5
+        self.length = 3
+        self.pointRadius = (((self.width**2)+(self.length**2))**0.5)/2 #Pythagoras
+        self.pointAngle = np.arctan2(self.width, self.length)
     
-    width = 1.5
-    length = 3
-    pointRadius = (((width**2)+(length**2))**0.5)/2 #Pythagoras
-    pointAngle = np.arctan2(width, length)
+    def distanceToCar(self, pos):
+        translatedDistance = vectorProjectDist(self.pos, pos, self.orient)
+        #simSelf.debugLines.append([0, simSelf.realToPixelPos(self.pos), simSelf.realToPixelPos(pos), 0])
+        if((abs(translatedDistance[0]) < (self.length/2)) and (abs(translatedDistance[1]) < (self.width/2))):
+            return(True, 0)
+        else:
+            returnDistance = 0
+            if(abs(translatedDistance[0]) < (self.length/2)): #if it's beside the car
+                returnDistance = abs(translatedDistance[1]) - (self.width/2) #shortest dist is a line perp. from the side of the car
+                # debugAngle = (radInv(self.orient) if (translatedDistance[0] < 0) else self.orient)
+                # simSelf.debugLines.append([1, simSelf.realToPixelPos(pos), [returnDistance, distAngleBetwPos(pos, [self.pos[0] + abs(translatedDistance[0])*np.cos(debugAngle), self.pos[1] + abs(translatedDistance[0])*np.sin(debugAngle)])[1]], 1])
+            elif(abs(translatedDistance[1]) < (self.width/2)): #if it's in front of or behind the car
+                returnDistance = abs(translatedDistance[0]) - (self.length/2) #shortest dist is a line perp. from the front/back of the car
+                # debugAngle = self.orient + ((-np.pi/2) if (translatedDistance[1] < 0) else (np.pi/2))
+                # simSelf.debugLines.append([1, simSelf.realToPixelPos(pos), [returnDistance, distAngleBetwPos(pos, [self.pos[0] + abs(translatedDistance[1])*np.cos(debugAngle), self.pos[1] + abs(translatedDistance[1])*np.sin(debugAngle)])[1]], 1])
+            else:
+                #returnDistance = ((abs(translatedDistance[0]) - (self.length/2))**2 + (abs(translatedDistance[1]) - (self.width/2))**2)**0.5  #A^2 + B^2 = C^2
+                tempAngle = np.arctan2(abs(translatedDistance[1]) - (self.width/2), abs(translatedDistance[0]) - (self.length/2))
+                returnDistance = abs(translatedDistance[1]/np.sin(tempAngle))  #soh  #note: this should never divide by 0, but if it does, change the '<' from previous two if-statements to a '<='
+                #returnDistance = translatedDistance[0]/np.cos(tempAngle)  #cah
+                ## debug:
+                # debugOffsets = [[np.cos(self.pointAngle+self.orient) * self.pointRadius, np.sin(self.pointAngle+self.orient) * self.pointRadius],
+                #         [np.cos(np.pi-self.pointAngle+self.orient) * self.pointRadius, np.sin(np.pi-self.pointAngle+self.orient) * self.pointRadius]]
+                # debugPos = [(self.pos[i] + (-1 if (translatedDistance[1]<0) else 1)*debugOffsets[(0 if (((translatedDistance[0]<0) and (translatedDistance[1]<0)) or ((translatedDistance[0]>0) and (translatedDistance[1]>0))) else 1)][i])  for i in range(2)]
+                # simSelf.debugLines.append([0, simSelf.realToPixelPos(pos), simSelf.realToPixelPos(debugPos), 2])
+            return(False, returnDistance)
     
     #drawing is done by calculating the position of the corners and drawing a polygon with those points. Not efficient, not pretty, just fun
     def draw(self, simSelf): #note: i'm just passing the 'parent' object, but you could absolutely use actual class inheritance structure to do this, i just dont like that sort of thing
@@ -125,24 +166,15 @@ class raceCar:
             # cornerPoints.append(simSelf.realToPixelPos([np.cos(-self.pointAngle+self.orient) * self.pointRadius + self.pos[0], np.sin(-self.pointAngle+self.orient) * self.pointRadius + self.pos[1]]))
             offsets = [[np.cos(self.pointAngle+self.orient) * self.pointRadius, np.sin(self.pointAngle+self.orient) * self.pointRadius],
                         [np.cos(np.pi-self.pointAngle+self.orient) * self.pointRadius, np.sin(np.pi-self.pointAngle+self.orient) * self.pointRadius]]
-            cornerPoints.append(simSelf.realToPixelPos([self.pos[0] + offsets[0][0], self.pos[1] + offsets[0][1]]))
-            cornerPoints.append(simSelf.realToPixelPos([self.pos[0] + offsets[1][0], self.pos[1] + offsets[1][1]]))
-            cornerPoints.append(simSelf.realToPixelPos([self.pos[0] - offsets[0][0], self.pos[1] - offsets[0][1]]))
-            cornerPoints.append(simSelf.realToPixelPos([self.pos[0] - offsets[1][0], self.pos[1] - offsets[1][1]]))
+            cornerPoints.append(simSelf.realToPixelPos([self.pos[0] + offsets[0][0], self.pos[1] + offsets[0][1]])) #front left
+            cornerPoints.append(simSelf.realToPixelPos([self.pos[0] + offsets[1][0], self.pos[1] + offsets[1][1]])) #back left
+            cornerPoints.append(simSelf.realToPixelPos([self.pos[0] - offsets[0][0], self.pos[1] - offsets[0][1]])) #back right
+            cornerPoints.append(simSelf.realToPixelPos([self.pos[0] - offsets[1][0], self.pos[1] - offsets[1][1]])) #front right
             pygame.draw.polygon(simSelf.window, self.color, cornerPoints) #draw car
             arrowPoints = [simSelf.realToPixelPos(self.pos), cornerPoints[1], cornerPoints[2]]
             oppositeColor = [255-self.color[0], 255-self.color[1], 255-self.color[1]]
             pygame.draw.polygon(simSelf.window, oppositeColor, arrowPoints) #draw arrow
     
-    # def draw(self, window, sizeScale, drawWidth, drawHeight, drawPosX, drawPosY):  #old old way
-    #     if(((self.pos[0]*sizeScale + drawPosX) < (drawWidth + drawPosX)) and ((self.pos[0]*sizeScale + drawPosX) > drawPosX) and ((self.pos[1]*sizeScale + drawPosY) < (drawHeight + drawPosY)) and ((self.pos[1]*sizeScale + drawPosY) > drawPosY)):
-    #         cornerPoints = []
-    #         cornerPoints.append(( (np.cos(self.pointAngle+self.orient) * self.pointRadius + self.pos[0]) * sizeScale + drawPosX, (np.sin(self.pointAngle+self.orient) * self.pointRadius + self.pos[1]) * sizeScale + drawPosY ))
-    #         cornerPoints.append(( (np.cos(np.pi-self.pointAngle+self.orient) * self.pointRadius + self.pos[0]) * sizeScale + drawPosX, (np.sin(np.pi-self.pointAngle+self.orient) * self.pointRadius + self.pos[1]) * sizeScale + drawPosY ))
-    #         cornerPoints.append(( (np.cos(np.pi+self.pointAngle+self.orient) * self.pointRadius + self.pos[0]) * sizeScale + drawPosX, (np.sin(np.pi+self.pointAngle+self.orient) * self.pointRadius + self.pos[1]) * sizeScale + drawPosY ))
-    #         cornerPoints.append(( (np.cos(-self.pointAngle+self.orient) * self.pointRadius + self.pos[0]) * sizeScale + drawPosX, (np.sin(-self.pointAngle+self.orient) * self.pointRadius + self.pos[1]) * sizeScale + drawPosY ))
-    #         pygame.draw.polygon(window, self.color, cornerPoints)
-
 
 class pygamesim:
     def __init__(self, window, cars=[], drawWidth=1200, drawHeight=600, drawPosX=0, drawPosY=0, sizeScale=30, invertYaxis=True, importConeLogFilename='', logging=True, logname="pygamesim"):
@@ -155,6 +187,7 @@ class pygamesim:
         self.sizeScale = sizeScale #pixels per meter
         self.invertYaxis = invertYaxis
         self.logging = logging
+        self.logfilename = ''
         if(logging):
             timeString = datetime.datetime.now().strftime("%Y-%m-%d_%H;%M;%S")
             self.logfilename = (logname + "_" + timeString)
@@ -167,7 +200,7 @@ class pygamesim:
         
         self.finishLineColor = [255,40,0]
         self.finishLineWidth = 2 #pixels wide
-        self.finishLinePos = [] #[ [cone ID, [x, y], left/right], [cone ID, [x, y], left/right]]
+        self.finishLinePos = [None, None] #[ left Cone, right Cone] #just pointers to cones
         
         self.leftConeColor = [255,255,0] #yellow
         self.rightConeColor = [0,50,255] #dark blue
@@ -184,11 +217,16 @@ class pygamesim:
         self.coneConnectionThresholdSquared = self.coneConnectionThreshold**2
         self.coneConnectionHighAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         self.coneConnectionMaxAngleDelta = np.deg2rad(120) #if the angle difference is larger than this, it just doesnt make sense to connect them. (this IS a hard threshold)
+        self.coneConnectionRestrictiveAngleChangeThreshold = np.deg2rad(20) # the most-restrictive-angle code only switches if angle is this much more restrictive
+        self.coneConnectionRestrictiveAngleStrengthThreshold = 0.5 # the strength of the more restrictive cone needs to be at least this proportion of the old (less restrictive angle) strength
         
         self.pathConnectionThreshold = 10 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         self.pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         
         self.pathFirstLineCarAngleDeltaMax = np.deg2rad(45) #if the radDiff() between car (.orient) and the first line's connections is bigger than this, switch conneections or stop
+        self.pathFirstLineCarSideAngleDelta = np.deg2rad(80) #left cones should be within +- pathFirstLineCarSideAngleDelta radians of the side of the car (asin, car.orient + or - pi/2, depending on left/right side)
+        self.pathFirstLinePosDist = 4 # simple center to center distance, hard threshold, used to filter out very far cones
+        self.pathFirstLineCarDist = 3 # real distance, not hard threshold, just distance at which lowest strength-score is given
         
         self.leftConeList = []  #[ [cone ID, [x,y], [[cone ID, index (left), angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)], ]     #note: 3rd argument is for drawing a line (track boundy) through the cones, every cone can connect to 2 (or less) cones in this way
         self.rightConeList = [] #[ [cone ID, [x,y], [[cone ID, index (right), angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)], ]     #note: 3rd argument is for drawing a line (track boundy) through the cones, every cone can connect to 2 (or less) cones in this way
@@ -206,7 +244,7 @@ class pygamesim:
         self.logFileChanged = False
         
         self.debugLines = [] #[[lineType, pos, pos/angles, color_index (0-2)], ] #third entry is: (lineType==0: straight line from two positions), (lineType==1: straight line from pos and [radius, angle]), (lineType==2: arc from pos and [radius, startAngle, endAngle])
-        self.debugLineColors = [[255,0,255],[255,255,255],[0,255,0]] #purple, white, green
+        self.debugLineColors = [[255,0,255],[255,255,255],[0,255,0], [255,160,255]] #purple, white, green, pink
         self.debugLineWidth = 3
         
         #this has to happen AFTER variables/lists are initialized, (becuase it's hard to append to nonexistant conelists)
@@ -225,11 +263,11 @@ class pygamesim:
         if((coneDataString == '') or (coneDataString == "") or (len(coneDataString) < 1)):
             return([])
         else:
-            coneDataStringList = coneDataString.strip().split(';')
+            coneDataStringList = coneDataString.strip().strip("[]").split(';')
             returnConeData = []
             for i in range(len(coneDataStringList)):
                 #if((coneDataStringList[i].count['['] > 0) and (coneDataStringList[i].count['['] == coneDataStringList[i].count[']'])): #nesteld lists
-                returnConeData.append(coneDataStringList[i])
+                returnConeData.append(coneDataStringList[i].strip("'"))
             return(returnConeData)
     
     def coneDataCopy(self, coneData):
@@ -268,62 +306,70 @@ class pygamesim:
             if('.' not in filename):
                 print("(importConeLog) filename doesn't contain a '.', so i'm adding '.csv' to the end")
                 filename += '.csv'
-            readFile = open(filename, 'r')
-            global coneLogTableColumnDef
-            if(readFile.readline() == coneLogTableColumnDef): #alternatively, you could try to find columns (column names) in the first line and determine the indexes of data in lineArray
-                discardedLines = 0
-                highestImportedConeID = 0
-                for line in readFile:
-                    lineArray = line.strip().split(',')
-                    lineData = [0, False, 0.0, 0.0, -1, -1, []] #init var
-                    if(len(lineArray) >= 7):
-                        if(lineArray[0].isnumeric() and ((lineArray[1].upper() == 'LEFT') or (lineArray[1].upper() == 'RIGHT')) and (lineArray[4].isnumeric() or (lineArray[4]=='-1')) and (lineArray[5].isnumeric() or (lineArray[5]=='-1'))): #note: cant check floats
-                            try:
-                                lineData[0] = int(lineArray[0])
-                                lineData[1] = (lineArray[1].upper() == 'RIGHT')
-                                lineData[2] = float(lineArray[2])
-                                lineData[3] = float(lineArray[3])
-                                lineData[4] = int(lineArray[4])
-                                lineData[5] = int(lineArray[5])
-                                lineData[6] = self.stringToConeData(lineArray[6].strip())
-                                ## add a value to all coneIDs to allow for existing data to remain
-                                highestImportedConeID = max(lineData[0], highestImportedConeID)
-                                lineData[0] = ((lineData[0]+self.newConeID) if (lineData[0] >= 0) else -1)
-                                lineData[4] = ((lineData[4]+self.newConeID) if (lineData[4] >= 0) else -1)
-                                lineData[5] = ((lineData[5]+self.newConeID) if (lineData[5] >= 0) else -1)
-                                ## append a coneList
-                                listToAppend = (self.rightConeList if lineData[1] else self.leftConeList)
-                                listToAppend.append([lineData[0], [lineData[2], lineData[3]], [[lineData[4],-1,0.0,0.0,0.0],[lineData[5],-1,0.0,0.0,0.0]], lineData[6]])
-                            except:
-                                print("string to numeric conversion faillure ([2] or [3] probably not float)")
+            if(not (self.logging and (self.logfilename in filename))):
+                readFile = open(filename, 'r')
+                global coneLogTableColumnDef
+                if(readFile.readline() == coneLogTableColumnDef): #alternatively, you could try to find columns (column names) in the first line and determine the indexes of data in lineArray
+                    discardedLines = 0
+                    highestImportedConeID = 0
+                    for line in readFile:
+                        lineArray = line.strip().split(',')
+                        lineData = [0, False, 0.0, 0.0, -1, -1, []] #init var
+                        if(len(lineArray) >= 7):
+                            if(lineArray[0].isnumeric() and ((lineArray[1].upper() == 'LEFT') or (lineArray[1].upper() == 'RIGHT')) and (lineArray[4].isnumeric() or (lineArray[4]=='-1')) and (lineArray[5].isnumeric() or (lineArray[5]=='-1'))): #note: cant check floats
+                                try:
+                                    lineData[0] = int(lineArray[0])
+                                    lineData[1] = (lineArray[1].upper() == 'RIGHT')
+                                    lineData[2] = float(lineArray[2])
+                                    lineData[3] = float(lineArray[3])
+                                    lineData[4] = int(lineArray[4])
+                                    lineData[5] = int(lineArray[5])
+                                    lineData[6] = self.stringToConeData(lineArray[6].strip())
+                                    ## add a value to all coneIDs to allow for existing data to remain
+                                    highestImportedConeID = max(lineData[0], highestImportedConeID)
+                                    lineData[0] = ((lineData[0]+self.newConeID) if (lineData[0] >= 0) else -1)
+                                    lineData[4] = ((lineData[4]+self.newConeID) if (lineData[4] >= 0) else -1)
+                                    lineData[5] = ((lineData[5]+self.newConeID) if (lineData[5] >= 0) else -1)
+                                    ## append a coneList
+                                    listToAppend = (self.rightConeList if lineData[1] else self.leftConeList)
+                                    listToAppend.append([lineData[0], [lineData[2], lineData[3]], [[lineData[4],-1,0.0,0.0,0.0],[lineData[5],-1,0.0,0.0,0.0]], lineData[6]])
+                                except:
+                                    print("string to numeric conversion faillure ([2] or [3] probably not float)")
+                                    discardedLines += 1
+                            else:
+                                print("string to numeric conversion faillure: simple check failed (isnumeric() and LEFT/RIGHT check)")
                                 discardedLines += 1
                         else:
-                            print("string to numeric conversion faillure: simple check failed (isnumeric() and LEFT/RIGHT check)")
+                            print("string to numeric conversion faillure: ")
                             discardedLines += 1
-                    else:
-                        print("string to numeric conversion faillure: ")
-                        discardedLines += 1
-                if(discardedLines > 0):
-                    print("had to discard", discardedLines, "lines when importing coneLog")
-                self.newConeID += highestImportedConeID
-                for currentConeList in [self.leftConeList, self.rightConeList]: #for each list seperately
-                    for i in range(len(currentConeList)):
-                        connections = currentConeList[i][2]
-                        for j in range(2):
-                            if(connections[j][0] >= 0):
-                                ## connection[j] structure: [cone ID, index, angle, distance, cone-connection-strength]
-                                connections[j][1] = findIndexBy2DEntry(currentConeList, 0, connections[j][0])
-                                if(connections[j][1] < 0): #sanity check
-                                    print("couldnt find index in list for connecction!?!:", currentConeList[i])
-                                connectedCone = currentConeList[connections[j][1]]
-                                distance, angle = distAngleBetwPos(currentConeList[i][1], connectedCone[1])
-                                connections[j][2] = angle
-                                connections[j][3] = distance
-                                connections[j][4] = -1 #connection strength is not imported and cant be (easily) calculated, so just set it to -1 and call it a day
-                self.logFileChanged = True #logging shouldnt be on (in which case this will do nothing), but if it is, this is required
+                    if(discardedLines > 0):
+                        print("had to discard", discardedLines, "lines when importing coneLog")
+                    self.newConeID += highestImportedConeID
+                    coneLists = [self.leftConeList, self.rightConeList]
+                    for k in range(len(coneLists)): #for each list seperately
+                        currentConeList = coneLists[k] #just for legibility
+                        for i in range(len(currentConeList)):
+                            connections = currentConeList[i][2]
+                            for j in range(2):
+                                if(connections[j][0] >= 0):
+                                    ## connection[j] structure: [cone ID, index, angle, distance, cone-connection-strength]
+                                    connections[j][1] = findIndexBy2DEntry(currentConeList, 0, connections[j][0])
+                                    if(connections[j][1] < 0): #sanity check
+                                        print("couldnt find index in list for connecction!?!:", currentConeList[i])
+                                    connectedCone = currentConeList[connections[j][1]]
+                                    distance, angle = distAngleBetwPos(currentConeList[i][1], connectedCone[1])
+                                    connections[j][2] = angle
+                                    connections[j][3] = distance
+                                    connections[j][4] = -1 #connection strength is not imported and cant be (easily) calculated, so just set it to -1 and call it a day
+                            global CD_FINISH
+                            if(CD_FINISH in currentConeList[i][3]):#if it has finish flag in coneData
+                                self.finishLinePos[k] = currentConeList[i]
+                    self.logFileChanged = True #logging shouldnt be on (in which case this will do nothing), but if it is, this is required
+                else:
+                    print("can't import coneLog because the first line is not equal to coneLogTableColumnDef")
+                readFile.close()
             else:
-                print("can't import coneLog because the first line is not equal to coneLogTableColumnDef")
-            readFile.close()
+                print("cant import own logfile")
         except FileNotFoundError:
             print("can't import coneLog because file:", "'" + filename + "'", "wasnt found.")
         except:
@@ -347,66 +393,10 @@ class pygamesim:
     def isInsideWindowReal(self, realPos):
         return((realPos[0] < (self.drawWidth/self.sizeScale)) and (realPos[0] > 0.0) and (realPos[1] < (self.drawHeight/self.sizeScale)) and (realPos[1] > 0.0)) #not changed by inverting Y because it doesnt care WHERE inside the Y-axis it is, just that it IS
     
-    def distanceToConeSquared(self, pos, listsToCheck=[], sortByDistance=False, mergeLists=True, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, excludeDoublyConnectedCones=False, ignoreLinkedConeIDs=[]):
+    def distanceToConeSquared(self, pos, listsToCheck=[], sortByDistance=False, mergeLists=True, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, coneConnectionExclusions=NO_CONN_EXCL, ignoreLinkedConeIDs=[]):
         if(len(listsToCheck) < 1):
             listsToCheck = [self.leftConeList, self.rightConeList] #cant be default parameter
         returnList = []  #[[ [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], squaredDist, index in left/right array, cone data (certainty, time spotted, etc)], ], ]  #note: coneID of first cone in first conelist is array[0][0][0]
-        for conelist in range(len(listsToCheck)):
-            if(not mergeLists):
-                returnList.append([])
-            #for cone in listsToCheck[conelist]: #doesnt let me store index
-            for coneIndex in range(len(listsToCheck[conelist])):
-                cone = listsToCheck[conelist][coneIndex]
-                #cone stucture:  [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)]
-                ignoreCone = False
-                if(cone[0] in ignoreConeIDs):
-                    ignoreCone = True
-                if(excludeDoublyConnectedCones and (cone[2][0][1] >= 0) and (cone[2][1][1] >= 0)):
-                    ignoreCone = True
-                elif((cone[2][0][1] >= 0) or (cone[2][1][1] >= 0)):
-                    for coneIDtoIgnore in ignoreLinkedConeIDs:  #using "((cone[2][0][0] in ignoreLinkedConeIDs) or (cone[2][0][0] in ignoreLinkedConeIDs))" would search the array twice, a single forloop is faster
-                        if((cone[2][0][0] == coneIDtoIgnore) or (cone[2][1][0] == coneIDtoIgnore)):
-                            ignoreCone = True
-                if(not ignoreCone):
-                    squaredDistance = (pos[0]-cone[1][0])**2 + (pos[1]-cone[1][1])**2  #A^2 + B^2 = C^2
-                    if((simpleSquaredThreshold < 0) or ((simpleSquaredThreshold > 0) and (squaredDistance < simpleSquaredThreshold))):
-                        returnCone = []
-                        returnCone.append(cone[0]) #cone ID
-                        returnCone.append(cone[1]) #pos
-                        returnCone.append(cone[2]) #[[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]]
-                        returnCone.append(squaredDistance)
-                        returnCone.append(coneIndex)
-                        returnCone.append(cone[3])
-                        #store the data in the return list. If 'sortByDistance', then sort it right here, as opposed to afterwards
-                        #alternatively, 'listToAppend = returnList if mergeLists else returnList[conelist]' and the just append to that (saves a few lines of code)
-                        if(mergeLists):
-                            if(sortByDistance):
-                                insertionDone = False
-                                for i in range(len(returnList)):
-                                    if((returnCone[3] < returnList[i][3]) and (not insertionDone)): #if the new entry is larger
-                                        returnList.insert(i, returnCone)
-                                        insertionDone = True
-                                if(not insertionDone): #if the new entry is larger than the last entry, append it
-                                    returnList.append(returnCone)
-                            else:
-                                returnList.append(returnCone)
-                        else:
-                            if(sortByDistance):
-                                insertionDone = False
-                                for i in range(len(returnList[conelist])):
-                                    if((returnCone[3] < returnList[conelist][i][3]) and (not insertionDone)): #if the new entry is larger
-                                        returnList[conelist].insert(i, returnCone)
-                                        insertionDone = True
-                                if(not insertionDone): #if the new entry is larger than the last entry, append it
-                                    returnList[conelist].append(returnCone)
-                            else:
-                                returnList[conelist].append(returnCone)
-        return(returnList)
-    
-    def distanceToCone(self, pos, listsToCheck=[], sortBySomething=DONT_SORT, mergeLists=True, ignoreConeIDs=[], simpleThreshold=-1.0, excludeDoublyConnectedCones=False, ignoreLinkedConeIDs=[], angleDeltaTarget=0.0, angleThreshRange=[]): #note: angleThreshRange is [lowBound, upBound]
-        if(len(listsToCheck) < 1):
-            listsToCheck = [self.leftConeList, self.rightConeList] #cant be default parameter    
-        returnList = []  #[[ [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], [dist, angle], index in left/right array, cone data (certainty, time spotted, etc)], ], ]  #note: coneID of first cone in first conelist is array[0][0][0]
         for conelist in range(len(listsToCheck)):
             returnListPointer = returnList
             if(not mergeLists):
@@ -419,7 +409,62 @@ class pygamesim:
                 ignoreCone = False
                 if(cone[0] in ignoreConeIDs):
                     ignoreCone = True
-                if(excludeDoublyConnectedCones and (cone[2][0][1] >= 0) and (cone[2][1][1] >= 0)):
+                coneConnections = [cone[2][0][1] >= 0, cone[2][1][1] >= 0]
+                if(((coneConnectionExclusions == EXCL_UNCONN) and not (coneConnections[0] or coneConnections[1])) or \
+                   ((coneConnectionExclusions == EXCL_SING_CONN) and ((coneConnections[0] and not coneConnections[1]) or (not coneConnections[0] and coneConnections[1]))) or \
+                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1]))):
+                    ignoreCone = True
+                elif((cone[2][0][1] >= 0) or (cone[2][1][1] >= 0)):
+                    for coneIDtoIgnore in ignoreLinkedConeIDs:  #using "((cone[2][0][0] in ignoreLinkedConeIDs) or (cone[2][0][0] in ignoreLinkedConeIDs))" would search the array twice, a single forloop is faster
+                        if((cone[2][0][0] == coneIDtoIgnore) or (cone[2][1][0] == coneIDtoIgnore)):
+                            ignoreCone = True
+                if(not ignoreCone):
+                    squaredDistance = (pos[0]-cone[1][0])**2 + (pos[1]-cone[1][1])**2  #A^2 + B^2 = C^2
+                    if((simpleSquaredThreshold < 0) or ((simpleSquaredThreshold > 0) and (squaredDistance < simpleSquaredThreshold))):
+                        ## returnCone structure: [squaredDistance, coneIndex, cone] (where 'cone' is just a simple pointer to the cone)
+                        returnCone = [squaredDistance, coneIndex, cone]
+                        if(sortByDistance):
+                            insertionDone = False
+                            for i in range(len(returnListPointer)):
+                                if((returnCone[0] < returnListPointer[i][0]) and (not insertionDone)): #if the new entry is larger
+                                    returnListPointer.insert(i, returnCone)
+                                    insertionDone = True
+                            if(not insertionDone): #if the new entry is larger than the last entry, append it
+                                returnListPointer.append(returnCone)
+                        else:
+                            returnListPointer.append(returnCone)
+        return(returnList)
+    
+    def distanceToCone(self, pos, listsToCheck=[], sortBySomething=DONT_SORT, mergeLists=True, ignoreConeIDs=[], simpleThreshold=-1.0, coneConnectionExclusions=NO_CONN_EXCL, ignoreLinkedConeIDs=[], angleDeltaTarget=0.0, angleThreshRange=[]): #note: angleThreshRange is [lowBound, upBound] or [[lowBound, upBound], [lowBound, upBound], etc] for however many input lists there are (normally only 2, left and right)
+        if(len(listsToCheck) < 1):
+            listsToCheck = [self.leftConeList, self.rightConeList] #cant be default parameter    
+        returnList = []  #[[ [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], [dist, angle], index in left/right array, cone data (certainty, time spotted, etc)], ], ]  #note: coneID of first cone in first conelist is array[0][0][0]
+        multiAngleThreshRange = ((type(angleThreshRange[0]) is list) if (len(angleThreshRange)>0) else False)
+        for conelist in range(len(listsToCheck)):
+            returnListPointer = returnList
+            if(not mergeLists):
+                returnList.append([])
+                returnListPointer = returnList[conelist] # makes appending to it easier
+            hasAngleThreshRange = (len(angleThreshRange) == 2) #init var
+            currentAngleThreshRange = angleThreshRange #init var
+            if(multiAngleThreshRange):
+                hasAngleThreshRange = ((len(angleThreshRange[conelist])==2) if (type(angleThreshRange[conelist]) is list) else False) #extra safety check
+                if(hasAngleThreshRange):
+                    currentAngleThreshRange = angleThreshRange[conelist]
+                    # self.debugLines.append([1, self.realToPixelPos(self.cars[0].pos), [simpleThreshold, currentAngleThreshRange[0]], 1]) #line from floating cone at someAngles[0] radians with a length of coneConnectionThreshold
+                    # self.debugLines.append([1, self.realToPixelPos(self.cars[0].pos), [simpleThreshold, currentAngleThreshRange[1]], 1]) #line from floating cone at someAngles[1] radians with a length of coneConnectionThreshold
+                    # self.debugLines.append([2, self.realToPixelPos(self.cars[0].pos), [simpleThreshold, currentAngleThreshRange[0], currentAngleThreshRange[1]], 1]) #arc centered at floating cone with radius coneConnectionThreshold, startAngle being someAngles[0] radians and endAngle being someAngles[1] radians
+            #for cone in listsToCheck[conelist]: #doesnt let me store index
+            for coneIndex in range(len(listsToCheck[conelist])):
+                cone = listsToCheck[conelist][coneIndex]
+                #cone stucture:  [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)]
+                ignoreCone = False
+                if(cone[0] in ignoreConeIDs):
+                    ignoreCone = True
+                coneConnections = [cone[2][0][1] >= 0, cone[2][1][1] >= 0]
+                if(((coneConnectionExclusions == EXCL_UNCONN) and not (coneConnections[0] or coneConnections[1])) or \
+                   ((coneConnectionExclusions == EXCL_SING_CONN) and ((coneConnections[0] and not coneConnections[1]) or (not coneConnections[0] and coneConnections[1]))) or \
+                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1]))):
                     ignoreCone = True
                 elif((cone[2][0][1] >= 0) or (cone[2][1][1] >= 0)):
                     for coneIDtoIgnore in ignoreLinkedConeIDs:  #using "((cone[2][0][0] in ignoreLinkedConeIDs) or (cone[2][0][0] in ignoreLinkedConeIDs))" would search the array twice, a single forloop is faster
@@ -432,20 +477,14 @@ class pygamesim:
                     # #distance = posDelta[0]/np.cos(angle)  #cah
                     # #distance = (posDelta[0]**2 + posDelta[1]**2)**0.5  #(A^2 + B^2)^0.5 = C
                     distance, angle = distAngleBetwPos(pos, cone[1]) #math obove was moved to a handy function
-                    if(((distance < simpleThreshold) if (simpleThreshold > 0) else True) and ((radRange(angle, angleThreshRange[0], angleThreshRange[1])) if (len(angleThreshRange)==2) else True)):
-                        returnCone = []
-                        returnCone.append(cone[0]) #cone ID
-                        returnCone.append(cone[1]) #pos
-                        returnCone.append(cone[2]) #[[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]]
-                        returnCone.append([distance, angle])
-                        returnCone.append(coneIndex)
-                        returnCone.append(cone[3])
-                        #store the data in the return list. If 'sortByDistance', then sort it right here, as opposed to afterwards
-                        #alternatively, 'listToAppend = returnList if mergeLists else returnList[conelist]' and the just append to that (saves a few lines of code)
+                    if(((distance < simpleThreshold) if (simpleThreshold > 0) else True) and ((radRange(angle, currentAngleThreshRange[0], currentAngleThreshRange[1])) if (hasAngleThreshRange) else True)):
+                        ## returnCone structure: [[distance, angle], coneIndex, cone] (where 'cone' is just a simple pointer to the cone)
+                        returnCone = [[distance, angle], coneIndex, cone]
+                        
                         if(sortBySomething == SORTBY_DIST):
                             insertionDone = False
                             for i in range(len(returnListPointer)):
-                                if((returnCone[3][0] < returnListPointer[i][3][0]) and (not insertionDone)): #if the new entry is larger
+                                if((returnCone[0][0] < returnListPointer[i][0][0]) and (not insertionDone)): #if the new entry is larger
                                     returnListPointer.insert(i, returnCone)
                                     insertionDone = True
                             if(not insertionDone): #if the new entry is larger than the last entry, append it
@@ -453,7 +492,7 @@ class pygamesim:
                         elif(sortBySomething == SORTBY_ANGL):
                             insertionDone = False
                             for i in range(len(returnListPointer)):
-                                if((returnCone[3][1] < returnListPointer[i][3][1]) and (not insertionDone)): #if the new entry is larger
+                                if((returnCone[0][1] < returnListPointer[i][0][1]) and (not insertionDone)): #if the new entry is larger
                                     returnListPointer.insert(i, returnCone)
                                     insertionDone = True
                             if(not insertionDone): #if the new entry is larger than the last entry, append it
@@ -461,7 +500,7 @@ class pygamesim:
                         elif(sortBySomething == SORTBY_ANGL_DELT):
                             insertionDone = False
                             for i in range(len(returnListPointer)):
-                                if((radDiff(returnCone[3][1], angleDeltaTarget) < radDiff(returnListPointer[i][3][1], angleDeltaTarget)) and (not insertionDone)): #if the new entry is larger
+                                if((radDiff(returnCone[0][1], angleDeltaTarget) < radDiff(returnListPointer[i][0][1], angleDeltaTarget)) and (not insertionDone)): #if the new entry is larger
                                     returnListPointer.insert(i, returnCone)
                                     insertionDone = True
                             if(not insertionDone): #if the new entry is larger than the last entry, append it
@@ -469,7 +508,7 @@ class pygamesim:
                         elif(sortBySomething == SORTBY_ANGL_DELT_ABS):
                             insertionDone = False
                             for i in range(len(returnListPointer)):
-                                if((abs(radDiff(returnCone[3][1], angleDeltaTarget)) < abs(radDiff(returnListPointer[i][3][1], angleDeltaTarget))) and (not insertionDone)): #if the new entry is larger
+                                if((abs(radDiff(returnCone[0][1], angleDeltaTarget)) < abs(radDiff(returnListPointer[i][0][1], angleDeltaTarget))) and (not insertionDone)): #if the new entry is larger
                                     returnListPointer.insert(i, returnCone)
                                     insertionDone = True
                             if(not insertionDone): #if the new entry is larger than the last entry, append it
@@ -477,7 +516,6 @@ class pygamesim:
                         else:
                             returnListPointer.append(returnCone)
         return(returnList)
-    
     
     def overlapConeCheck(self, posToCheck):
         boolAnswer = False;   leftOrRight = False;   indexInLeftRightList = 0;   coneListEntry = [] #boolAnswer MUST default to False, the other variables dont matter as much
@@ -506,13 +544,103 @@ class pygamesim:
         else:
             currentFrontOrBack = (intBoolInv(coneToConnectPreferredConnection) if (currentConnectionsFilled[coneToConnectPreferredConnection]) else coneToConnectPreferredConnection) # default to coneToConnectPreferredConnection
             currentExistingAngle = radRoll(radInv(currentConeConnections[intBoolInv(currentFrontOrBack)][2])) #if there is not existing connection, this will return radRoll(radInv(0.0)), which is pi (or -pi). only make use of this value if(currentConnectionsFilled[0] or currentConnectionsFilled[1])
-            nearbyConeList = self.distanceToCone(coneToConnectPos, [self.rightConeList if leftOrRight else self.leftConeList], SORTBY_DIST, True, [coneToConnectID], self.coneConnectionThreshold, True, [coneToConnectID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
-            # nearbyConeList structure: [[cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], [dist, angle], index in left/right array, cone data], ]
+            nearbyConeList = self.distanceToCone(coneToConnectPos, [self.rightConeList if leftOrRight else self.leftConeList], SORTBY_DIST, True, [coneToConnectID], self.coneConnectionThreshold, EXCL_DUBL_CONN, [coneToConnectID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
+            # nearbyConeList structure: [[dist, angle], index in left/right array, [[cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]]]
+            if(len(nearbyConeList) < 1):
+                #print("nearbyConeList empty")
+                return(False, [])
+            bestCandidateIndex = -1;   highestStrength = 0;   otherfrontOrBack = -1;  candidatesDiscarded = 0
+            candidateList = []
+            for i in range(len(nearbyConeList)):
+                cone = nearbyConeList[i][2] #not strictly needed, just for legibility
+                #cone data structure: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]  (regular cone structure)
+                connectionsFilled = [(cone[2][0][1] >= 0), (cone[2][1][1] >= 0)] #2-size list of booleans
+                if(connectionsFilled[0] and connectionsFilled[1]): #cone already doubly connected
+                    print("cone already doubly connected, but that was supposed to be filtered out in distanceToCone()!?!")
+                    candidatesDiscarded += 1
+                elif((cone[2][0][0] == coneToConnectID) or (cone[2][1][0] == coneToConnectID)): #cone already connected to coneToConnect
+                    print("cone connection already exists, but that was supposed to be filtered out in distanceToCone()!?!")
+                    candidatesDiscarded += 1
+                else:
+                    frontOrBack = (coneToConnectPreferredConnection if (connectionsFilled[intBoolInv(coneToConnectPreferredConnection)]) else intBoolInv(coneToConnectPreferredConnection)) # default to the inverse of coneToConnectPreferredConnection
+                    coneCandidateStrength = 1 #init var
+                    coneCandidateStrength *= 1.5-(nearbyConeList[i][0][0]/self.coneConnectionThreshold)  #high distance, low strength. Linear. worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
+                    angleToCone = nearbyConeList[i][0][1]
+                    #hard no's: if the angle difference is above the max (like 135 degrees), the prospect cone is just too damn weird, just dont connect to this one
+                    #note: this can be partially achieved by using angleThreshRange in distanceToCone() to preventatively discard cones like  angleThreshRange=([currentExistingAngle - self.coneConnectionMaxAngleDelta, currentExistingAngle + self.coneConnectionMaxAngleDelta] if (currentConnectionsFilled[0] or currentConnectionsFilled[1]) else [])
+                    if(((connectionsFilled[0] or connectionsFilled[1]) and (abs(radDiff(angleToCone, cone[2][intBoolInv(frontOrBack)][2])) > self.coneConnectionMaxAngleDelta)) or ((currentConnectionsFilled[0] or currentConnectionsFilled[1]) and (abs(radDiff(angleToCone, currentExistingAngle)) > self.coneConnectionMaxAngleDelta))):
+                        #print("very large angle delta")
+                        candidatesDiscarded += 1
+                    else:
+                        if(connectionsFilled[0] or connectionsFilled[1]): #if cone already has a connection, check the angle delta
+                            coneExistingAngle = cone[2][intBoolInv(frontOrBack)][2] #note: intBoolInv() is used to grab the existing connection
+                            coneCandidateStrength *= 1.5- min(abs(radDiff(coneExistingAngle, angleToCone))/self.coneConnectionHighAngleDelta, 1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                        if(currentConnectionsFilled[0] or currentConnectionsFilled[1]):
+                            angleDif = radDiff(currentExistingAngle, angleToCone) #radians to add to currentExistingAngle to get to angleToCone (abs value is most interesting)
+                            coneCandidateStrength *= 1.5- min(abs(angleDif)/self.coneConnectionHighAngleDelta, 1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                            ## (Vincent's) most-restrictive angle could be implemented here, or at the end, by using SORTBY_ANGL_DELT and scrolling through the list from bestCandidateIndex to one of the ends of the list (based on left/right-edness), however, this does require a previous connection (preferably a connection that is in, or leads to, the pathList) to get angleDeltaTarget
+                            coneCandidateStrength *= 1 + (0.5 if leftOrRight else -0.5)*max(min(angleDif/self.coneConnectionHighAngleDelta, 1), -1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                            ## if most-restrictive angle is applied at the end, when all candidates have been reviewed
+                            candidateList.append([i, angleDif, coneCandidateStrength])
+                        #if(idk yet
+                        if(coneCandidateStrength > highestStrength):
+                            highestStrength = coneCandidateStrength
+                            bestCandidateIndex = i
+                            otherfrontOrBack = frontOrBack
+            if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(nearbyConeList) == candidatesDiscarded)):
+                print("it seems no suitible candidates for cone connection were found at all... bummer.", len(nearbyConeList), candidatesDiscarded, bestCandidateIndex, highestStrength)
+                return(False, [])
+            
+            ## most restrictive angle check
+            if(currentConnectionsFilled[0] or currentConnectionsFilled[1]): #most restrictive angle can only be applied if there is a reference angle (you could also check len(candidateList)
+                print()
+                bestCandidateListIndex = findIndexBy2DEntry(candidateList, 0, bestCandidateIndex)
+                for i in range(len(candidateList)):
+                    if((candidateList[i][1] > candidateList[bestCandidateListIndex][1]) if leftOrRight else (candidateList[i][1] < candidateList[bestCandidateListIndex][1])): #most restrictive angle is lowest angle
+                        print("more restrictive angle found:", candidateList[i][1], "is better than", candidateList[bestCandidateListIndex][1])
+                        #if((abs(radDiff(candidateList[i][1], candidateList[bestCandidateListIndex][1])) > self.coneConnectionRestrictiveAngleChangeThreshold) and ((candidateList[i][2]/highestStrength) > self.coneConnectionRestrictiveAngleStrengthThreshold)):
+                        if(abs(radDiff(candidateList[i][1], candidateList[bestCandidateListIndex][1])) > self.coneConnectionRestrictiveAngleChangeThreshold):
+                            print("old highestStrength:", round(highestStrength, 2), " new highestStrength:", round(candidateList[i][2], 2), " ratio:", round(candidateList[i][2]/highestStrength, 2))
+                            bestCandidateListIndex = i
+                            bestCandidateIndex = candidateList[i][0]
+                            highestStrength = candidateList[i][2]
+            
+            #print("cone connection made between (ID):", coneToConnectID, "and (ID):", nearbyConeList[bestCandidateIndex][0])
+            ## make the connection:
+            coneListToUpdate = (self.rightConeList if leftOrRight else self.leftConeList)
+            if(updateInputConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
+                ## input cone
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][0] = nearbyConeList[bestCandidateIndex][2][0] #save coneID
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][1] = nearbyConeList[bestCandidateIndex][1] #save index
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][2] = nearbyConeList[bestCandidateIndex][0][1] #save angle (from perspective of coneToConnect)
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][3] = nearbyConeList[bestCandidateIndex][0][0] #save distance
+                coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][4] = highestStrength
+                self.logFileChanged = True #set flag
+            if(updateWinnerConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
+                ## and the other cone
+                winnerConeIndexInList = nearbyConeList[bestCandidateIndex][1]
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][0] = coneToConnectID #save coneID
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][1] = coneToConnectIndex #save index
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][2] = radInv(nearbyConeList[bestCandidateIndex][0][1]) #save angle (from perspective of that cone)
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][3] = nearbyConeList[bestCandidateIndex][0][0] #save distance
+                coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][4] = highestStrength
+                self.logFileChanged = True #set flag
+            newConnectionData = [nearbyConeList[bestCandidateIndex][2][0], nearbyConeList[bestCandidateIndex][1], nearbyConeList[bestCandidateIndex][0][1], nearbyConeList[bestCandidateIndex][0][0], highestStrength, currentFrontOrBack, otherfrontOrBack]
+            return(True, newConnectionData) # newConnectionData = [ID, index, angle, dist, strength, connection_index_inputCone, connection_index_winnerCone]
+    
+    def connectConeSuperSimple(self, coneToConnectID, coneToConnectPos, leftOrRight, coneToConnectIndex, currentConeConnections=[[-1,-1,0.0,0.0,0.0],[-1,-1,0.0,0.0,0.0]], coneToConnectPreferredConnection=1, updateInputConeInList=True, updateWinnerConeInList=True):
+        currentConnectionsFilled = [(currentConeConnections[0][1] >= 0), (currentConeConnections[1][1] >= 0)] #2-size list of booleans
+        if(currentConnectionsFilled[0] and currentConnectionsFilled[1]):#if both connection entries are already full
+            print("input cone already doubly connected?!:", currentConeConnections)
+            return(False, [])
+        else:
+            currentFrontOrBack = (intBoolInv(coneToConnectPreferredConnection) if (currentConnectionsFilled[coneToConnectPreferredConnection]) else coneToConnectPreferredConnection) # default to coneToConnectPreferredConnection
+            nearbyConeList = self.distanceToConeSquared(coneToConnectPos, [self.rightConeList if leftOrRight else self.leftConeList], True, True, [coneToConnectID], self.coneConnectionThresholdSquared, EXCL_DUBL_CONN, [coneToConnectID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
             if(len(nearbyConeList) > 0):
                 bestCandidateIndex = -1;   highestStrength = 0;   otherfrontOrBack = -1;  candidatesDiscarded = 0
                 for i in range(len(nearbyConeList)):
-                    cone = nearbyConeList[i] #not needed, just for legibility
-                    #cone data structure: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], [dist, angle], index in left/right array, cone data]
+                    cone = nearbyConeList[i][2] #not needed, just for legibility
+                    #cone data structure: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], squared dist, index in left/right array, cone data (certainty, time spotted, etc)]
                     connectionsFilled = [(cone[2][0][1] >= 0), (cone[2][1][1] >= 0)] #2-size list of booleans
                     if(connectionsFilled[0] and connectionsFilled[1]): #cone already doubly connected
                         print("cone already doubly connected, but that was supposed to be filtered out in distanceToCone()!?!")
@@ -521,113 +649,41 @@ class pygamesim:
                         print("cone connection already exists, but that was supposed to be filtered out in distanceToCone()!?!")
                         candidatesDiscarded += 1
                     else:
-                        frontOrBack = (coneToConnectPreferredConnection if (connectionsFilled[intBoolInv(coneToConnectPreferredConnection)]) else intBoolInv(coneToConnectPreferredConnection)) # default to the inverse of coneToConnectPreferredConnection
+                        frontOrBack = (coneToConnectPreferredConnection if (connectionsFilled[intBoolInv(coneToConnectPreferredConnection)]) else intBoolInv(coneToConnectPreferredConnection)) #default to the inverse of coneToConnectPreferredConnection
                         coneCandidateStrength = 1 #init var
-                        coneCandidateStrength *= 1.5-(cone[3][0]/self.coneConnectionThreshold)  #high distance, low strength. Linear. worst>0.5 best<1.5
-                        angleToCone = cone[3][1]
-                        #hard no's: if the angle difference is above the max (like 135 degrees), the prospect cone is just too damn weird, just dont connect to this one
-                        #note: this can be partially achieved by using angleThreshRange in distanceToCone() to preventatively discard cones like  angleThreshRange=([currentExistingAngle - self.coneConnectionMaxAngleDelta, currentExistingAngle + self.coneConnectionMaxAngleDelta] if (currentConnectionsFilled[0] or currentConnectionsFilled[1]) else [])
-                        if(((connectionsFilled[0] or connectionsFilled[1]) and (abs(radDiff(angleToCone, cone[2][intBoolInv(frontOrBack)][2])) > self.coneConnectionMaxAngleDelta)) or ((currentConnectionsFilled[0] or currentConnectionsFilled[1]) and (abs(radDiff(angleToCone, currentExistingAngle)) > self.coneConnectionMaxAngleDelta))):
-                            #print("very large angle delta")
-                            candidatesDiscarded += 1
-                        else:
-                            if(connectionsFilled[0] or connectionsFilled[1]): #if cone already has a connection, check the angle delta
-                                coneExistingAngle = cone[2][intBoolInv(frontOrBack)][2] #note: intBoolInv() is used to grab the existing connection
-                                coneCandidateStrength *= 1.5- min(abs(radDiff(angleToCone, coneExistingAngle))/self.coneConnectionHighAngleDelta, 1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
-                            if(currentConnectionsFilled[0] or currentConnectionsFilled[1]):
-                                coneCandidateStrength *= 1.5- min(abs(radDiff(angleToCone, currentExistingAngle))/self.coneConnectionHighAngleDelta, 1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
-                            #if(idk yet
-                            #(Vincent's) most-restrictive angle could be implemented here, or at the end, by using SORTBY_ANGL_DELT and scrolling through the list from bestCandidateIndex to one of the ends of the list (based on left/right-edness), however, this does require a previous connection (preferably a connection that is in, or leads to, the pathList) to get angleDeltaTarget
-                            if(coneCandidateStrength > highestStrength):
-                                highestStrength = coneCandidateStrength
-                                bestCandidateIndex = i
-                                otherfrontOrBack = frontOrBack
+                        coneCandidateStrength *= 1.5-(nearbyConeList[i][0]/self.coneConnectionThresholdSquared)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
+                        ## no angle math can be done, as Pythagoras's ABC is used, not sohcahtoa :)
+                        if(coneCandidateStrength > highestStrength):
+                            highestStrength = coneCandidateStrength
+                            bestCandidateIndex = i
+                            otherfrontOrBack = frontOrBack
                 if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(nearbyConeList) == candidatesDiscarded)):
                     print("it seems no suitible candidates for cone connection were found at all... bummer.", len(nearbyConeList), candidatesDiscarded, bestCandidateIndex, highestStrength)
                     return(False, [])
                 ## else (because it didnt return() and stop the function)
-                #print("cone connection made between (ID):", coneToConnectID, "and (ID):", nearbyConeList[bestCandidateIndex][0])
+                #print("simple cone connection made between (ID):", coneToConnectID, "and (ID):", nearbyConeList[bestCandidateIndex][0])
                 ## make the connection:
                 coneListToUpdate = (self.rightConeList if leftOrRight else self.leftConeList)
                 if(updateInputConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
                     ## input cone
-                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][0] = nearbyConeList[bestCandidateIndex][0] #save coneID
-                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][1] = nearbyConeList[bestCandidateIndex][4] #save index
-                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][2] = nearbyConeList[bestCandidateIndex][3][1] #save angle (from perspective of coneToConnect)
-                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][3] = nearbyConeList[bestCandidateIndex][3][0] #save distance
+                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][0] = nearbyConeList[bestCandidateIndex][2][0] #save coneID
+                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][1] = nearbyConeList[bestCandidateIndex][1] #save index
+                    #cant save angle data
+                    coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][3] = nearbyConeList[bestCandidateIndex][0] #save squared distance
                     coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][4] = highestStrength
-                    self.logFileChanged = True #set flag
                 if(updateWinnerConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
                     ## and the other cone
-                    winnerConeIndexInList = nearbyConeList[bestCandidateIndex][4]
+                    winnerConeIndexInList = nearbyConeList[bestCandidateIndex][1]
                     coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][0] = coneToConnectID #save coneID
                     coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][1] = coneToConnectIndex #save index
-                    coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][2] = radInv(nearbyConeList[bestCandidateIndex][3][1]) #save angle (from perspective of that cone)
-                    coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][3] = nearbyConeList[bestCandidateIndex][3][0] #save distance
+                    ## cant save angle data
+                    coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][3] = nearbyConeList[bestCandidateIndex][0] #save squared distance
                     coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][4] = highestStrength
-                    self.logFileChanged = True #set flag
-                newConnectionData = [nearbyConeList[bestCandidateIndex][0], nearbyConeList[bestCandidateIndex][4], nearbyConeList[bestCandidateIndex][3][1], nearbyConeList[bestCandidateIndex][3][0], highestStrength, currentFrontOrBack, otherfrontOrBack]
-                return(True, newConnectionData) # newConnectionData = [ID, index, angle, dist, strength, connection_index_inputCone, connection_index_winnerCone]
+                newConnectionData = [nearbyConeList[bestCandidateIndex][2][0], nearbyConeList[bestCandidateIndex][1], nearbyConeList[bestCandidateIndex][0], highestStrength, currentFrontOrBack, otherfrontOrBack]
+                return(True, newConnectionData) # newConnectionData = [ID, index, squared dist, strength, connection_index_inputCone, connection_index_winnerCone]
             else:
-                #print("nearbyConeList empty")
+                print("nearbyConeList empty")
                 return(False, [])
-    
-    # def connectConeSuperSimple(self, coneToConnectID, coneToConnectPos, leftOrRight, coneToConnectIndex, currentConeConnections=[[-1,-1,0.0,0.0,0.0],[-1,-1,0.0,0.0,0.0]], coneToConnectPreferredConnection=1, updateInputConeInList=True, updateWinnerConeInList=True):
-    #     currentConnectionsFilled = [(currentConeConnections[0][1] >= 0), (currentConeConnections[1][1] >= 0)] #2-size list of booleans
-    #     if(currentConnectionsFilled[0] and currentConnectionsFilled[1]):#if both connection entries are already full
-    #         print("input cone already doubly connected?!:", currentConeConnections)
-    #         return(False, [])
-    #     else:
-    #         currentFrontOrBack = (intBoolInv(coneToConnectPreferredConnection) if (currentConnectionsFilled[coneToConnectPreferredConnection]) else coneToConnectPreferredConnection) # default to coneToConnectPreferredConnection
-    #         nearbyConeList = self.distanceToConeSquared(coneToConnectPos, [self.rightConeList if leftOrRight else self.leftConeList], True, True, [coneToConnectID], self.coneConnectionThresholdSquared, True, [coneToConnectID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
-    #         if(len(nearbyConeList) > 0):
-    #             bestCandidateIndex = -1;   highestStrength = 0;   otherfrontOrBack = -1;  candidatesDiscarded = 0
-    #             for i in range(len(nearbyConeList)):
-    #                 cone = nearbyConeList[i] #not needed, just for legibility
-    #                 #cone data structure: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], squared dist, index in left/right array, cone data (certainty, time spotted, etc)]
-    #                 connectionsFilled = [(cone[2][0][1] >= 0), (cone[2][1][1] >= 0)] #2-size list of booleans
-    #                 if(connectionsFilled[0] and connectionsFilled[1]): #cone already doubly connected
-    #                     print("cone already doubly connected, but that was supposed to be filtered out in distanceToCone()!?!")
-    #                     candidatesDiscarded += 1
-    #                 elif((cone[2][0][0] == coneToConnectID) or (cone[2][1][0] == coneToConnectID)): #cone already connected to coneToConnect
-    #                     print("cone connection already exists, but that was supposed to be filtered out in distanceToCone()!?!")
-    #                     candidatesDiscarded += 1
-    #                 else:
-    #                     frontOrBack = (coneToConnectPreferredConnection if (connectionsFilled[intBoolInv(coneToConnectPreferredConnection)]) else intBoolInv(coneToConnectPreferredConnection)) #default to the inverse of coneToConnectPreferredConnection
-    #                     coneCandidateStrength = 1 #init var
-    #                     coneCandidateStrength *= 1.5-(cone[3]/self.coneConnectionThresholdSquared)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5
-    #                     ## no angle math can be done, as Pythagoras's ABC is used, not sohcahtoa :)
-    #                     if(coneCandidateStrength > highestStrength):
-    #                         highestStrength = coneCandidateStrength
-    #                         bestCandidateIndex = i
-    #                         otherfrontOrBack = frontOrBack
-    #             if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(nearbyConeList) == candidatesDiscarded)):
-    #                 print("it seems no suitible candidates for cone connection were found at all... bummer.", len(nearbyConeList), candidatesDiscarded, bestCandidateIndex, highestStrength)
-    #                 return(False, [])
-    #             ## else (because it didnt return() and stop the function)
-    #             print("cone connection made between (ID):", coneToConnectID, "and (ID):", nearbyConeList[bestCandidateIndex][0])
-    #             ## make the connection:
-    #             coneListToUpdate = (self.rightConeList if leftOrRight else self.leftConeList)
-    #             if(updateInputConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
-    #                 ## input cone
-    #                 coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][0] = nearbyConeList[bestCandidateIndex][0] #save coneID
-    #                 coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][1] = nearbyConeList[bestCandidateIndex][4] #save index
-    #                 #cant save angle data
-    #                 coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][3] = nearbyConeList[bestCandidateIndex][3] #save squared distance
-    #                 coneListToUpdate[coneToConnectIndex][2][currentFrontOrBack][4] = highestStrength
-    #             if(updateWinnerConeInList): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
-    #                 ## and the other cone
-    #                 winnerConeIndexInList = nearbyConeList[bestCandidateIndex][4]
-    #                 coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][0] = coneToConnectID #save coneID
-    #                 coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][1] = coneToConnectIndex #save index
-    #                 ## cant save angle data
-    #                 coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][3] = nearbyConeList[bestCandidateIndex][3] #save squared distance
-    #                 coneListToUpdate[winnerConeIndexInList][2][otherfrontOrBack][4] = highestStrength
-    #             newConnectionData = [nearbyConeList[bestCandidateIndex][0], nearbyConeList[bestCandidateIndex][4], nearbyConeList[bestCandidateIndex][3], highestStrength, currentFrontOrBack, otherfrontOrBack]
-    #             return(True, newConnectionData) # newConnectionData = [ID, index, squared dist, strength, connection_index_inputCone, connection_index_winnerCone]
-    #         else:
-    #             print("nearbyConeList empty")
-    #             return(False, [])
     
     def makePath(self):
         # pathList content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
@@ -636,248 +692,251 @@ class pygamesim:
             print("not gonna make path, already full circle")
             return(False)
         if(len(self.pathList) == 0):
-            if((len(self.rightConeList) > 0) and (len(self.leftConeList) > 0)):
-                #TBD !
-                #delete this:
-                firstLineLeftCone = self.leftConeList[0];   firstLineRightCone = self.rightConeList[0]
-                
-                ## if firstLine___Cone is connected to something, make sure those connections are angled similarly to the car itself, maybe
-                
-                pathWidth, lineAngle = distAngleBetwPos(firstLineLeftCone[1], firstLineRightCone[1])
-                carAngle = radRoll(lineAngle + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
-                centerPoint = [firstLineRightCone[1][0] + (firstLineLeftCone[1][0]-firstLineRightCone[1][0])/2, firstLineRightCone[1][1] + (firstLineLeftCone[1][1]-firstLineRightCone[1][1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
-                self.pathList.append([centerPoint, [lineAngle, carAngle], pathWidth, [firstLineLeftCone[0], firstLineLeftCone[1], 0], [firstLineRightCone[0], firstLineRightCone[1], 0], 69.420])
-            else:
-                print("one or more of the coneLists is empty, cant place first pathLine")
+            if((len(self.rightConeList) < 2) or (len(self.leftConeList) < 2)): #first pathLine can only be made between 2 connected cones
+                print("not enough cones in one or more coneLists, cant place first pathLine")
                 return(False)
-        else:
-            lastPathLine = self.pathList[-1] # -1 gets the last item in list, you could also use (len(pathList)-1)
-            lastLeftCone = self.leftConeList[lastPathLine[3][2]]
-            lastRightCone = self.rightConeList[lastPathLine[4][2]]
-            lastLeftConeConnectionIndex = 1 #try to use 'front' connection by default
-            lastRightConeConnectionIndex = 1
-            lastLeftConnectionsFilled = [lastLeftCone[2][0][1] >= 0, lastLeftCone[2][1][1] >= 0]
-            lastRightConnectionsFilled = [lastRightCone[2][0][1] >= 0, lastRightCone[2][1][1] >= 0]
-            #most of the code below is sanity checks, but some of it is for the purpouses of flipping connections to fit the 'back','front' model. This can be done differently, by putting it in the connectCone() function, for example. Threre might be some useless redundancy in the code below, but fuck it, it works (for now)
-            ## check basics NOTE: certain parts may become obsolete, given later improvements to the first-pathLine-finding code. The more restrictive the first pathLine is, the simpler finding the rest of the path becomes
-            if(len(self.pathList) == 1): #in the (somewhat niche) scenario where the first pathline has been drawn, but the direction to follow is still unclear
-                if(not (lastLeftConnectionsFilled[0] or lastLeftConnectionsFilled[1])):
-                    #there is only one pathLine entry, and the last (and therefore also first) left cone has no connections, then why bother looking
-                    print("no connections on first lastLeftCone (unlikely):", lastLeftCone)
+            
+            #search cones here
+            firstCone = [None, None]
+            firstConeIndexInArray = [-1,-1]
+            if((self.finishLinePos[0] is not None) or (self.finishLinePos[1] is not None)):
+                print("using finish cones to make first pathLine")
+                if((self.finishLinePos[0] is not None) and (self.finishLinePos[1] is not None)):
+                    firstCone = self.finishLinePos #finishLinePos is already a list of 2 pointers, so it should be fine to go without copying them(, right?)
+                    firstConeIndexInArray = [findIndexBy2DEntry(self.leftConeList, 0, firstCone[0][0]), findIndexBy2DEntry(self.rightConeList, 0, firstCone[1][0])]
+                else:
+                    print("only 1 finish cone set, makePath can just wait untill the second is found, right?")
                     return(False)
-                elif(not lastLeftConnectionsFilled[lastLeftConeConnectionIndex]): #if it only has a 'back' connection, just move the back one to the front
+            else: #if there aren't already finish cones, then find it the old-fashioned way, by looking for cones near the car
+                sideAngleRanges = [[self.cars[0].orient+(np.pi/2)-self.pathFirstLineCarSideAngleDelta, self.cars[0].orient+(np.pi/2)+self.pathFirstLineCarSideAngleDelta], [self.cars[0].orient-(np.pi/2)-self.pathFirstLineCarSideAngleDelta, self.cars[0].orient-(np.pi/2)+self.pathFirstLineCarSideAngleDelta]] #left side is car.orient +pi/2, right side is car.orient -pi/2
+                firstConeCandidates = self.distanceToCone(self.cars[0].pos, [self.leftConeList, self.rightConeList], SORTBY_DIST, False, [], self.pathFirstLinePosDist, EXCL_UNCONN, [], self.cars[0].orient, sideAngleRanges)
+                for LorR in range(2):
+                    bestCandidateIndex = -1;   highestStrength = 0;   candidatesDiscarded = 0
+                    #carPerpAngle = self.cars[0].orient + (np.pi*(0.5 if (LorR == 1) else -0.5))
+                    carPerpAngle = self.cars[0].orient - (np.pi/2) #always get CW perpendicular
+                    for i in range(len(firstConeCandidates[LorR])):
+                        cone = firstConeCandidates[LorR][i][2]
+                        connectionsFilled = [(cone[2][0][1] >= 0), (cone[2][1][1] >= 0)] #2-size list of booleans
+                        connectionAnglesAllowed = [((abs(radDiff(cone[2][0][2], self.cars[0].orient)) < self.pathFirstLineCarAngleDeltaMax) if connectionsFilled[0] else False), ((abs(radDiff(cone[2][1][2], self.cars[0].orient)) < self.pathFirstLineCarAngleDeltaMax) if connectionsFilled[1] else False)]
+                        ## it's important to note that the distance calculated by distanceToCone() is between the center of the car and the cone, and therefore not the shortest path, or real distance to the car (a cone next to a wheel will have a higher distance than a cone next to the middle of the car, which is illogical)
+                        ## this illogical distance can still be used to help filter out candidates, but for an accurate strength-rating, distanceToCar() (a function of the raceCar class) should be used
+                        coneOverlapsCar, distToCar = self.cars[0].distanceToCar(cone[1])
+                        #print("evaluating "+("right" if (LorR==1) else "left")+" cone:", cone[0], connectionsFilled, connectionAnglesAllowed, coneOverlapsCar, distToCar)
+                        if(not (connectionsFilled[0] or connectionsFilled[1])):
+                            ## somehow, an unconnected cone slipped past the filer in distanceToCone(). this should be impossible, but i wrote the filter code in a hurry, so little debugging cant hurt
+                            print("impossible filter slip 1")
+                            candidatesDiscarded += 1
+                        elif(not (connectionAnglesAllowed[0] or connectionAnglesAllowed[1])):
+                            ## neither of the connections on this candidate 
+                            print("neither connections have acceptable angles")
+                            candidatesDiscarded += 1
+                        elif(connectionAnglesAllowed[0] and connectionAnglesAllowed[1]):
+                            ## somehow, both connections are alligned with the car, and since coneConnectionMaxAngleDelta exists, that should be impossible
+                            print("impossible angle sitch 1")
+                            candidatesDiscarded += 1
+                        elif(coneOverlapsCar):
+                            print("cone overlaps car")
+                            candidatesDiscarded += 1
+                        else:
+                            coneCandidateStrength = 1 #init var
+                            coneCandidateStrength *= 1.5-min(distToCar/self.pathFirstLineCarDist, 1)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5
+                            coneCandidateStrength *= 1.5-abs(radDiff(cone[2][(0 if connectionAnglesAllowed[0] else 1)][2], self.cars[0].orient))/self.pathFirstLineCarAngleDeltaMax  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                            ## this following check makes sure the pathline is perpendicular to the car
+                            conePerpAngle = 0 #init var
+                            if(connectionsFilled[0] and connectionsFilled[1]):
+                                conePerpAngle = radMidd(cone[2][0][2], cone[2][1][2]) #note: radMidd() has inputs (lowBound, upBound), so for right cones this will give an angle that points AWAY from the car, and for left cones it points towards the car (both in the same direction if they're paralel)
+                            else:
+                                connectionToUse = (1 if connectionsFilled[1] else 0)
+                                conePerpAngle = radRoll(cone[2][connectionToUse][2] + (np.pi*(0.5 if (connectionToUse == 0) else -0.5))) #see note on claculation with double connection
+                            coneCandidateStrength *= 1.5-min(abs(radDiff(conePerpAngle, carPerpAngle))/self.pathConnectionMaxAngleDelta, 1)
+                            ## using existing chosen firstCone, only works for the right cone (this is an unequal check, so i hate it, but it does work to make sure the first line is straight (not diagonal))
+                            if(LorR == 1): #TO BE IMPROVED, but i dont know quite how yet
+                                leftFirstConeConnectionsFilled = [(firstCone[0][2][0][1] >= 0), (firstCone[0][2][1][1] >= 0)]
+                                leftPerpAngle = 0 #init var
+                                if(leftFirstConeConnectionsFilled[0] and leftFirstConeConnectionsFilled[1]):
+                                    leftPerpAngle = radMidd(firstCone[0][2][0][2], firstCone[0][2][1][2])
+                                else:
+                                    connectionToUse = (1 if leftFirstConeConnectionsFilled[1] else 0)
+                                    leftPerpAngle = radRoll(firstCone[0][2][connectionToUse][2] + (np.pi*(0.5 if (connectionToUse == 0) else -0.5)))
+                                tempPathWidth, tempPathAngle = distAngleBetwPos(firstCone[0][1], cone[1])
+                                coneCandidateStrength *= 1.5-min(abs(radDiff(tempPathAngle, leftPerpAngle))/self.pathConnectionMaxAngleDelta, 1)
+                                #you could also even do distance, but whatever
+                            if(coneCandidateStrength > highestStrength):
+                                highestStrength = coneCandidateStrength
+                                bestCandidateIndex = i
+                    if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(firstConeCandidates[LorR]) == candidatesDiscarded)):
+                        print("it seems no suitible candidates for first "+("right" if (LorR==1) else "left")+" cone were found at all... bummer.", len(firstConeCandidates[LorR]), candidatesDiscarded, bestCandidateIndex, highestStrength)
+                        return(False, [])
+                    ## if the code makes it here, a suitable first cone has been selected.
+                    #print("first "+("right" if (LorR==1) else "left")+" cone found!", highestStrength, bestCandidateIndex, len(firstConeCandidates[LorR]), candidatesDiscarded)
+                    firstCone[LorR] = firstConeCandidates[LorR][bestCandidateIndex][2]
+                    firstConeIndexInArray[LorR] = firstConeCandidates[LorR][bestCandidateIndex][1] #could be eliminated in favor of pointers?
+            
+            ## angle checks and swithing connections if possible
+            for LorR in range(2):
+                firstConeConnectionIndex = 1 #try to use the 'front' connection by default
+                firstConnectionsFilled = [firstCone[LorR][2][0][1] >= 0, firstCone[LorR][2][1][1] >= 0]
+                if(not (firstConnectionsFilled[0] or firstConnectionsFilled[1])): #if it has no conenctions at all (this SHOULD NEVER HAPPEN, because distanceToCone() filters out unconnected cones, but might as well check
+                    #first cone is unconnected
+                    print("no connections on "+("right" if (LorR==1) else "left")+" firstCone:", firstCone[LorR])
+                    return(False)
+                elif(not firstConnectionsFilled[firstConeConnectionIndex]): #if it only has a 'back' connection, just move the back one to the front
                     #first, switch connection data to make preferable (front) the only valid one
                     #print("whipping lastLeft (1):", lastLeftCone[2])
-                    tempConVal = lastLeftCone[2][0] #one of these is an empty connection
-                    lastLeftCone[2][0] = lastLeftCone[2][1]
-                    lastLeftCone[2][1] = tempConVal
+                    tempConVal = firstCone[LorR][2][0] #one of these is an empty connection
+                    firstCone[LorR][2][0] = firstCone[LorR][2][1]
+                    firstCone[LorR][2][1] = tempConVal
                     self.logFileChanged = True #set flag
                     #then check the angle of that connection. If it is too far off from the car angle then something is terribly wrong (or 
-                    if(abs(radDiff(lastLeftCone[2][lastLeftConeConnectionIndex][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
-                        print("first and only left angle large:", lastLeftConeConnectionIndex, round(np.rad2deg(lastLeftCone[2][lastLeftConeConnectionIndex][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastLeftCone[2][lastLeftConeConnectionIndex][2], self.cars[0].orient))),2))
+                    if(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
+                        print("only first "+("right" if (LorR==1) else "left")+" connection angle larger than allowed:", firstConeConnectionIndex, round(np.rad2deg(firstCone[LorR][2][firstConeConnectionIndex][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.cars[0].orient))),2))
                         return(False)
-                elif(lastLeftConnectionsFilled[intBoolInv(lastLeftConeConnectionIndex)]): #if it has both connections:
-                    if(abs(radDiff(lastLeftCone[2][lastLeftConeConnectionIndex][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
-                        #print("first left angle large:", lastLeftConeConnectionIndex, round(np.rad2deg(lastLeftCone[2][lastLeftConeConnectionIndex][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastLeftCone[2][lastLeftConeConnectionIndex][2], self.cars[0].orient))),2))
-                        if(abs(radDiff(lastLeftCone[2][intBoolInv(lastLeftConeConnectionIndex)][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
-                            print("second left angle also large", round(np.rad2deg(lastLeftCone[2][intBoolInv(lastLeftConeConnectionIndex)][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastLeftCone[2][intBoolInv(lastLeftConeConnectionIndex)][2], self.cars[0].orient))),2))
+                elif(firstConnectionsFilled[intBoolInv(firstConeConnectionIndex)]): #if it has both connections:
+                    if(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
+                        if(abs(radDiff(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
+                            print("second left angle also larger than allowed", round(np.rad2deg(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.cars[0].orient))),2))
                             return(False)
                         else: #first angle was large, but second angle wasnt, just switch the connections around and we're good to go
                             #print("whipping lastLeft (2):", lastLeftCone[2])
-                            tempConVal = lastLeftCone[2][0] #one of these is an empty connection
-                            lastLeftCone[2][0] = lastLeftCone[2][1]
-                            lastLeftCone[2][1] = tempConVal
+                            tempConVal = firstCone[LorR][2][0] #one of these is an empty connection
+                            firstCone[LorR][2][0] = firstCone[LorR][2][1]
+                            firstCone[LorR][2][1] = tempConVal
                             self.logFileChanged = True #set flag
-                ##else do nothing, everything is allready good and there's no need to worry
-            elif(not lastLeftConnectionsFilled[lastLeftConeConnectionIndex]): #if it doesnt have a connected cone on the 
-                #print("no preferable (front) connection on lastLeftCone")
-                if(not lastLeftConnectionsFilled[intBoolInv(lastLeftConeConnectionIndex)]):
-                    print("no connections on lastLeftCone (impossible):", lastLeftCone)
-                    return(False)
-                else:
-                    if(findIndexBy3DEntry(self.pathList, 3, 0, lastLeftCone[2][intBoolInv(lastLeftConeConnectionIndex)][0]) >= 0): #check if that isnt already in pathlist
-                        ## if it is, then we just stop here. no more path generation can be done for now
-                        print("single lastLeft connection already in pathList (path at end of cone line, make more connections)")
+                ## else do nothing, everything is allready good and there's no need to worry
+            ## and now just put the first cones into the pathlist
+            pathWidth, lineAngle = distAngleBetwPos(firstCone[0][1], firstCone[1][1])
+            carAngle = radRoll(lineAngle + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
+            centerPoint = [firstCone[1][1][0] + (firstCone[0][1][0]-firstCone[1][1][0])/2, firstCone[1][1][1] + (firstCone[0][1][1]-firstCone[1][1][1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
+            self.pathList.append([centerPoint, [lineAngle, carAngle], pathWidth, [firstCone[0][0], firstCone[0][1], firstConeIndexInArray[0]], [firstCone[1][0], firstCone[1][1], firstConeIndexInArray[1]], 69.420])
+        
+        else:
+            lastPathLine = self.pathList[-1] # -1 gets the last item in list, you could also use (len(pathList)-1)
+            coneLists = [self.leftConeList, self.rightConeList];  lastCone = [];  lastConeConnectionIndex = [];  lastConePerpAngle = [];  prospectCone = [];  prospectConeConnectionIndex = [];  
+            for LorR in range(2):
+                lastCone.append(coneLists[LorR][lastPathLine[3+LorR][2]])
+                lastConeConnectionIndex.append(1) #try to use the 'front' connection by default
+                lastConnectionsFilled = [lastCone[LorR][2][0][1] >= 0, lastCone[LorR][2][1][1] >= 0]
+                #most of the code below is sanity checks, but some of it is for the purpouses of flipping connections to fit the 'back','front' model. This can be done differently, by putting it in the connectCone() function, for example. Threre might be some useless redundancy in the code below, but fuck it, it works (for now)
+                if(not lastConnectionsFilled[lastConeConnectionIndex[LorR]]): #if it doesnt have a connected cone on the 
+                    #print("no preferable (front) connection on lastLeftCone")
+                    if(not lastConnectionsFilled[intBoolInv(lastConeConnectionIndex[LorR])]):
+                        print("no connections on lastCone["+("right" if (LorR==1) else "left")+"] (impossible):", lastCone[LorR])
                         return(False)
-                    else: #if not, then the 'back' connection is the next (prospect) one, and this (last) cone has it all backwards. Switch the connection data for this cone around
-                        #print("whipping lastLeft (3):", lastLeftCone[2])
-                        tempConVal = lastLeftCone[2][0]
-                        lastLeftCone[2][0] = lastLeftCone[2][1]
-                        lastLeftCone[2][1] = tempConVal
-                        self.logFileChanged = True #set flag
-            
-            if(len(self.pathList) == 1): #in the (somewhat niche) scenario where the first pathline has been drawn, but the direction to follow is still unclear
-                if(not (lastRightConnectionsFilled[0] or lastRightConnectionsFilled[1])):
-                    #there is only one pathLine entry, and the last (and therefore also first) right cone has no connections, then why bother looking
-                    print("no connections on first lastRightCone (unlikely):", lastRightCone)
-                    return(False)
-                elif(not lastRightConnectionsFilled[lastRightConeConnectionIndex]): #if it only has a 'back' connection, just move the back one to the front
-                    #first, switch connection data to make preferable (front) the only valid one
-                    #print("whipping lastRight (1):", lastRightCone[2])
-                    tempConVal = lastRightCone[2][0] #one of these is an empty connection
-                    lastRightCone[2][0] = lastRightCone[2][1]
-                    lastRightCone[2][1] = tempConVal
-                    self.logFileChanged = True #set flag
-                    #then check the angle of that connection. If it is too far off from the car angle then something is terribly wrong (or 
-                    if(abs(radDiff(lastRightCone[2][lastRightConeConnectionIndex][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
-                        print("first and only right angle large:", lastRightConeConnectionIndex, round(np.rad2deg(lastRightCone[2][lastRightConeConnectionIndex][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastRightCone[2][lastRightConeConnectionIndex][2], self.cars[0].orient))),2))
-                        return(False)
-                elif(lastRightConnectionsFilled[intBoolInv(lastRightConeConnectionIndex)]): #if it has both connections:
-                    if(abs(radDiff(lastRightCone[2][lastRightConeConnectionIndex][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
-                        #print("first right angle large:", lastRightConeConnectionIndex, round(np.rad2deg(lastRightCone[2][lastRightConeConnectionIndex][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastRightCone[2][lastRightConeConnectionIndex][2], self.cars[0].orient))),2))
-                        if(abs(radDiff(lastRightCone[2][intBoolInv(lastRightConeConnectionIndex)][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
-                            print("second right angle also large", round(np.rad2deg(lastRightCone[2][intBoolInv(lastRightConeConnectionIndex)][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastRightCone[2][intBoolInv(lastRightConeConnectionIndex)][2], self.cars[0].orient))),2))
+                    else:
+                        if(findIndexBy3DEntry(self.pathList, 3, 0, lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][0]) >= 0): #check if that isnt already in pathlist
+                            ## if it is, then we just stop here. no more path generation can be done for now
+                            print("single lastCone["+("right" if (LorR==1) else "left")+"] connection already in pathList (path at end of cone line, make more connections)")
                             return(False)
-                        else: #first angle was large, but second angle wasnt, just switch the connections around and we're good to go
-                            #print("whipping lastRight (2):", lastRightCone[2])
-                            tempConVal = lastRightCone[2][0] #one of these is an empty connection
-                            lastRightCone[2][0] = lastRightCone[2][1]
-                            lastRightCone[2][1] = tempConVal
+                        else: #if not, then the 'back' connection is the next (prospect) one, and this (last) cone has it all backwards. Switch the connection data for this cone around
+                            #print("whipping lastCone["+("right" if (LorR==1) else "left")+"] (3):", lastLeftCone[2])
+                            tempConVal = lastCone[LorR][2][0]
+                            lastCone[LorR][2][0] = lastCone[LorR][2][1]
+                            lastCone[LorR][2][1] = tempConVal
                             self.logFileChanged = True #set flag
-                ##else do nothing, everything is allready good and there's no need to worry
-            elif(not lastRightConnectionsFilled[lastRightConeConnectionIndex]): #if it doesnt have a connected cone on the 
-                #print("no preferable (front) connection on lastRightCone")
-                if(not lastRightConnectionsFilled[intBoolInv(lastRightConeConnectionIndex)]):
-                    print("no connections on lastRightCone (impossible):", lastRightCone)
-                    return(False)
-                else:
-                    if(findIndexBy3DEntry(self.pathList, 4, 0, lastRightCone[2][intBoolInv(lastRightConeConnectionIndex)][0]) >= 0): #check if that isnt already in pathlist
-                        ## if it is, then we just stop here. no more path generation can be done for now
-                        print("single lastRight connection already in pathList (path at end of cone line, make more connections)")
+                #super safety check for first-pathLine code
+                if(len(self.pathList) == 1): #now check both angles again, just to be sure:
+                    if(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.cars[0].orient) > self.pathFirstLineCarAngleDeltaMax)):
+                        print("post correction first "+("right" if (LorR==1) else "left")+" angle large:", lastConeConnectionIndex[LorR], round(np.rad2deg(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.cars[0].orient))),2))
+                        if(((lastConnectionsFilled[intBoolInv(lastConeConnectionIndex[LorR])])) and (abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.cars[0].orient) > self.pathFirstLineCarAngleDeltaMax))):
+                            print("post correction second angle also large", round(np.rad2deg(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.cars[0].orient))),2))
                         return(False)
-                    else: #if not, then the 'back' connection is the next (prospect) one, and this (last) cone has it all backwards. Switch the connection data for this cone around
-                        #print("whipping lastRight (3):", lastRightCone[2])
-                        tempConVal = lastRightCone[2][0]
-                        lastRightCone[2][0] = lastRightCone[2][1]
-                        lastRightCone[2][1] = tempConVal
-                        self.logFileChanged = True #set flag
+                lastConePerpAngle.append(radMidd(lastCone[LorR][2][LorR][2], lastCone[LorR][2][intBoolInv(LorR)][2]) if (lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][1] >= 0) else radRoll(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2] + (np.pi*(0.5 if (lastConeConnectionIndex[LorR]==LorR) else -0.5)))) #note: addition or subtraction of half pi is a bit strange, dont worry about it :)
+                #note: currently i am using radInv() when calculating angle delta, because angles are from left cone to right cone, but if you reverse radMidd(lastRightCone[2][1][2], lastRightCone[2][0][2]) to be radMidd(lastRightCone[2][0][2], lastRightCone[2][1][2]) it will give an inverted angle already. less human, more efficient
+                #and now the prospect cones
+                prospectCone.append(coneLists[LorR][lastCone[LorR][2][lastConeConnectionIndex[LorR]][1]])
             
-            if(len(self.pathList) == 1): #now check both angles again, just to be sure:
-                if(abs(radDiff(lastLeftCone[2][lastLeftConeConnectionIndex][2], self.cars[0].orient) > self.pathFirstLineCarAngleDeltaMax)):
-                    print("post correction first left angle large:", lastLeftConeConnectionIndex, round(np.rad2deg(lastLeftCone[2][lastLeftConeConnectionIndex][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastLeftCone[2][lastLeftConeConnectionIndex][2], self.cars[0].orient))),2))
-                    if(((lastLeftConnectionsFilled[intBoolInv(lastLeftConeConnectionIndex)])) and (abs(radDiff(lastLeftCone[2][intBoolInv(lastLeftConeConnectionIndex)][2], self.cars[0].orient) > self.pathFirstLineCarAngleDeltaMax))):
-                        print("post correction second angle also large", round(np.rad2deg(lastLeftCone[2][intBoolInv(lastLeftConeConnectionIndex)][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastLeftCone[2][intBoolInv(lastLeftConeConnectionIndex)][2], self.cars[0].orient))),2))
-                    return(False)
-                if(abs(radDiff(lastRightCone[2][lastRightConeConnectionIndex][2], self.cars[0].orient) > self.pathFirstLineCarAngleDeltaMax)):
-                    print("post correction first right angle large:", lastRightConeConnectionIndex, round(np.rad2deg(lastRightCone[2][lastRightConeConnectionIndex][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastRightCone[2][lastRightConeConnectionIndex][2], self.cars[0].orient))),2))
-                    if(abs(radDiff(lastRightCone[2][intBoolInv(lastRightConeConnectionIndex)][2], self.cars[0].orient) > self.pathFirstLineCarAngleDeltaMax)):
-                        print("post correction second angle also large", round(np.rad2deg(lastRightCone[2][intBoolInv(lastRightConeConnectionIndex)][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastRightCone[2][intBoolInv(lastRightConeConnectionIndex)][2], self.cars[0].orient))),2))
-                    return(False)
-            
-            lastLeftConePerpAngle = (radMidd(lastLeftCone[2][0][2], lastLeftCone[2][1][2]) if (lastLeftCone[2][intBoolInv(lastLeftConeConnectionIndex)][1] >= 0) else radRoll(lastLeftCone[2][lastLeftConeConnectionIndex][2] + (np.pi*(-0.5 if (lastLeftConeConnectionIndex==1) else 0.5)))) #all of this assumes CCW is positive and CW is negative
-            lastRightConePerpAngle = (radMidd(lastRightCone[2][1][2], lastRightCone[2][0][2]) if (lastRightCone[2][intBoolInv(lastRightConeConnectionIndex)][1] >= 0) else radRoll(lastRightCone[2][lastRightConeConnectionIndex][2] + (np.pi*(0.5 if (lastRightConeConnectionIndex==1) else -0.5))))
-            prospectLeftCone = self.leftConeList[lastLeftCone[2][lastLeftConeConnectionIndex][1]] #get index from connection from lastLeftCone
-            prospectRightCone = self.rightConeList[lastRightCone[2][lastRightConeConnectionIndex][1]] #get index from connection from lastRightCone
             #check if you've gone full circle
-            if(((prospectLeftCone[0] == self.pathList[0][3][0]) and (prospectRightCone[0] == self.pathList[0][4][0])) \
-               or ((lastLeftCone[0] == self.pathList[0][3][0]) and (prospectRightCone[0] == self.pathList[0][4][0])) \
-               or ((prospectLeftCone[0] == self.pathList[0][3][0]) and (lastRightCone[0] == self.pathList[0][4][0]))):
+            if(((prospectCone[0][0] == self.pathList[0][3][0]) and (prospectCone[1][0] == self.pathList[0][4][0])) \
+               or ((lastCone[0][0] == self.pathList[0][3][0]) and (prospectCone[1][0] == self.pathList[0][4][0])) \
+               or ((prospectCone[0][0] == self.pathList[0][3][0]) and (lastCone[1][0] == self.pathList[0][4][0]))):
                 print("path full circle (by default)")
                 self.pathFullCircle = True
                 return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
-            prospectLeftConeConnectionIndex = (0 if (prospectLeftCone[2][0][0] == lastLeftCone[0]) else (1 if (prospectLeftCone[2][1][0] == lastLeftCone[0]) else -1)) #match connection. In simple, regular situations you could assume that the 'front' connection of the lastCone is the 'back' connection of prospectCone, but this is not a simple system, now is it :)
-            prospectRightConeConnectionIndex = (0 if (prospectRightCone[2][0][0] == lastRightCone[0]) else (1 if (prospectRightCone[2][1][0] == lastRightCone[0]) else -1)) #match connection. In simple, regular situations you could assume that the 'front' connection of the lastCone is the 'back' connection of prospectCone, but this is not a simple system, now is it :)
-            ## check connections and stop or switch around if needed
-            if(prospectLeftConeConnectionIndex == -1):
-                print("BIG issue: lastLeftCone pointed to this prospect cone, but this prospect cone does not point back", lastLeftCone[2], prospectLeftCone[2])
-            elif(prospectLeftConeConnectionIndex == 1): #prospect cone has its connections switched around (lastLeftCone's 'front' should connect to prospectLeftCone's 'back')
-                #print("whipping prospect left:", prospectLeftCone[2])
-                tempConVal = prospectLeftCone[2][0]
-                prospectLeftCone[2][0] = prospectLeftCone[2][1]
-                prospectLeftCone[2][1] = tempConVal
-                prospectRightConeConnectionIndex = 0
-                self.logFileChanged = True #set flag
             
-            if(prospectRightConeConnectionIndex == -1):
-                print("BIG issue: lastRightCone pointed to this prospect cone, but this prospect cone does not point back", lastRightCone[2], prospectRightCone[2])
-            elif(prospectRightConeConnectionIndex == 1): #prospect cone has its connections switched around (lastRightCone's 'front' should connect to prospectRightCone's 'back')
-                #print("whipping prospect right:", prospectRightCone[2])
-                tempConVal = prospectRightCone[2][0]
-                prospectRightCone[2][0] = prospectRightCone[2][1]
-                prospectRightCone[2][1] = tempConVal
-                prospectRightConeConnectionIndex = 0
-                self.logFileChanged = True #set flag
+            prospectConeConnectionIndex = [];  prospectConePerpAngle = []
+            for LorR in range(2):
+                prospectConeConnectionIndex.append(0 if (prospectCone[LorR][2][0][0] == lastCone[LorR][0]) else (1 if (prospectCone[LorR][2][1][0] == lastCone[LorR][0]) else -1)) #match connection. In simple, regular situations you could assume that the 'front' connection of the lastCone is the 'back' connection of prospectCone, but this is not a simple system, now is it :)
+                if(prospectConeConnectionIndex[LorR] == -1):
+                    print("BIG issue: lastCone["+("right" if (LorR==1) else "left")+"] pointed to this prospect cone, but this prospect cone does not point back", lastCone[LorR][2], prospectCone[LorR][2])
+                elif(prospectConeConnectionIndex[LorR] == 1): #prospect cone has its connections switched around (lastLeftCone's 'front' should connect to prospectLeftCone's 'back')
+                    #print("whipping prospect left:", prospectLeftCone[2])
+                    tempConVal = prospectCone[LorR][2][0]
+                    prospectCone[LorR][2][0] = prospectCone[LorR][2][1]
+                    prospectCone[LorR][2][1] = tempConVal
+                    prospectConeConnectionIndex[LorR] = 0
+                    self.logFileChanged = True #set flag
+                
+                prospectConePerpAngle.append(radMidd(prospectCone[LorR][2][LorR][2], prospectCone[LorR][2][intBoolInv(LorR)][2]) if (prospectCone[LorR][2][intBoolInv(prospectConeConnectionIndex[LorR])][1] >= 0) else radRoll(prospectCone[LorR][2][prospectConeConnectionIndex[LorR]][2] + (np.pi*(0.5 if (prospectConeConnectionIndex[LorR] == LorR) else -0.5))))
+                #note: currently i am using radInv() when calculating angle delta, because angles are from left cone to right cone, but if you reverse radMidd(lastRightCone[2][1][2], lastRightCone[2][0][2]) to be radMidd(lastRightCone[2][0][2], lastRightCone[2][1][2]) it will give an inverted angle already. less human, more efficient
             
-            prospectLeftConePerpAngle = (radMidd(prospectLeftCone[2][0][2], prospectLeftCone[2][1][2]) if (prospectLeftCone[2][intBoolInv(prospectLeftConeConnectionIndex)][1] >= 0) else radRoll(prospectLeftCone[2][prospectLeftConeConnectionIndex][2] + (np.pi*(-0.5 if (prospectLeftConeConnectionIndex==1) else 0.5))))
-            prospectRightConePerpAngle = (radMidd(prospectRightCone[2][1][2], prospectRightCone[2][0][2]) if (prospectRightCone[2][intBoolInv(prospectRightConeConnectionIndex)][1] >= 0) else radRoll(prospectRightCone[2][prospectRightConeConnectionIndex][2] + (np.pi*(0.5 if (prospectRightConeConnectionIndex==1) else -0.5))))
-            #note: currently i am using radInv() when calculating angle delta, because angles are from left cone to right cone, but if you reverse radMidd(lastRightCone[2][1][2], lastRightCone[2][0][2]) to be radMidd(lastRightCone[2][0][2], lastRightCone[2][1][2]) it will give an inverted angle already. less human, more efficient
+            # self.debugLines = [] #clear debugLines
+            # for LorR in range(2):
+            #     self.debugLines.append([1, self.realToPixelPos(lastCone[LorR][1]), [4, lastConePerpAngle[LorR]], 1+LorR])
+            #     self.debugLines.append([1, self.realToPixelPos(prospectCone[LorR][1]), [4, prospectConePerpAngle[LorR]], 1+LorR])
             
-            self.debugLines = [] #clear debugLines
-            self.debugLines.append([1, self.realToPixelPos(lastLeftCone[1]), [4, lastLeftConePerpAngle], 1])
-            self.debugLines.append([1, self.realToPixelPos(prospectLeftCone[1]), [4, prospectLeftConePerpAngle], 1])
-            self.debugLines.append([1, self.realToPixelPos(lastRightCone[1]), [4, lastRightConePerpAngle], 2])
-            self.debugLines.append([1, self.realToPixelPos(prospectRightCone[1]), [4, prospectRightConePerpAngle], 2])
-            
-            ## all of should really be in a forloop of some kind, but fuck it; manual it is
+            ## all of could really be in a forloop of some kind, but fuck it; manual it is
             strengths = [1,1,1] #4 possible path lines, one of which already exists (between lastLeftCone and lastRightCone), so calculate the strengths for the remaining three possible pathlines
             pathWidths = [0,0,0];   pathAngles = [0,0,0]
-            pathWidths[0], pathAngles[0] = distAngleBetwPos(lastLeftCone[1], prospectRightCone[1]) #last left to next right (for left (CCW) corners, where one left cone (lastLeftCone) connects to several right cones  (lastRightCone AND prospectRightCone))
-            strengths[0] *= 1.5-(min(pathWidths[0], self.pathConnectionThreshold)/self.pathConnectionThreshold) #strength based on distance, the threshold just determines minimum score, distance can be larger than threshold without math errors
-            strengths[0] *= 1.5-(min(abs(radDiff(pathAngles[0], lastLeftConePerpAngle)), self.pathConnectionMaxAngleDelta)/self.pathConnectionMaxAngleDelta) #strength based on angle delta from lastLeftConePerpAngle, the maxAngleDelta just determines minimum score, angle can be larger than threshold without math errors
-            strengths[0] *= 1.5-(min(abs(radDiff(radInv(pathAngles[0]), prospectRightConePerpAngle)), self.pathConnectionMaxAngleDelta)/self.pathConnectionMaxAngleDelta) #strength based on angle delta from prospectRightConePerpAngle, the maxAngleDelta just determines minimum score, angle can be larger than threshold without math errors
-            pathWidths[1], pathAngles[1] = distAngleBetwPos(prospectLeftCone[1], lastRightCone[1]) #last right to next left (for right (CW) corners, where one right cone (lastRightCone) connects to several left cones (lastLeftCone AND prospectLeftCone))
-            strengths[1] *= 1.5-(min(pathWidths[1], self.pathConnectionThreshold)/self.pathConnectionThreshold)
-            strengths[1] *= 1.5-(min(abs(radDiff(pathAngles[1], prospectLeftConePerpAngle)), self.pathConnectionMaxAngleDelta)/self.pathConnectionMaxAngleDelta)
-            strengths[1] *= 1.5-(min(abs(radDiff(radInv(pathAngles[1]), lastRightConePerpAngle)), self.pathConnectionMaxAngleDelta)/self.pathConnectionMaxAngleDelta)
-            pathWidths[2], pathAngles[2] = distAngleBetwPos(prospectLeftCone[1], prospectRightCone[1]) #prospect cones to each other (for straight sections of track, lekker simpel)
-            strengths[2] *= 1.5-(min(pathWidths[2], self.pathConnectionThreshold)/self.pathConnectionThreshold)
-            strengths[2] *= 1.5-(min(abs(radDiff(pathAngles[2], prospectLeftConePerpAngle)), self.pathConnectionMaxAngleDelta)/self.pathConnectionMaxAngleDelta)
-            strengths[2] *= 1.5-(min(abs(radDiff(radInv(pathAngles[2]), prospectRightConePerpAngle)), self.pathConnectionMaxAngleDelta)/self.pathConnectionMaxAngleDelta)
-            maxStrengthIndex, maxStrengthVal = maxIndex(strengths)
+            allCones = lastCone + prospectCone  #combine lists
+            allPerpAngles = lastConePerpAngle + prospectConePerpAngle #combine lists
+            maxStrengthIndex = -1; maxStrengthVal = -1;  winningCone = [None, None]
+            for i in range(3):
+                pathWidths[i], pathAngles[i] = distAngleBetwPos(allCones[(0 if (i==0) else 2)][1], allCones[(1 if (i==1) else 3)][1]) #last left to next right (for left (CCW) corners, where one left cone (lastLeftCone) connects to several right cones  (lastRightCone AND prospectRightCone))
+                strengths[i] *= 1.5-min(pathWidths[i]/self.pathConnectionThreshold, 1) #strength based on distance, the threshold just determines minimum score, distance can be larger than threshold without math errors
+                strengths[i] *= 1.5-min(abs(radDiff(pathAngles[i], allPerpAngles[(0 if (i==0) else 2)]))/self.pathConnectionMaxAngleDelta, 1) #strength based on angle delta from lastLeftConePerpAngle, the maxAngleDelta just determines minimum score, angle can be larger than threshold without math errors
+                strengths[i] *= 1.5-min(abs(radDiff(radInv(pathAngles[i]), allPerpAngles[(1 if (i==1) else 3)]))/self.pathConnectionMaxAngleDelta, 1) #strength based on angle delta from prospectRightConePerpAngle, the maxAngleDelta just determines minimum score, angle can be larger than threshold without math errors
+                if(strengths[i] >= maxStrengthVal):
+                    maxStrengthVal = strengths[i]
+                    maxStrengthIndex = i
+                    winningCone[0] = allCones[(0 if (i==0) else 2)];  winningCone[1] = allCones[(1 if (i==1) else 3)]
+            
             print("path found:", maxStrengthIndex, "at strength:", round(maxStrengthVal, 2))
             carAngle = radRoll(pathAngles[maxStrengthIndex] + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
             ## the next section could especially benefit from a forloop, as none of these values are in lists/arrays and they absolutely could be. At least it is slightly legible, i guess
+            winningConeIndex = []
             if(maxStrengthIndex == 0):
-                winningLeftCone = lastLeftCone;  winningRightCone = prospectRightCone
-                winningLeftConeIndex = lastPathLine[3][2];  winningRightConeIndex = lastRightCone[2][lastRightConeConnectionIndex][1]
+                winningConeIndex.append(lastPathLine[3][2]);  winningConeIndex.append(lastCone[1][2][lastConeConnectionIndex[1]][1])
             elif(maxStrengthIndex == 1):
-                winningLeftCone = prospectLeftCone;  winningRightCone = lastRightCone
-                winningLeftConeIndex = lastLeftCone[2][lastLeftConeConnectionIndex][1];  winningRightConeIndex = lastPathLine[4][2]
-            elif(maxStrengthIndex == 2):
-                winningLeftCone = prospectLeftCone;  winningRightCone = prospectRightCone
-                winningLeftConeIndex = lastLeftCone[2][lastLeftConeConnectionIndex][1];  winningRightConeIndex = lastRightCone[2][lastRightConeConnectionIndex][1]
-            else: #should never happen
-                print("OH GOD NO")
+                winningConeIndex.append(lastCone[0][2][lastConeConnectionIndex[0]][1]);  winningConeIndex.append(lastPathLine[4][2])
+            else: #(maxStrengthIndex == 2)
+                winningConeIndex.append(lastCone[0][2][lastConeConnectionIndex[0]][1]);  winningConeIndex.append(lastCone[1][2][lastConeConnectionIndex[1]][1])
             #check if you've gone full circle
-            if((winningLeftCone[0] == self.pathList[0][3][0]) and (winningRightCone[0] == self.pathList[0][4][0])):
+            if((winningCone[0][0] == self.pathList[0][3][0]) and (winningCone[1][0] == self.pathList[0][4][0])):
                 print("path full circle (from winning cones)")
                 self.pathFullCircle = True
                 return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
             else:
-                centerPoint = [winningRightCone[1][0] + (winningLeftCone[1][0]-winningRightCone[1][0])/2, winningRightCone[1][1] + (winningLeftCone[1][1]-winningRightCone[1][1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
-                self.pathList.append([centerPoint, [pathAngles[maxStrengthIndex], carAngle], pathWidths[maxStrengthIndex], [winningLeftCone[0], winningLeftCone[1], winningLeftConeIndex], [winningRightCone[0], winningRightCone[1], winningRightConeIndex], maxStrengthVal])
+                centerPoint = [winningCone[1][1][0] + (winningCone[0][1][0]-winningCone[1][1][0])/2, winningCone[1][1][1] + (winningCone[0][1][1]-winningCone[1][1][1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
+                self.pathList.append([centerPoint, [pathAngles[maxStrengthIndex], carAngle], pathWidths[maxStrengthIndex], [winningCone[0][0], winningCone[0][1], winningConeIndex[0]], [winningCone[1][0], winningCone[1][1], winningConeIndex[1]], maxStrengthVal])
         return(True)
     
     def addCone(self, leftOrRight, pos, coneData=[], connections=[[-1,-1,0.0,0.0,0.0],[-1,-1,0.0,0.0,0.0]], connectNewCone=True, reconnectOverlappingCone=False): #note: left=False, right=True
-        isNewCone = True; returnConeID = 0; indexInLRlist=0; returnLeftOrRight=leftOrRight; returnPos=pos; returnConnections=[[subItem for subItem in item] for item in connections]; returnConeData=self.coneDataCopy(coneData) #init vars
-        overlapsCone, overlappingConeLeftOrRight, overlappingConeIndex, overlappingConeData = self.overlapConeCheck(pos) #check if the new cone overlaps with an existing cone
+        isNewCone = True; indexInLRlist=0; returnLeftOrRight=leftOrRight; #init vars
+        overlapsCone, overlappingConeLeftOrRight, overlappingConeIndex, overlappingCone = self.overlapConeCheck(pos) #check if the new cone overlaps with an existing cone
         if(overlapsCone): #if the new cone overlaps an existing cone
             isNewCone = False
-            returnConeID = overlappingConeData[0]
             indexInLRlist = overlappingConeIndex
             returnLeftOrRight = overlappingConeLeftOrRight
-            returnPos = overlappingConeData[1] #copy pointer
-            returnConnections = overlappingConeData[2] #copy pointer to connection data
             if(reconnectOverlappingCone): #really just for mouse-based UI, clicking on an existing cone will make it attempt to connect
-                self.connectCone(returnConeID, returnPos, returnLeftOrRight, indexInLRlist, returnConnections, 1, True, True) #fill in (ID, pos, leftOrRight, index in left/right, currentConnections, preferred_connection_index)
-                ## returnConnections will also change if , because it is only a pointer to the data in the left/right-conelist
-            returnConeData = overlappingConeData[3]
+                self.connectCone(overlappingCone[0], overlappingCone[1], returnLeftOrRight, indexInLRlist, overlappingCone[2], 1, True, True) #fill in (ID, pos, leftOrRight, index in left/right, currentConnections, preferred_connection_index)
+            returnConePointer = (self.rightConeList if returnLeftOrRight else self.leftConeList)[indexInLRlist]
         else:
             isNewCone = True
-            returnConeID = self.newConeID
+            newConnections = [[subItem for subItem in item] for item in connections]
             if(connectNewCone):
-                hasConnected, newConnectionData = self.connectCone(returnConeID, pos, leftOrRight, len(self.rightConeList) if leftOrRight else len(self.leftConeList), connections, 0, False, True) #little tricky: technically the left/right list index that the new cone is in doesnt exist yet, but it is about to be added to the end, so current list length = index. MAY NOT work if multithreaded
+                hasConnected, newConnectionData = self.connectCone(self.newConeID, pos, leftOrRight, len(self.rightConeList) if leftOrRight else len(self.leftConeList), connections, 0, False, True) #little tricky: technically the left/right list index that the new cone is in doesnt exist yet, but it is about to be added to the end, so current list length = index. MAY NOT work if multithreaded
                 if(hasConnected): ## newConnectionData structure: [ID, index, angle, dist, strength, connection_index_inputCone, connection_index_winnerCone]
-                    #returnConnections[newConnectionData[5]] = [item for item in newConnectionData[0:5]]
-                    returnConnections[newConnectionData[5]] = newConnectionData[0:5]
+                    #newConnections[newConnectionData[5]] = [item for item in newConnectionData[0:5]]
+                    newConnections[newConnectionData[5]] = newConnectionData[0:5]
             ## now append the list
             listToAppend = (self.rightConeList if leftOrRight else self.leftConeList) #this saves a simgle line of code, totally worth it
-            listToAppend.append([returnConeID, pos, returnConnections, returnConeData])
+            listToAppend.append([self.newConeID, pos, newConnections, self.coneDataCopy(coneData)])
             indexInLRlist = len(listToAppend)-1
             if(self.logging):
-                self.logCone(leftOrRight, returnConeID, pos, returnConnections, coneData)
+                self.logCone(leftOrRight, self.newConeID, pos, newConnections, coneData)
             self.newConeID += 1
-        return(isNewCone, returnConeID, indexInLRlist, returnLeftOrRight, returnPos, returnConnections, returnConeData) #return some useful data
+            returnConePointer = listToAppend[indexInLRlist]
+        return(isNewCone, indexInLRlist, returnLeftOrRight, returnConePointer) #return some useful data (note: returnConePointer contains all other data, but fuck it)
     
     def addCar(self, pos=[12.0, 4.0], orient=0.0, color=[50,200,50]):
         self.cars.append(raceCar(pos, orient, color))
@@ -889,23 +948,18 @@ class pygamesim:
         # coneData.append(CD_FINISH)
         #check if the requested position already has a cone
         addConeResult = self.addCone(leftOrRight, pos, coneData, connectNewCone=True, reconnectOverlappingCone=False) #attempt to add new cone, if a cone is already at that position, addCone() will return that info
-        if((addConeResult[3] != self.finishLinePos[0][2]) if (len(self.finishLinePos) > 0) else True): #cant have two finish cones that are one-sided (left/right)
+        returnedCone = addConeResult[3]
+        if(self.finishLinePos[1 if (addConeResult[2]) else 0] is None): #cant have more than 1 finish cone per side
             if(not addConeResult[0]): #if this is True, a new cone was added
-                print("setting finish on existing cone with ID:", addConeResult[1], ("(right)" if addConeResult[3] else "(left)"))
+                print("setting finish on existing cone with ID:", returnedCone[0], ("(right)" if addConeResult[2] else "(left)"))
                 for coneDataEntry in coneData: #for all coneData identifiers
-                    if not (coneDataEntry in addConeResult[6]): #if it's not already in there
-                        if(addConeResult[3]): #left/right
-                            self.rightConeList[addConeResult[2]][3].append(coneDataEntry)
-                        else:
-                            self.leftConeList[addConeResult[2]][3].append(coneDataEntry)
+                    if not (coneDataEntry in returnedCone[3]): #if it's not already in there
+                        returnedCone[3].append(coneDataEntry)
                 self.logFileChanged = True #set flag
-            self.finishLinePos.append([addConeResult[1], addConeResult[4], addConeResult[3]]) # [cone ID, [x,y], left/right]
+            self.finishLinePos[1 if (addConeResult[2]) else 0] = returnedCone #i'm not sure it's kosher to use booleans as integers of 1 or 0 in python, so i made an extra little if-statement
             return(True)
         else:
-            print("existing finish cone is also", ("right," if addConeResult[3] else "left,"), "they can't both be")
-            return(False)
-        if(len(self.finishLinePos) > 2):
-            print("too many finish line points")
+            print(("right," if addConeResult[2] else "left,"), "finish cone already set")
             return(False)
     
     #drawing funtions
@@ -957,13 +1011,12 @@ class pygamesim:
             pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.pathList[-1][0]), self.realToPixelPos(self.pathList[0][0]), self.pathLineWidth) #line that loops around to start
     
     def drawFinishLine(self):
-        if(len(self.finishLinePos) == 2):
+        if((self.finishLinePos[0] is not None) and (self.finishLinePos[1] is not None)):
             pygame.draw.line(self.window, self.finishLineColor, self.realToPixelPos(self.finishLinePos[0][1]), self.realToPixelPos(self.finishLinePos[1][1]), self.finishLineWidth)
     
     def drawCars(self):
         for car in self.cars:
             car.draw(self)
-            #car.draw(self.window, self.sizeScale, self.drawWidth, self.drawHeight, self.drawPosX, self.drawPosY) #old style
     
     def drawFloatingCone(self, drawPossibleConnections=True, drawConnectionThresholdCircle=False):
         if(len(self.floatingCone) == 2): #if there is a floating cone to be drawn
@@ -975,18 +1028,18 @@ class pygamesim:
                     pygame.draw.circle(self.window, coneColor, [int(self.floatingCone[0][0]), int(self.floatingCone[0][1])], self.coneConnectionThreshold * self.sizeScale, self.coneLineWidth) #draw circle with coneConnectionThreshold radius 
                 overlapsCone, overlappingConeLeftOrRight, overlappingConeIndex, overlappingConeData = self.overlapConeCheck(self.pixelsToRealPos(self.floatingCone[0]))
                 if(overlapsCone and drawPossibleConnections): #if mouse is hovering over existing cone
-                    nearbyConeList = self.distanceToConeSquared(overlappingConeData[1], [self.rightConeList if overlappingConeLeftOrRight else self.leftConeList], False, True, [overlappingConeData[0]], self.coneConnectionThresholdSquared, True, [])
+                    nearbyConeList = self.distanceToConeSquared(overlappingConeData[1], [self.rightConeList if overlappingConeLeftOrRight else self.leftConeList], False, True, [overlappingConeData[0]], self.coneConnectionThresholdSquared, EXCL_DUBL_CONN, [])
                     overlappingConePixelPos = self.realToPixelPos(overlappingConeData[1])
                     for cone in nearbyConeList:
-                        pygame.draw.line(self.window, coneColor, overlappingConePixelPos, self.realToPixelPos(cone[1]), int(self.coneLineWidth/2))
+                        pygame.draw.line(self.window, coneColor, overlappingConePixelPos, self.realToPixelPos(cone[2][1]), int(self.coneLineWidth/2))
                 else:
                     #pygame.draw.circle(self.window, coneColor, [int(self.floatingCone[0][0]), int(self.floatingCone[0][1])], int(conePixelDiam/2)) #draw cone (as filled circle, not ellipse)
                     conePos = ASA(-(conePixelDiam/2), self.floatingCone[0]) #bounding box of ellipse is positioned in topleft corner, so shift cone half a conesize to the topleft.
                     pygame.draw.ellipse(self.window, coneColor, [conePos, [conePixelDiam, conePixelDiam]]) #draw cone
                     if(drawPossibleConnections):
-                        nearbyConeList = self.distanceToConeSquared(self.pixelsToRealPos(self.floatingCone[0]), [self.rightConeList if self.floatingCone[1] else self.leftConeList], False, True, [], self.coneConnectionThresholdSquared, True, [])
+                        nearbyConeList = self.distanceToConeSquared(self.pixelsToRealPos(self.floatingCone[0]), [self.rightConeList if self.floatingCone[1] else self.leftConeList], False, True, [], self.coneConnectionThresholdSquared, EXCL_DUBL_CONN, [])
                         # ## debug
-                        # nearbyConeList = self.distanceToCone(self.pixelsToRealPos(self.floatingCone[0]), [self.rightConeList if self.floatingCone[1] else self.leftConeList], DONT_SORT, True, [], self.coneConnectionThreshold, True, [], 0.0, someAngles)
+                        # nearbyConeList = self.distanceToCone(self.pixelsToRealPos(self.floatingCone[0]), [self.rightConeList if self.floatingCone[1] else self.leftConeList], DONT_SORT, True, [], self.coneConnectionThreshold, EXCL_DUBL_CONN, [], 0.0, someAngles)
                         # someAngles = [-self.coneConnectionHighAngleDelta, self.coneConnectionHighAngleDelta]
                         # self.debugLines = []
                         # self.debugLines.append([1, self.floatingCone[0], [self.coneConnectionThreshold, someAngles[0]], 0]) #line from floating cone at someAngles[0] radians with a length of coneConnectionThreshold
@@ -994,7 +1047,7 @@ class pygamesim:
                         # self.debugLines.append([2, self.floatingCone[0], [self.coneConnectionThreshold, someAngles[0], someAngles[1]], 0]) #arc centered at floating cone with radius coneConnectionThreshold, startAngle being someAngles[0] radians and endAngle being someAngles[1] radians
                         # ## end debug
                         for cone in nearbyConeList:
-                            pygame.draw.line(self.window, coneColor, self.floatingCone[0], self.realToPixelPos(cone[1]), int(self.coneLineWidth/2))
+                            pygame.draw.line(self.window, coneColor, self.floatingCone[0], self.realToPixelPos(cone[2][1]), int(self.coneLineWidth/2))
     
     def drawDebugLines(self):
          #debugLines structure: [pos,pos, color_index (0-2)]
@@ -1017,11 +1070,14 @@ class pygamesim:
     def redraw(self):
         self.background()
         self.drawCones(True) #boolean parameter is whether to draw lines between connected cones (track bounds) or not
-        self.drawDebugLines()
         self.drawPathLines(True, True) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
         self.drawFinishLine()
         self.drawCars()
         self.drawFloatingCone(True, False)
+        self.drawDebugLines()
+        if(self.logging):
+            textimg = pygame.font.Font(None, 21).render(self.logfilename, 1, [255-self.bgColor[0], 255-self.bgColor[1], 255-self.bgColor[2]], self.bgColor)
+            self.window.blit(textimg, [self.drawPosX + 5,self.drawPosY + 5])
         if(self.logging and (pygame.time.get_ticks() > self.rewriteLogTimer) and self.logFileChanged):
             self.rewriteLogfile()
     
@@ -1133,10 +1189,6 @@ global pygamesimInputLast, oldWindowSize
 pygamesimInputLast = None #to be filled
 oldWindowSize = [1200,600]
 
-def shouldKeepRunning():
-    global windowKeepRunning
-    return(windowKeepRunning)
-
 def pygameInit():
     pygame.init()
     pygame.font.init()
@@ -1168,11 +1220,10 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
             pygame.event.set_grab(0)
             pygamesimInput.floatingCone = []
             if(pygame.key.get_pressed()[102]):
-                print("placing finish")
                 pygamesimInput.setFinishCone(False, pygamesimInput.pixelsToRealPos(pos))
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
             else:
-                pygamesimInput.addCone(False, pygamesimInput.pixelsToRealPos(pos), connectNewCone=True, reconnectOverlappingCone=True)
+                pygamesimInput.addCone(False, pygamesimInput.pixelsToRealPos(pos), connectNewCone=False, reconnectOverlappingCone=True)
     if(button==3): #left mouse button
         if(buttonDown): #mouse pressed down
             pygamesimInput.floatingCone = [pos, True]
@@ -1186,7 +1237,7 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                 pygamesimInput.setFinishCone(True, pygamesimInput.pixelsToRealPos(pos))
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
             else:
-                pygamesimInput.addCone(True, pygamesimInput.pixelsToRealPos(pos), connectNewCone=True, reconnectOverlappingCone=True)
+                pygamesimInput.addCone(True, pygamesimInput.pixelsToRealPos(pos), connectNewCone=False, reconnectOverlappingCone=True)
 
 def handleKeyPress(pygamesimInput, keyDown, key, keyName, eventToHandle):
     if(key==102): # f
@@ -1216,15 +1267,12 @@ def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=Tr
             mousePos = pygame.mouse.get_pos()
         global pygamesimInputLast
         if(pygame.mouse.get_focused() or (not demandMouseFocus)):
-            print("now"); inputCount = 0
             for pygamesimInput in pygamesimInputList:
                 # localBoundries = [[pygamesimInput.drawPosX, pygamesimInput.drawPosY], [pygamesimInput.drawWidth, pygamesimInput.drawHeight]]
                 # if(((mousePos[0]>=localBoundries[0][0]) and (mousePos[0]<(localBoundries[0][0]+localBoundries[1][0]))) and ((mousePos[1]>=localBoundries[0][1]) and (mousePos[0]<(localBoundries[0][1]+localBoundries[1][1])))):
                 if(pygamesimInput.isInsideWindowPixels(mousePos)):
-                    print("found input", inputCount)
                     pygamesimInputLast = pygamesimInput
                     return(pygamesimInput)
-                inputCount += 1
         if(type(pygamesimInputLast) is not pygamesim): #if this is the first interaction
             pygamesimInputLast = pygamesimInputList[0]
         return(pygamesimInputLast)

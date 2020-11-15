@@ -1,8 +1,8 @@
 import pygamesim as pgs
 
 
-enableLogging = False
-numberOfSimsRoot = 1 #this value squared is the actual number of sims, this is just how many rows and columns of sims there are
+enableLogging = True
+numberOfSimsRoot = 2 #this value squared is the actual number of sims, this is just how many rows and columns of sims there are
 #file importing
 fileToImport = [['' for j in range(numberOfSimsRoot)] for i in range(numberOfSimsRoot)]
 if(len(pgs.sys.argv) == 2):
