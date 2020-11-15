@@ -6,9 +6,10 @@ import time
 import numpy as np
 import cv2 as cv
 
-breaks = True
 
 def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length = 10, exclude_corners = True):
+
+    'simply a function that draws dashed lines in pygame'    
 
     # convert tuples to numpy arrays
     start_pos = np.array(start_pos)
@@ -42,7 +43,8 @@ class Car:
         self.acceleration = 0.0
         self.steering = 0.0
         self.fov = 500 #150
-        self.turning_sharpness = 1.6
+        self.turning_sharpness = 1.4
+        self.breaks = True
         
 
     def update(self, dt):
@@ -94,7 +96,6 @@ class Game:
         image_path = os.path.join(current_dir, "car_r_s.png")
         car_image = pygame.image.load(image_path)
         img = cv.imread(image_path)
-        print(img.shape)
         
         image_path1 = os.path.join(current_dir, "cone_s.png")
         cone_image = pygame.image.load(image_path1)
@@ -107,14 +108,7 @@ class Game:
         time_start = time.time()
 
         
-        cones = [Cone(22,4),
-                 Cone(8.5,16.5),
-                 Cone(16,20),
-                 Cone(26,19),
-                 Cone(13,4),
-                 Cone(29,5),
-                 Cone(36,8),
-                 Cone(6.5,10)]
+        cones = []
         
         non_passed_cones = cones.copy()
         
@@ -125,6 +119,7 @@ class Game:
         a = 0
         b = 0
         closest_cone = None
+        mouse_pos_list = []
         
         while not self.exit:
             
@@ -134,16 +129,34 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.exit = True
+             
 
             # User input
             pressed = pygame.key.get_pressed()
+            
+            
+            if pressed[pygame.K_c]:
+                    mouse_pos = pygame.mouse.get_pos()
+                    
+                    if mouse_pos in mouse_pos_list:
+                        continue
+                    else:
+                        cone = Cone(mouse_pos[0]/ppu,mouse_pos[1]/ppu)
+                        cones.append(cone)
+                        non_passed_cones.append(cone)
+                        
+                    mouse_pos_list.append(mouse_pos)
+                    
+            if pressed[pygame.K_LCTRL] and pressed[pygame.K_c]:
+                cones  = []
+                non_passed_cones = []
 
             if pressed[pygame.K_UP]:
                 if car.velocity.x < 0:
                     car.acceleration = car.brake_deceleration
                 else:
                     car.acceleration += 1 * dt
-            elif pressed[pygame.K_DOWN] and breaks == True:
+            elif pressed[pygame.K_DOWN] and car.breaks == True:
                 if car.velocity.x > 0:
                     car.acceleration = -car.brake_deceleration
                 else:
@@ -160,7 +173,6 @@ class Game:
                     if dt != 0:
                         car.acceleration = -car.velocity.x / dt
                         
-
 
             time_running = time.time() - time_start
             
@@ -206,15 +218,15 @@ class Game:
                 car.steering -= 50 * dt
             elif pressed[pygame.K_LEFT]:
                 car.steering += 50 * dt
-                
-            elif np.linalg.norm(closest_cone.position-car.position) < car.fov/ppu and np.linalg.norm(closest_cone.position-car.position) > 30/ppu and time_running > 2 and closest_cone.passed == False:
+             
+            #automatic steering
+            elif len(cones) > 0 and np.linalg.norm(closest_cone.position-car.position) < car.fov/ppu and np.linalg.norm(closest_cone.position-car.position) > 30/ppu and time_running > 2 and closest_cone.passed == False:
                 a_b = closest_cone.position-car.position
                 dist = closest_cone.dist_car
                 a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
                 
                 rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
                                     [np.sin(-car_angle*np.pi/180),np.cos(-car_angle*np.pi/180)]])
-                
                 
                 a_b = rotate*a_b
                 
@@ -262,15 +274,17 @@ class Game:
             for i in range(len(circles)):
                 pygame.draw.circle(self.screen,(155,155,155), circles[i], 1, 1)
             
-            for cone in cones:
-                self.screen.blit(cone_image, cone.position * ppu - (5,13))
-                if cone.visible == True:
-                    draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , cone.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
+            if len(cones) > 0:
+                for cone in cones:
+                    self.screen.blit(cone_image, cone.position * ppu - (5,13))
+                    if cone.visible == True:
+                        draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , cone.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
                     
             
             self.screen.blit(rotated, car.position * ppu - ((rect.width / 2)+ round(img.shape[1]/2),( rect.height / 2) + round(img.shape[0]/2)))
             
-            draw_line_dashed(self.screen, (155,255,255),(pos_1,pos_2) , closest_cone.position * ppu , width = 2, dash_length = 10, exclude_corners = True)
+            if len(cones) > 0:
+                draw_line_dashed(self.screen, (155,255,255),(pos_1,pos_2) , closest_cone.position * ppu , width = 2, dash_length = 10, exclude_corners = True)
             
             pygame.draw.circle(self.screen,(255,255,255), (pos_1,pos_2), car.fov, 1)
             
@@ -298,10 +312,23 @@ class Game:
             text_pos = [10, 110]
             self.screen.blit(text_surf, text_pos)
             
-            text_surf = text_font.render(f'Closest cone position: {closest_cone.position}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'number of cones: {len(cones)}', 1, (255, 255, 255))
             text_pos = [10, 130]
             self.screen.blit(text_surf, text_pos)
-
+            
+            text_surf = text_font.render(f'Press C to place cone', 1, (155, 155, 155))
+            text_pos = [10, 640]
+            self.screen.blit(text_surf, text_pos)
+            
+            text_surf = text_font.render(f'Press CTRL+C to clear all cones', 1, (155, 155, 155))
+            text_pos = [10, 660]
+            self.screen.blit(text_surf, text_pos)
+            
+            text_surf = text_font.render(f'Press arrow keys to steer manually', 1, (155, 155, 155))
+            text_pos = [10, 680]
+            self.screen.blit(text_surf, text_pos)
+            
+            
             pygame.display.flip()
             
             self.clock.tick(self.ticks)
