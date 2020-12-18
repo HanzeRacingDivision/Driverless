@@ -29,7 +29,7 @@ def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length 
 
 
 class Car:
-    def __init__(self, x, y, angle=-180.0, length=2.5, max_steering=70, max_acceleration=6.0):
+    def __init__(self, x, y, angle=-180.0, length=2.5, max_steering=80, max_acceleration=6.0):
         self.position = Vector2(x, y)
         self.velocity = Vector2(0.0, 0.0)
         self.angle = angle
@@ -200,6 +200,9 @@ class Game:
 
             time_running = time.time() - time_start
             
+            
+            
+            #redefining the car angle so that it is in (-180,180)
             temp_sign = np.mod(car.angle,360)
             if temp_sign > 180:
                 car_angle_sign = -1
@@ -211,11 +214,12 @@ class Game:
             if car_angle < 0:
                 car_angle = -180 - car_angle
                 
+                
             #list of visibile targets and passed targets
-            
             visible_targets = []
             dists = []
             non_passed_dists = []
+            
             
             #make list of visible targets and list of passed targets
             for target in targets:
@@ -235,6 +239,11 @@ class Game:
             #define closest target
             if len(non_passed_targets) > 0:
                 closest_target = non_passed_targets[np.array(non_passed_dists).argmin()]
+                #set up while loop here to find next target
+                
+                
+                
+                
             else:
                 #if currently no targets left and is a track, set all targets to non-passed and continue
                 if track == True:
@@ -243,7 +252,7 @@ class Game:
                         target.passed = False
 
 
-
+            #setting car_pos for angle calculations
             rotated = pygame.transform.rotate(car_image, car.angle)
             rect = rotated.get_rect()
             car_pos = car.position - (rect.width / (2*ppu), rect.height /(2*ppu)) - (10/ppu,0)
@@ -274,7 +283,7 @@ class Game:
                 alpha = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
                 alpha = alpha[0,0]
 
-                car.steering = (140/np.pi)*np.arctan(alpha/dist**car.turning_sharpness)
+                car.steering = (car.max_steering*2/np.pi)*np.arctan(alpha/dist**car.turning_sharpness)
                 car.velocity.x = 3
                 
             else:
