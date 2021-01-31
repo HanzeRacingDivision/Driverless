@@ -238,10 +238,14 @@ class Game:
                     
             #define closest target
             if len(non_passed_targets) > 0:
-                closest_target = non_passed_targets[np.array(non_passed_dists).argmin()]
+                if len(non_passed_dists) == 0:
+                    non_passed_targets = []
+                else:
+                    closest_target = non_passed_targets[np.array(non_passed_dists).argmin()]
                 #set up while loop here to find next target
                 
                 
+
                 
                 
             else:
