@@ -29,7 +29,7 @@ def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length 
 
 
 class Car:
-    def __init__(self, x, y, angle=-180.0, length=2.5, max_steering=80, max_acceleration=6.0):
+    def __init__(self, x, y, angle = 0, length = 2.5, max_steering = 80, max_acceleration = 6.0):
         self.position = Vector2(x, y)
         self.velocity = Vector2(0.0, 0.0)
         self.angle = angle
@@ -45,6 +45,7 @@ class Car:
         self.fov = 300 #150
         self.turning_sharpness = 1.4
         self.breaks = True
+        self.fov_range = 60
         
 
     def update(self, dt):
@@ -67,16 +68,41 @@ class Target:
         self.passed = False
         self.visible = False
         self.dist_car = 10**10
+        self.alpha = 0
+        self.valid = False
         
-    def update(self, car, time_running, ppu, car_pos): 
+    def update(self, car, time_running, ppu, car_pos,car_angle): 
         self.dist_car = np.linalg.norm(self.position-car_pos)
         
         if self.passed == False and np.linalg.norm(self.position-car_pos) <= 30/ppu and time_running > 2: 
             self.passed = True
+            self.valid = False
+            
         if np.linalg.norm(self.position-car_pos) < car.fov/ppu and time_running > 2:
             self.visible = True
+            
+            a_b = self.position-car_pos
+            a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
+            
+            rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
+                                [np.sin(-car_angle*np.pi/180),np.cos(-car_angle*np.pi/180)]])
+            
+            a_b = rotate*a_b
+            
+            a = a_b[0]
+            b = a_b[1]
+            
+            beta = np.arctan(b/a)*(180/np.pi)
+            alpha = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
+            self.alpha = alpha[0,0]
+            
+            if np.abs(self.alpha) < 60 and self.passed == False:
+                self.valid = True
+            else:
+                self.valid = False
         else:
             self.visible = False
+            self.valid = False
         
 
 
@@ -106,7 +132,7 @@ class Game:
         #image_path2 = os.path.join(current_dir, "fin.png")
        # fin_image = pygame.image.load(image_path2)
 
-        car = Car(36,19)
+        car = Car(7,14)
         ppu = 32
         time_start = time.time()
 
@@ -116,11 +142,8 @@ class Game:
         non_passed_targets = targets.copy()
         
         alpha = 0
-        beta = 0
         circles = []
         dist = 0
-        a = 0
-        b = 0
         closest_target = None
         mouse_pos_list = []
         track = False
@@ -219,34 +242,44 @@ class Game:
             visible_targets = []
             dists = []
             non_passed_dists = []
-            
+            valid_targets = []
+            valid_dists = []
+
+
             
             #make list of visible targets and list of passed targets
             for target in targets:
+                
                 non_passed_dists.append(target.dist_car)
                 dists.append(target.dist_car)
+                
                 if target.visible == True:
                     visible_targets.append(target)
                     
                 if target.passed == True:
                     non_passed_dists.remove(target.dist_car)
-                
+
+                if target.valid == True:
+                    valid_targets.append(target)
+                    valid_dists.append(target.dist_car)
+                    
             for target in non_passed_targets:
                 if target.passed == True:
                     non_passed_targets.remove(target)
                      
                     
+                    
+            len_valid_targets = len(valid_targets)
+            
             #define closest target
-            if len(non_passed_targets) > 0:
-                if len(non_passed_dists) == 0:
-                    non_passed_targets = []
+            if len(valid_targets) > 0:
+                if len(valid_dists) == 0:
+                    valid_targets = []
                 else:
-                    closest_target = non_passed_targets[np.array(non_passed_dists).argmin()]
+                    closest_target = valid_targets[np.array(valid_dists).argmin()]
                 #set up while loop here to find next target
                 
-                
 
-                
                 
             else:
                 #if currently no targets left and is a track, set all targets to non-passed and continue
@@ -270,23 +303,10 @@ class Game:
              
             #automatic steering
             
-            elif len(targets) > 0 and np.linalg.norm(closest_target.position-car_pos) < car.fov/ppu and np.linalg.norm(closest_target.position-car_pos) > 30/ppu and time_running > 2 and closest_target.passed == False:
-                a_b = closest_target.position-car_pos
+            elif len(valid_targets) > 0 and np.linalg.norm(closest_target.position-car_pos) < car.fov/ppu and np.linalg.norm(closest_target.position-car_pos) > 30/ppu and time_running > 2 and closest_target.passed == False:
+                
                 dist = closest_target.dist_car
-                a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
-                
-                rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
-                                    [np.sin(-car_angle*np.pi/180),np.cos(-car_angle*np.pi/180)]])
-                
-                a_b = rotate*a_b
-                
-                a = a_b[0]
-                b = a_b[1]
-                
-                beta = np.arctan(b/a)*(180/np.pi)
-                alpha = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
-                alpha = alpha[0,0]
-
+                alpha = closest_target.alpha
                 car.steering = (car.max_steering*2/np.pi)*np.arctan(alpha/dist**car.turning_sharpness)
                 car.velocity.x = 3
                 
@@ -302,7 +322,7 @@ class Game:
             # Logic
             car.update(dt)
             for target in targets:
-                target.update(car, time_running, ppu, car_pos)
+                target.update(car, time_running, ppu, car_pos, car_angle)
             
 
             # Drawing
@@ -332,28 +352,29 @@ class Game:
             
             self.screen.blit(rotated, car.position * ppu - ((rect.width / 2)+ round(img.shape[1]/2),( rect.height / 2) + round(img.shape[0]/2)))
             
-            if len(targets) > 0:
+            if len(valid_targets) > 0:
                 draw_line_dashed(self.screen, (155,255,255),(pos_1,pos_2) , closest_target.position * ppu , width = 2, dash_length = 10, exclude_corners = True)
             
             pygame.draw.circle(self.screen,(255,255,255), (pos_1,pos_2), car.fov, 1)
             
-         #   if len(non_passed_targets) == 0:
-          #      self.screen.blit(fin_image, (350,250))
+
+            pygame.draw.rect(self.screen,(100 - 10*dist, 100 - 10*dist, 100 - 10*dist),(10,180,12,dist*20 - 20)) 
             
+
             text_font = pygame.font.Font(None, 30)
-            text_surf = text_font.render(f'Angle to target : {alpha}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Angle to target : {round(alpha,1)}', 1, (255, 255, 255))
             text_pos = [10, 10]
             self.screen.blit(text_surf, text_pos)
             
-            text_surf = text_font.render(f'Car angle : {car_angle}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Car angle : {round(car_angle,2)}', 1, (255, 255, 255))
             text_pos = [10, 30]
             self.screen.blit(text_surf, text_pos)
             
-            text_surf = text_font.render(f'Steering : {car.steering}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Steering : {round(car.steering,2)}', 1, (255, 255, 255))
             text_pos = [10, 50]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Distance to target : {dist}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Distance to target : {round(dist,2)}', 1, (255, 255, 255))
             text_pos = [10, 70]
             self.screen.blit(text_surf, text_pos)
             
@@ -368,7 +389,6 @@ class Game:
             text_surf = text_font.render(f'Track: {track}', 1, (255, 255, 255))
             text_pos = [10, 150]
             self.screen.blit(text_surf, text_pos)
-            
             
             text_surf = text_font.render(f'Press T to place target', 1, (155, 155, 155))
             text_pos = [10, 620]
