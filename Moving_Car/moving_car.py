@@ -5,6 +5,7 @@ from pygame.math import Vector2
 import time
 import numpy as np
 import cv2 as cv
+from PIL import Image, ImageDraw
 
 
 def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length = 10, exclude_corners = True):
@@ -148,6 +149,8 @@ class Game:
         mouse_pos_list = []
         track = False
         
+        
+
         
         while not self.exit:
             
@@ -326,6 +329,8 @@ class Game:
             
 
             # Drawing
+
+            
             self.screen.fill((0, 0, 0))
             rotated = pygame.transform.rotate(car_image, car.angle)
             rect = rotated.get_rect()
@@ -336,6 +341,23 @@ class Game:
             
             circle = (pos_1-10,pos_2)
             circles.append(circle)
+            
+            pil_size = car.fov*2
+
+            pil_image = Image.new("RGBA", (pil_size, pil_size))
+            pil_draw = ImageDraw.Draw(pil_image)
+            #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
+            pil_draw.pieslice((0, 0, pil_size-1, pil_size-1), -car.angle-car.fov_range, -car.angle+car.fov_range, fill= (55, 55, 35))
+            
+            mode = pil_image.mode
+            size = pil_image.size
+            data = pil_image.tobytes()
+            
+            image = pygame.image.fromstring(data, size, mode)
+            image_rect = image.get_rect(center= (pos_1 - 10,pos_2))
+
+            self.screen.blit(image, image_rect)        
+                    
             
             for i in range(len(circles)):
                 pygame.draw.circle(self.screen,(155,155,155), circles[i], 1, 1)
@@ -349,17 +371,18 @@ class Game:
                     if target.visible == True:
                         draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , target.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
                     
-            
+
             self.screen.blit(rotated, car.position * ppu - ((rect.width / 2)+ round(img.shape[1]/2),( rect.height / 2) + round(img.shape[0]/2)))
             
             if len(valid_targets) > 0:
                 draw_line_dashed(self.screen, (155,255,255),(pos_1,pos_2) , closest_target.position * ppu , width = 2, dash_length = 10, exclude_corners = True)
             
-            pygame.draw.circle(self.screen,(255,255,255), (pos_1,pos_2), car.fov, 1)
+          #  pygame.draw.circle(self.screen,(255,255,255), (pos_1,pos_2), car.fov, 1)
             
 
             pygame.draw.rect(self.screen,(100 - 10*dist, 100 - 10*dist, 100 - 10*dist),(10,180,12,dist*20 - 20)) 
             
+        
 
             text_font = pygame.font.Font(None, 30)
             text_surf = text_font.render(f'Angle to target : {round(alpha,1)}', 1, (255, 255, 255))
