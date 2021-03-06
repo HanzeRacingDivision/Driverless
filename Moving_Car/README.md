@@ -10,11 +10,11 @@ To run moving_car_splines.py you will need the following images:<br/>
 - right_spline_s.png <br/>
 <br/>
 To run moving_car_splines.py you will need the following python packages:<br/>
-- os <br/>
-- pygame <br/>
-- math <br/>
-- time <br/>
-- numpy <br/>
-- cv2 <br/>
-- PIL <br/>
-- scipy <br/>
+* os <br/>
+* pygame <br/>
+* math <br/>
+* time <br/>
+* numpy <br/>
+* cv2 <br/>
+* PIL <br/>
+* scipy <br/>
