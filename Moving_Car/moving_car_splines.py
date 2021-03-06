@@ -48,7 +48,7 @@ class Car:
         self.turning_sharpness = 1.8
         self.breaks = True
         self.fov_range = 60
-        self.auto = True
+        self.auto = False
         self.headlights = False
 
     def update(self, dt):
@@ -114,7 +114,7 @@ class Left_cone:
     def update(self, car, time_running, ppu, car_pos,car_angle): 
         self.dist_car = np.linalg.norm(self.position-car_pos)
         
-        if np.linalg.norm(self.position-car_pos) < car.fov/ppu and self.visible == False:
+        if np.linalg.norm(self.position-car_pos) < car.fov/ppu and self.visible == False and car.auto == True:
             
             a_b = self.position-car_pos
             a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
@@ -135,7 +135,7 @@ class Left_cone:
                 self.visible = True
             else:
                 pass
-                #self.visible = False #commenting this line allows cones to be remembered
+                # self.visible = False #commenting this line allows cones to be remembered
         else:
             pass
            # self.visible = False  #commenting this line allows cones to be remembered
@@ -148,7 +148,7 @@ class Right_cone:
     def update(self, car, time_running, ppu, car_pos,car_angle): 
         self.dist_car = np.linalg.norm(self.position-car_pos)
             
-        if np.linalg.norm(self.position-car_pos) < car.fov/ppu and self.visible == False:
+        if np.linalg.norm(self.position-car_pos) < car.fov/ppu and self.visible == False and car.auto == True:
             
             a_b = self.position-car_pos
             a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
@@ -209,11 +209,9 @@ class Game:
         
         image_path6 = os.path.join(current_dir, "right_spline_s.png")
         right_spline_image = pygame.image.load(image_path6)
-        
-        #image_path2 = os.path.join(current_dir, "fin.png")
-       # fin_image = pygame.image.load(image_path2)
 
         car = Car(5,11)
+
         ppu = 32
         time_start = time.time()
 
@@ -237,6 +235,7 @@ class Game:
         right_spline_linked = False
         left_spline_linked = False
         fullscreen = False
+        track_number = 0
         
 
         
@@ -299,13 +298,22 @@ class Game:
             
             #if CTRL + c then clear screen
             if pressed[pygame.K_LCTRL] and pressed[pygame.K_c]:
+                #resetting most vars
                 targets  = []
                 non_passed_targets = []
                 circles = []
                 left_cones = []
-                right_cones = []      
+                right_cones = []    
+                visible_left_cones = []
+                visible_right_cones = []
                 left_spline = []
                 right_spline = []
+                right_spline_linked == False
+                left_spline_linked == False
+                mouse_pos_list = []
+                left_spline = 0
+                right_spline = 0
+                
                 
             #if a pressed then toggle automatic driving
             for event in events:
@@ -384,7 +392,7 @@ class Game:
                 car_angle = -180 - car_angle
                 
                 
-            #list of visibile targets and passed targets
+            #list of visibile targets and non-passed targets
             dists = []
             non_passed_dists = []
             visible_targets = []
@@ -446,12 +454,12 @@ class Game:
                 #set up while loop here to find next target
             
                 
-            else:
-                #if currently no targets left and is a track, set all targets to non-passed and continue
-                if track == True:
-                    non_passed_targets = targets.copy()
-                    for target in targets:
-                        target.passed = False
+            #if currently no targets left and is a track, set all targets to non-passed and continue
+            if len(targets) > 0 and len(non_passed_targets) == 0 and track == True:
+                track_number += 1
+                non_passed_targets = targets.copy()
+                for target in targets:
+                    target.passed = False
 
 
             #setting car_pos for angle calculations
@@ -525,7 +533,6 @@ class Game:
                     
                     x.append(x_temp)
                     y.append(y_temp)
-                    
                 
                 if len(visible_right_cones) == 2:
                     K = 1
@@ -666,6 +673,11 @@ class Game:
                 text_surf = text_font.render(f'Autonomous: {car.auto}', 1, (255, 255, 255))
                 text_pos = [10, 80]
                 self.screen.blit(text_surf, text_pos)
+
+                text_surf = text_font.render(f'Track number: {track_number}', 1, (255, 255, 255))
+                text_pos = [10, 100]
+                self.screen.blit(text_surf, text_pos)
+                
                 
                # text_surf = text_font.render(f'number of visible left cones: {len(visible_left_cones)}', 1, (255, 255, 255))
                # text_pos = [10, 100]
