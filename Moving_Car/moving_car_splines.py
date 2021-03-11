@@ -4,7 +4,6 @@ from math import sin, radians, degrees, copysign
 from pygame.math import Vector2
 import time
 import numpy as np
-import cv2 as cv
 from PIL import Image, ImageDraw
 from scipy.interpolate import splprep, splev
 
@@ -190,7 +189,7 @@ class Game:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         image_path = os.path.join(current_dir, "car_r_30.png")
         car_image = pygame.image.load(image_path)
-        img = cv.imread(image_path)
+        img = pygame.image.load(image_path)
         
         image_path1 = os.path.join(current_dir, "target_r_t.png")
         target_image = pygame.image.load(image_path1)
@@ -484,7 +483,12 @@ class Game:
                 car.velocity.x = 2.5
                 
             else:
-                car.steering = 0
+                if(car.steering > (50 * dt)):
+                    car.steering -= 120 * dt
+                elif(car.steering < -(50 * dt)):
+                    car.steering += 120 * dt
+                else:
+                    car.steering = 0
 
             
             
@@ -572,13 +576,14 @@ class Game:
             rotated = pygame.transform.rotate(car_image, car.angle)
             rect = rotated.get_rect()
             
-            pos_temp = car.position * ppu - (rect.width / 2, rect.height / 2)
+            pos_temp = car.position * ppu
             pos_1 = int(pos_temp.x)
             pos_2 = int(pos_temp.y)
             
-            circle = (pos_1-5,pos_2)
+            circle = (pos_1,pos_2)
             circles.append(circle)
             
+            # draw headlights
             if car.headlights == True:
                 pil_size = car.fov*2
     
@@ -592,14 +597,16 @@ class Game:
                 data = pil_image.tobytes()
                 
                 image = pygame.image.fromstring(data, size, mode)
-                image_rect = image.get_rect(center= (pos_1-5 ,pos_2))
+                image_rect = image.get_rect(center= (pos_1, pos_2))
     
                 self.screen.blit(image, image_rect)        
-                    
+                
             
+            # draw dotted line (histogram) of past car locations
             for i in range(len(circles)):
                 pygame.draw.circle(self.screen,(155,155,155), circles[i], 1, 1)
             
+            # draw targets
             if len(targets) > 0:
                 for target in targets:
                     if target in non_passed_targets:
@@ -609,7 +616,7 @@ class Game:
                     if target.visible == True and car.auto == True:
                         draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , target.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
               
-                    
+            
             if len(left_cones) > 0:
                 for left_cone in left_cones:
                     self.screen.blit(left_cone_image, left_cone.position * ppu - (3,3))
@@ -627,16 +634,18 @@ class Game:
             if right_spline != 0 and len(right_spline) > 0:
                 for i in range(len(right_spline[0])):
                     self.screen.blit(right_spline_image, Vector2(right_spline[0][i],right_spline[1][i]) * ppu - (3,3))
-                    
-
-            self.screen.blit(rotated, car.position * ppu - ((rect.width / 2)+ round(img.shape[1]/2),( rect.height / 2) + round(img.shape[0]/2)))
             
+            # draw the car sprite
+            #pygame.draw.rect(self.screen, (200,200,200), (car.position * ppu - ((rect.width / 2),(rect.height / 2)), (rect.width, rect.height))) #draws a little box around the car sprite (just for debug)
+            self.screen.blit(rotated, car.position * ppu - ((rect.width / 2),(rect.height / 2))) #draw car
+            
+            # draw dotted lines between car and valid targets
             if len(visible_targets) > 0 and car.auto == True:
                 draw_line_dashed(self.screen, (155,255,255),(pos_1,pos_2) , closest_target.position * ppu , width = 2, dash_length = 10, exclude_corners = True)
             
           #  pygame.draw.circle(self.screen,(255,255,255), (pos_1,pos_2), car.fov, 1)
             
-
+            # draw strange grey rectangle behind debug text on the left
             pygame.draw.rect(self.screen,(np.abs(100 - 10*dist), np.abs(100 - 10*dist), np.abs(100 - 10*dist)),(10,120,12,dist*20 - 20)) 
             
         
@@ -679,9 +688,9 @@ class Game:
                 self.screen.blit(text_surf, text_pos)
                 
                 
-               # text_surf = text_font.render(f'number of visible left cones: {len(visible_left_cones)}', 1, (255, 255, 255))
-               # text_pos = [10, 100]
-               # self.screen.blit(text_surf, text_pos)
+                text_surf = text_font.render(f'number of visible left cones: {len(visible_left_cones)}', 1, (255, 255, 255))
+                text_pos = [10, 120]
+                self.screen.blit(text_surf, text_pos)
                 
                # text_surf = text_font.render(f'Headlights: {car.headlights}', 1, (255, 255, 255))
                # text_pos = [10, 190]
