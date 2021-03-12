@@ -1,4 +1,4 @@
-import pygamesim as pgs
+import pygamesimCarCam as pgs
 
 
 enableLogging = True
@@ -41,7 +41,7 @@ for i in range(numberOfSimsRoot):
         multiSims[i].append(pgs.pygamesim(pgs.window, [], \
                                           (displaySize[0]/numberOfSimsRoot, displaySize[1]/numberOfSimsRoot), \
                                           ((displaySize[0]/numberOfSimsRoot)*i, (displaySize[1]/numberOfSimsRoot)*j), \
-                                          [0,0], 10, True, fileToImport[i][j], enableLogging, "pygamesim["+str(i)+"]["+str(j)+"]"))
+                                          0, 10, True, fileToImport[i][j], enableLogging, "pygamesimCC["+str(i)+"]["+str(j)+"]"))
         multiSims[i][j].bgColor = bgColorList[(i*numberOfSimsRoot)+j]
         multiSims[i][j].addCar()
 
