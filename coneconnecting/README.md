@@ -5,9 +5,11 @@ pygame 2.0.0 (older versions dont have SDL2, which determines how cursor-sprite 
 numpy (any version)
 
 how to run:
+
 run coneConnecting.py
 
 how to use:
+
 (you can resize the window by just dragging it like any other windows window)
 
 cones:
@@ -26,6 +28,7 @@ camera:
 other:
 - pressing R makes it try to find a path (requires connected cones on both side of track
 - pressing L makes it rewrite the coneLog immidielty (also happens automatically, but this just forces it to happen)
+
 driving (temporary):
 - arrow keys
 
@@ -37,11 +40,13 @@ meaning of the colors and other visual aspects:
 
 
 how to run with a previously saved track (coneLog CSV file):
+
 either open the coneConnecting.py window and drag&drop the file in there  OR
 use the command line and enter the coneLog filepath as an argument   OR
 make a windows shortcut, put the location of your python installation at the start of the Target section of the properties of the windows shortcut and just drag&drop the file onto the shortcut
 
 running multiple ones in paralel: (not threaded (yet))
+
 use coneConnecting multi.py
 it imports coneConnecting.py as a library and makes N by N instances of it
 you can also use the multi sketch to import several coneLogs at once. It will automatically make enough instances
