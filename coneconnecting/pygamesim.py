@@ -861,14 +861,15 @@ class pygamesim:
                 lastCone.append(coneLists[LorR][lastPathLine[3+LorR][2]])
                 lastConeConnectionIndex.append(1) #try to use the 'front' connection by default
                 lastConnectionsFilled = [lastCone[LorR][2][0][1] >= 0, lastCone[LorR][2][1][1] >= 0]
+                print(lastConnectionsFilled)
                 #most of the code below is sanity checks, but some of it is for the purpouses of flipping connections to fit the 'back','front' model. This can be done differently, by putting it in the connectCone() function, for example. Threre might be some useless redundancy in the code below, but fuck it, it works (for now)
                 if(not lastConnectionsFilled[lastConeConnectionIndex[LorR]]): #if it doesnt have a connected cone on the 
                     #print("no preferable (front) connection on lastLeftCone")
                     if(not lastConnectionsFilled[intBoolInv(lastConeConnectionIndex[LorR])]):
                         print("no connections on lastCone["+("right" if (LorR==1) else "left")+"] (impossible):", lastCone[LorR])
                         return(False)
-                    else:
-                        if(findIndexBy3DEntry(self.pathList, 3, 0, lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][0]) >= 0): #check if that isnt already in pathlist
+                    else: #single cone connection
+                        if(findIndexBy3DEntry(self.pathList, 3+LorR, 0, lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][0]) >= 0): #check if that isnt already in pathlist (by searching for a coneID in pathList)
                             ## if it is, then we just stop here. no more path generation can be done for now
                             print("single lastCone["+("right" if (LorR==1) else "left")+"] connection already in pathList (path at end of cone line, make more connections)")
                             return(False)

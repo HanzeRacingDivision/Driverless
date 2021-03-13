@@ -1,13 +1,13 @@
-#TBD: 
+#TBD: add spoof coneConnecter class that gets data from network, to run visualization for non-local coneConnecter
 
 #note: for numpy sin/cos/tan angles, 0 is at 3 o'clock, positive values are CCW and the range returned by arctan2 is (-180,180) or (-pi, pi)
 
 
-import pygame
-import numpy as np
-import datetime
-import time
-import sys
+import pygame       #python game library, used for the visualization
+import numpy as np  #general math library
+import datetime     #used for naming log files
+import time         #used for (temporary) driving math in raceCar() class
+import sys          #used for importing files from commandline (DOS run argument)
 
 # Array Scalar Multiplication and Addition
 global ASM, ASA
@@ -115,25 +115,21 @@ NO_CONN_EXCL = 0
 EXCL_UNCONN = 1
 EXCL_SING_CONN = 2
 EXCL_DUBL_CONN = 3
+EXCL_ANY_CONN = 4
 
 global CD_FINISH, coneLogTableColumnDef
 CD_FINISH = 'finish'
 coneLogTableColumnDef = "cone ID,leftOrRight,Xpos,Ypos,prev ID,next ID,coneData\n"
 
 class raceCar:
-    def __init__(self, pos, orient=0.0, steering=0.0, speed=0.0, color=[50,200,50]):
-        self.pos = pos #position (real, not pixels)
+    def __init__(self, pos=[12.0, 4.0], orient=0.0, steering=0.0, speed=0.0):
+        self.pos = [pos[0], pos[1]] #position (real)
         self.orient = orient #orientation (radians)
         self.steering = steering #steering variable (angle, radius, whatever, IDK yet)
         self.speed = speed #forward velocity (wheel speed)
         self.lastUpdateTime = time.time() #a timestamp to get accurate deltaTime for updatePos()
         self.width = 1.5 #width of car (real, not pixels)
         self.length = 3 #height of car (real, not pixels)
-        #the drawing stuff:
-        self.color = color
-        #polygon stuff (to be replaced by sprite?)
-        self.pointRadius = (((self.width**2)+(self.length**2))**0.5)/2 #Pythagoras
-        self.pointAngle = np.arctan2(self.width, self.length) #this is used to make corner point for polygon
     
     def updatePos(self): #update the position of the car
         timeRightNow = time.time() #python is not the fastest program, using time.time() at different points in this function will give different values, this won't
@@ -176,39 +172,16 @@ class raceCar:
                 # debugPos = [(self.pos[i] + (-1 if (translatedDistance[1]<0) else 1)*debugOffsets[(0 if (((translatedDistance[0]<0) and (translatedDistance[1]<0)) or ((translatedDistance[0]>0) and (translatedDistance[1]>0))) else 1)][i])  for i in range(2)]
                 # simSelf.debugLines.append([0, simSelf.realToPixelPos(pos), simSelf.realToPixelPos(debugPos), 2])
             return(False, returnDistance)
-    
-    #drawing is currently done by calculating the position of the corners and drawing a polygon with those points. Not efficient, not pretty, just fun
-    def draw(self, simSelf): #note: i'm just passing the 'parent' object, but you could absolutely use actual class inheritance structure to do this, i just dont like that sort of thing
-        if(simSelf.isInsideWindowReal(self.pos)):        
-            polygonPoints = []
-            # polygonPoints.append(simSelf.realToPixelPos([np.cos(self.pointAngle+self.orient) * self.pointRadius + self.pos[0], np.sin(self.pointAngle+self.orient) * self.pointRadius + self.pos[1]]))
-            # polygonPoints.append(simSelf.realToPixelPos([np.cos(np.pi-self.pointAngle+self.orient) * self.pointRadius + self.pos[0], np.sin(np.pi-self.pointAngle+self.orient) * self.pointRadius + self.pos[1]]))
-            # polygonPoints.append(simSelf.realToPixelPos([np.cos(np.pi+self.pointAngle+self.orient) * self.pointRadius + self.pos[0], np.sin(np.pi+self.pointAngle+self.orient) * self.pointRadius + self.pos[1]]))
-            # polygonPoints.append(simSelf.realToPixelPos([np.cos(-self.pointAngle+self.orient) * self.pointRadius + self.pos[0], np.sin(-self.pointAngle+self.orient) * self.pointRadius + self.pos[1]]))
-            offsets = [[np.cos(self.pointAngle+self.orient) * self.pointRadius, np.sin(self.pointAngle+self.orient) * self.pointRadius],
-                        [np.cos(np.pi-self.pointAngle+self.orient) * self.pointRadius, np.sin(np.pi-self.pointAngle+self.orient) * self.pointRadius]]
-            polygonPoints.append(simSelf.realToPixelPos([self.pos[0] + offsets[0][0], self.pos[1] + offsets[0][1]])) #front left
-            polygonPoints.append(simSelf.realToPixelPos([self.pos[0] + offsets[1][0], self.pos[1] + offsets[1][1]])) #back left
-            polygonPoints.append(simSelf.realToPixelPos([self.pos[0] - offsets[0][0], self.pos[1] - offsets[0][1]])) #back right
-            polygonPoints.append(simSelf.realToPixelPos([self.pos[0] - offsets[1][0], self.pos[1] - offsets[1][1]])) #front right
-            pygame.draw.polygon(simSelf.window, self.color, polygonPoints) #draw car
-            #arrow drawing (not needed, just handy to indicate direction of car)
-            arrowPoints = [simSelf.realToPixelPos(self.pos), polygonPoints[1], polygonPoints[2]] #not as efficient as using the line below, but self.pos can vary
-            oppositeColor = [255-self.color[0], 255-self.color[1], 255-self.color[1]]
-            pygame.draw.polygon(simSelf.window, oppositeColor, arrowPoints) #draw arrow
-    
 
-class pygamesim:
-    def __init__(self, window, cars=[], drawSize=(1200,600), drawOffset=(0,0), viewOffset=(0,0), sizeScale=30, invertYaxis=True, importConeLogFilename='', logging=True, logname="pygamesim"):
-        self.window = window #pass on the window object (pygame)
-        self.cars = cars #list of cars in this simulation (normaly a list with only 1 entry)
-        self.drawSize = (int(drawSize[0]),int(drawSize[1])) #width and height of the display area (does not have to be 100% of the window)
-        self.drawOffset = (int(drawOffset[0]), int(drawOffset[1])) #draw position offset, (0,0) is topleft
-        self.viewOffset = [float(viewOffset[0]), float(viewOffset[1])] #'camera' view offsets, changing this affects the real part of realToPixelPos()
-        self.sizeScale = sizeScale #pixels per meter
-        self.invertYaxis = invertYaxis
+
+class coneConnecter:
+    def __init__(self, car=None, importConeLogFilename='', logging=True, logname="coneLog"):
+        self.car = car #list of cars in this simulation (normaly a list with only 1 entry)
+        if(car is None):
+            print("warning: no car in coneConnector, some functions will not work")
         self.logging = logging
         self.logfilename = ''
+        
         if(logging):
             timeString = datetime.datetime.now().strftime("%Y-%m-%d_%H;%M;%S")
             self.logfilename = (logname + "_" + timeString)
@@ -216,23 +189,9 @@ class pygamesim:
             global coneLogTableColumnDef
             self.logfile.write(coneLogTableColumnDef)
             self.rewriteLogTimer = pygame.time.get_ticks() + 2000
+        
         ## now init all other variables/lists
-        self.bgColor = [50,50,50] #grey
-        
-        self.finishLineColor = [255,40,0]
-        self.finishLineWidth = 2 #pixels wide
-        self.finishLinePos = [None, None] #[ left Cone, right Cone] #just pointers to cones
-        
-        self.leftConeColor = [255,255,0] #yellow
-        self.rightConeColor = [0,50,255] #dark blue
-        self.coneLineWidth = 2 #pixels wide
-        
-        self.pathColor = [0,220,255] #light blue
-        self.pathLineWidth = 2 #pixels wide
-        #self.pathCenterPixelDiam = 
-        
         self.coneDiam = 0.2 #meters
-        #self.conePixelDiam = coneDiam * sizeScale #might make math faster, but will require re-calculating on change
         
         self.coneConnectionThreshold = 5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
         self.coneConnectionThresholdSquared = self.coneConnectionThreshold**2
@@ -255,27 +214,21 @@ class pygamesim:
         # #the pathList is a (properly ordered) list of points/lines for the car to travel through. It (like most lists here) prioratizes math efficiency over RAM usage, so several stored parameters are redundant (can be recalculated given other elements), which should save time when calculating optimal path.
         self.newConeID = 0 #add 1 after adding a cone
         
+        self.finishLinePos = [None, None] #[ left Cone, right Cone] #just pointers to cones
+        
         #self.leftConesFullCircle = False  #TBD: no checking function yet, and because connectCone() can connect a cone to the 0th cone at any time without completing the circle, a special function this is required
         #self.rightConesFullCircle = False
         self.pathFullCircle = False
         
-        self.floatingCone = [] #[ [[xpixel,ypixel], color] ] #note: x and y are in pixels, not meters. Translation to meters happens on final placement
-        
-        self.movingViewOffset = False
-        self.prevViewOffset = self.viewOffset
-        self.movingViewOffsetMouseStart = [0,0]
-        
         self.rewriteLogTimer = 0
         self.logFileChanged = False
-        
-        self.debugLines = [] #[[lineType, pos, pos/angles, color_index (0-2)], ] #third entry is: (lineType==0: straight line from two positions), (lineType==1: straight line from pos and [radius, angle]), (lineType==2: arc from pos and [radius, startAngle, endAngle])
-        self.debugLineColors = [[255,0,255],[255,255,255],[0,255,0], [255,160,255]] #purple, white, green, pink
-        self.debugLineWidth = 3
         
         #this has to happen AFTER variables/lists are initialized, (becuase it's hard to append to nonexistant conelists)
         if((len(importConeLogFilename) > 0) and (importConeLogFilename != '') and (importConeLogFilename != "")):
             self.importConeLog(importConeLogFilename, True)
     
+    
+    #logging functions
     def closeLog(self):
         if(self.logging): #just a safety check
             self.logfile.close()
@@ -400,24 +353,7 @@ class pygamesim:
         except:
             print("exception in importConeLog()")
     
-    def pixelsToRealPos(self, pixelPos):
-        if(self.invertYaxis):
-            return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((self.drawSize[1]-pixelPos[1]+self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
-        else:
-            return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((pixelPos[1]-self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
-    
-    def realToPixelPos(self, realPos):
-        if(self.invertYaxis):
-            return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], self.drawSize[1]-((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]]) #invert Y-axis for normal (0,0) at bottomleft display
-        else:
-            return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], ((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]])
-    
-    def isInsideWindowPixels(self, pixelPos):
-        return((pixelPos[0] < (self.drawSize[0] + self.drawOffset[0])) and (pixelPos[0] > self.drawOffset[0]) and (pixelPos[1] < (self.drawSize[1] + self.drawOffset[1])) and (pixelPos[1] > self.drawOffset[1]))
-    
-    def isInsideWindowReal(self, realPos):
-        return(self.isInsideWindowPixels(self.realToPixelPos(realPos))) #not very efficient, but simple
-    
+    #cone connecting functions    
     def distanceToConeSquared(self, pos, listsToCheck=[], sortByDistance=False, mergeLists=True, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, coneConnectionExclusions=NO_CONN_EXCL, ignoreLinkedConeIDs=[]):
         if(len(listsToCheck) < 1):
             listsToCheck = [self.leftConeList, self.rightConeList] #cant be default parameter
@@ -437,7 +373,8 @@ class pygamesim:
                 coneConnections = [cone[2][0][1] >= 0, cone[2][1][1] >= 0]
                 if(((coneConnectionExclusions == EXCL_UNCONN) and not (coneConnections[0] or coneConnections[1])) or \
                    ((coneConnectionExclusions == EXCL_SING_CONN) and ((coneConnections[0] and not coneConnections[1]) or (not coneConnections[0] and coneConnections[1]))) or \
-                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1]))):
+                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1])) or \
+                   ((coneConnectionExclusions == EXCL_ANY_CONN) and (coneConnections[0] or coneConnections[1]))):
                     ignoreCone = True
                 elif((cone[2][0][1] >= 0) or (cone[2][1][1] >= 0)):
                     for coneIDtoIgnore in ignoreLinkedConeIDs:  #using "((cone[2][0][0] in ignoreLinkedConeIDs) or (cone[2][0][0] in ignoreLinkedConeIDs))" would search the array twice, a single forloop is faster
@@ -476,9 +413,9 @@ class pygamesim:
                 hasAngleThreshRange = ((len(angleThreshRange[conelist])==2) if (type(angleThreshRange[conelist]) is list) else False) #extra safety check
                 if(hasAngleThreshRange):
                     currentAngleThreshRange = angleThreshRange[conelist]
-                    # self.debugLines.append([1, self.realToPixelPos(self.cars[0].pos), [simpleThreshold, currentAngleThreshRange[0]], 1]) #line from floating cone at someAngles[0] radians with a length of coneConnectionThreshold
-                    # self.debugLines.append([1, self.realToPixelPos(self.cars[0].pos), [simpleThreshold, currentAngleThreshRange[1]], 1]) #line from floating cone at someAngles[1] radians with a length of coneConnectionThreshold
-                    # self.debugLines.append([2, self.realToPixelPos(self.cars[0].pos), [simpleThreshold, currentAngleThreshRange[0], currentAngleThreshRange[1]], 1]) #arc centered at floating cone with radius coneConnectionThreshold, startAngle being someAngles[0] radians and endAngle being someAngles[1] radians
+                    # self.debugLines.append([1, self.realToPixelPos(self.car.pos), [simpleThreshold, currentAngleThreshRange[0]], 1]) #line from floating cone at someAngles[0] radians with a length of coneConnectionThreshold
+                    # self.debugLines.append([1, self.realToPixelPos(self.car.pos), [simpleThreshold, currentAngleThreshRange[1]], 1]) #line from floating cone at someAngles[1] radians with a length of coneConnectionThreshold
+                    # self.debugLines.append([2, self.realToPixelPos(self.car.pos), [simpleThreshold, currentAngleThreshRange[0], currentAngleThreshRange[1]], 1]) #arc centered at floating cone with radius coneConnectionThreshold, startAngle being someAngles[0] radians and endAngle being someAngles[1] radians
             #for cone in listsToCheck[conelist]: #doesnt let me store index
             for coneIndex in range(len(listsToCheck[conelist])):
                 cone = listsToCheck[conelist][coneIndex]
@@ -489,7 +426,8 @@ class pygamesim:
                 coneConnections = [cone[2][0][1] >= 0, cone[2][1][1] >= 0]
                 if(((coneConnectionExclusions == EXCL_UNCONN) and not (coneConnections[0] or coneConnections[1])) or \
                    ((coneConnectionExclusions == EXCL_SING_CONN) and ((coneConnections[0] and not coneConnections[1]) or (not coneConnections[0] and coneConnections[1]))) or \
-                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1]))):
+                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1])) or \
+                   ((coneConnectionExclusions == EXCL_ANY_CONN) and (coneConnections[0] or coneConnections[1]))):
                     ignoreCone = True
                 elif((cone[2][0][1] >= 0) or (cone[2][1][1] >= 0)):
                     for coneIDtoIgnore in ignoreLinkedConeIDs:  #using "((cone[2][0][0] in ignoreLinkedConeIDs) or (cone[2][0][0] in ignoreLinkedConeIDs))" would search the array twice, a single forloop is faster
@@ -715,6 +653,9 @@ class pygamesim:
         if(self.pathFullCircle):
             print("not gonna make path, already full circle")
             return(False)
+        if(self.car is None):
+            print("cant make path, there is no car")
+            return(False)
         if(len(self.pathList) == 0):
             if((len(self.rightConeList) < 2) or (len(self.leftConeList) < 2)): #first pathLine can only be made between 2 connected cones
                 print("not enough cones in one or more coneLists, cant place first pathLine")
@@ -732,19 +673,19 @@ class pygamesim:
                     print("only 1 finish cone set, makePath can just wait untill the second is found, right?")
                     return(False)
             else: #if there aren't already finish cones, then find it the old-fashioned way, by looking for cones near the car
-                sideAngleRanges = [[self.cars[0].orient+(np.pi/2)-self.pathFirstLineCarSideAngleDelta, self.cars[0].orient+(np.pi/2)+self.pathFirstLineCarSideAngleDelta], [self.cars[0].orient-(np.pi/2)-self.pathFirstLineCarSideAngleDelta, self.cars[0].orient-(np.pi/2)+self.pathFirstLineCarSideAngleDelta]] #left side is car.orient +pi/2, right side is car.orient -pi/2
-                firstConeCandidates = self.distanceToCone(self.cars[0].pos, [self.leftConeList, self.rightConeList], SORTBY_DIST, False, [], self.pathFirstLinePosDist, EXCL_UNCONN, [], self.cars[0].orient, sideAngleRanges)
+                sideAngleRanges = [[self.car.orient+(np.pi/2)-self.pathFirstLineCarSideAngleDelta, self.car.orient+(np.pi/2)+self.pathFirstLineCarSideAngleDelta], [self.car.orient-(np.pi/2)-self.pathFirstLineCarSideAngleDelta, self.car.orient-(np.pi/2)+self.pathFirstLineCarSideAngleDelta]] #left side is car.orient +pi/2, right side is car.orient -pi/2
+                firstConeCandidates = self.distanceToCone(self.car.pos, [self.leftConeList, self.rightConeList], SORTBY_DIST, False, [], self.pathFirstLinePosDist, EXCL_UNCONN, [], self.car.orient, sideAngleRanges)
                 for LorR in range(2):
                     bestCandidateIndex = -1;   highestStrength = 0;   candidatesDiscarded = 0
-                    #carPerpAngle = self.cars[0].orient + (np.pi*(0.5 if (LorR == 1) else -0.5))
-                    carPerpAngle = self.cars[0].orient - (np.pi/2) #always get CW perpendicular
+                    #carPerpAngle = self.car.orient + (np.pi*(0.5 if (LorR == 1) else -0.5))
+                    carPerpAngle = self.car.orient - (np.pi/2) #always get CW perpendicular
                     for i in range(len(firstConeCandidates[LorR])):
                         cone = firstConeCandidates[LorR][i][2]
                         connectionsFilled = [(cone[2][0][1] >= 0), (cone[2][1][1] >= 0)] #2-size list of booleans
-                        connectionAnglesAllowed = [((abs(radDiff(cone[2][0][2], self.cars[0].orient)) < self.pathFirstLineCarAngleDeltaMax) if connectionsFilled[0] else False), ((abs(radDiff(cone[2][1][2], self.cars[0].orient)) < self.pathFirstLineCarAngleDeltaMax) if connectionsFilled[1] else False)]
+                        connectionAnglesAllowed = [((abs(radDiff(cone[2][0][2], self.car.orient)) < self.pathFirstLineCarAngleDeltaMax) if connectionsFilled[0] else False), ((abs(radDiff(cone[2][1][2], self.car.orient)) < self.pathFirstLineCarAngleDeltaMax) if connectionsFilled[1] else False)]
                         ## it's important to note that the distance calculated by distanceToCone() is between the center of the car and the cone, and therefore not the shortest path, or real distance to the car (a cone next to a wheel will have a higher distance than a cone next to the middle of the car, which is illogical)
                         ## this illogical distance can still be used to help filter out candidates, but for an accurate strength-rating, distanceToCar() (a function of the raceCar class) should be used
-                        coneOverlapsCar, distToCar = self.cars[0].distanceToCar(cone[1])
+                        coneOverlapsCar, distToCar = self.car.distanceToCar(cone[1])
                         #print("evaluating "+("right" if (LorR==1) else "left")+" cone:", cone[0], connectionsFilled, connectionAnglesAllowed, coneOverlapsCar, distToCar)
                         if(not (connectionsFilled[0] or connectionsFilled[1])):
                             ## somehow, an unconnected cone slipped past the filer in distanceToCone(). this should be impossible, but i wrote the filter code in a hurry, so little debugging cant hurt
@@ -764,7 +705,7 @@ class pygamesim:
                         else:
                             coneCandidateStrength = 1 #init var
                             coneCandidateStrength *= 1.5-min(distToCar/self.pathFirstLineCarDist, 1)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5
-                            coneCandidateStrength *= 1.5-abs(radDiff(cone[2][(0 if connectionAnglesAllowed[0] else 1)][2], self.cars[0].orient))/self.pathFirstLineCarAngleDeltaMax  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                            coneCandidateStrength *= 1.5-abs(radDiff(cone[2][(0 if connectionAnglesAllowed[0] else 1)][2], self.car.orient))/self.pathFirstLineCarAngleDeltaMax  #high angle delta, low strength. Linear. worst>0.5 best<1.5
                             ## this following check makes sure the pathline is perpendicular to the car
                             conePerpAngle = 0 #init var
                             if(connectionsFilled[0] and connectionsFilled[1]):
@@ -812,13 +753,13 @@ class pygamesim:
                     firstCone[LorR][2][1] = tempConVal
                     self.logFileChanged = True #set flag
                     #then check the angle of that connection. If it is too far off from the car angle then something is terribly wrong (or 
-                    if(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
-                        print("only first "+("right" if (LorR==1) else "left")+" connection angle larger than allowed:", firstConeConnectionIndex, round(np.rad2deg(firstCone[LorR][2][firstConeConnectionIndex][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.cars[0].orient))),2))
+                    if(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.car.orient)) > self.pathFirstLineCarAngleDeltaMax):
+                        print("only first "+("right" if (LorR==1) else "left")+" connection angle larger than allowed:", firstConeConnectionIndex, round(np.rad2deg(firstCone[LorR][2][firstConeConnectionIndex][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.car.orient))),2))
                         return(False)
                 elif(firstConnectionsFilled[intBoolInv(firstConeConnectionIndex)]): #if it has both connections:
-                    if(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
-                        if(abs(radDiff(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.cars[0].orient)) > self.pathFirstLineCarAngleDeltaMax):
-                            print("second left angle also larger than allowed", round(np.rad2deg(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.cars[0].orient))),2))
+                    if(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.car.orient)) > self.pathFirstLineCarAngleDeltaMax):
+                        if(abs(radDiff(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.car.orient)) > self.pathFirstLineCarAngleDeltaMax):
+                            print("second left angle also larger than allowed", round(np.rad2deg(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.car.orient))),2))
                             return(False)
                         else: #first angle was large, but second angle wasnt, just switch the connections around and we're good to go
                             #print("whipping lastLeft (2):", lastLeftCone[2])
@@ -833,7 +774,7 @@ class pygamesim:
             centerPoint = [firstCone[1][1][0] + (firstCone[0][1][0]-firstCone[1][1][0])/2, firstCone[1][1][1] + (firstCone[0][1][1]-firstCone[1][1][1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
             self.pathList.append([centerPoint, [lineAngle, carAngle], pathWidth, [firstCone[0][0], firstCone[0][1], firstConeIndexInArray[0]], [firstCone[1][0], firstCone[1][1], firstConeIndexInArray[1]], 69.420])
         
-        else:
+        else: #if len(pathList) > 0
             lastPathLine = self.pathList[-1] # -1 gets the last item in list, you could also use (len(pathList)-1)
             coneLists = [self.leftConeList, self.rightConeList];  lastCone = [];  lastConeConnectionIndex = [];  lastConePerpAngle = [];  prospectCone = [];  prospectConeConnectionIndex = [];  
             for LorR in range(2):
@@ -859,10 +800,10 @@ class pygamesim:
                             self.logFileChanged = True #set flag
                 #super safety check for first-pathLine code
                 if(len(self.pathList) == 1): #now check both angles again, just to be sure:
-                    if(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.cars[0].orient) > self.pathFirstLineCarAngleDeltaMax)):
-                        print("post correction first "+("right" if (LorR==1) else "left")+" angle large:", lastConeConnectionIndex[LorR], round(np.rad2deg(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.cars[0].orient))),2))
-                        if(((lastConnectionsFilled[intBoolInv(lastConeConnectionIndex[LorR])])) and (abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.cars[0].orient) > self.pathFirstLineCarAngleDeltaMax))):
-                            print("post correction second angle also large", round(np.rad2deg(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2]), 2), round(np.rad2deg(self.cars[0].orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.cars[0].orient))),2))
+                    if(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.car.orient) > self.pathFirstLineCarAngleDeltaMax)):
+                        print("post correction first "+("right" if (LorR==1) else "left")+" angle large:", lastConeConnectionIndex[LorR], round(np.rad2deg(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.car.orient))),2))
+                        if(((lastConnectionsFilled[intBoolInv(lastConeConnectionIndex[LorR])])) and (abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.car.orient) > self.pathFirstLineCarAngleDeltaMax))):
+                            print("post correction second angle also large", round(np.rad2deg(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.car.orient))),2))
                         return(False)
                 lastConePerpAngle.append(radMidd(lastCone[LorR][2][LorR][2], lastCone[LorR][2][intBoolInv(LorR)][2]) if (lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][1] >= 0) else radRoll(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2] + (np.pi*(0.5 if (lastConeConnectionIndex[LorR]==LorR) else -0.5)))) #note: addition or subtraction of half pi is a bit strange, dont worry about it :)
                 #note: currently i am using radInv() when calculating angle delta, because angles are from left cone to right cone, but if you reverse radMidd(lastRightCone[2][1][2], lastRightCone[2][0][2]) to be radMidd(lastRightCone[2][0][2], lastRightCone[2][1][2]) it will give an inverted angle already. less human, more efficient
@@ -962,16 +903,19 @@ class pygamesim:
             returnConePointer = listToAppend[indexInLRlist]
         return(isNewCone, indexInLRlist, returnLeftOrRight, returnConePointer) #return some useful data (note: returnConePointer contains all other data, but fuck it)
     
-    def addCar(self, pos=[12.0, 4.0], orient=0.0, color=[50,200,50]):
-        self.cars.append(raceCar([pos[0], pos[1]], orient, color=[color[0], color[1], color[2]])) #copy array, sothat cars dont have pointer to the same (default) array
-        return(len(self.cars)-1) #return the length of the cars list minus 1, because that is the list index of this new car
+    def addCar(self, pos=[12.0, 4.0], orient=0.0, color=[50,200,50]): #note: the starting pos is just any number, should probably be 0
+        if(self.car is None):
+            self.car = raceCar([pos[0], pos[1]], orient, color=[color[0], color[1], color[2]]) #copy array, sothat cars dont have pointer to the same (default) array
+            return(True)
+        else: #if there's already a car on the track
+            return(False)
     
     def setFinishCone(self, leftOrRight, pos, coneDataInput=[CD_FINISH]): #note: left=False, right=True
         coneData = self.coneDataCopy(coneDataInput)
         # global CD_FINISH
         # coneData.append(CD_FINISH)
         #check if the requested position already has a cone
-        addConeResult = self.addCone(leftOrRight, pos, coneData, connectNewCone=True, reconnectOverlappingCone=False) #attempt to add new cone, if a cone is already at that position, addCone() will return that info
+        addConeResult = self.addCone(leftOrRight, pos, coneData, connectNewCone=False, reconnectOverlappingCone=False) #attempt to add new cone, if a cone is already at that position, addCone() will return that info
         returnedCone = addConeResult[3]
         if(self.finishLinePos[1 if (addConeResult[2]) else 0] is None): #cant have more than 1 finish cone per side
             if(not addConeResult[0]): #if this is True, a new cone was added
@@ -985,10 +929,90 @@ class pygamesim:
         else:
             print(("right," if addConeResult[2] else "left,"), "finish cone already set")
             return(False)
+
+
+#------------------------------------------------------------------------------------------------------------------------- everything from this point is for visualization ---------------------------------------------
+
+#drawing funtions
+class pygameDrawer:
+    def __init__(self, window, drawSize=(1200,600), drawOffset=(0,0), viewOffset=(0,0), carCamOrient=0, sizeScale=30, startWithCarCam=False, invertYaxis=True):
+        self.window = window #pass on the window object (pygame)
+        self.drawSize = (int(drawSize[0]),int(drawSize[1])) #width and height of the display area (does not have to be 100% of the window)
+        self.drawOffset = (int(drawOffset[0]), int(drawOffset[1])) #draw position offset, (0,0) is topleft
+        self.viewOffset = [float(viewOffset[0]), float(viewOffset[1])] #'camera' view offsets, changing this affects the real part of realToPixelPos()
+        self.carCamOrient = carCamOrient #orientation of the car (and therefore everything) on the screen. 0 is towards the right
+        self.sizeScale = sizeScale #pixels per meter
+        self.carCam = startWithCarCam #it's either carCam (car-centered cam, with rotating but no viewOffset), or regular cam (with viewOffset, but no rotating)
+        self.invertYaxis = invertYaxis #pygame has pixel(0,0) in the topleft, so this just flips the y-axis when drawing things
+        
+        self.bgColor = [50,50,50] #grey
+        
+        self.finishLineColor = [255,40,0]
+        self.finishLineWidth = 2 #pixels wide
+        
+        self.leftConeColor = [255,255,0] #yellow
+        self.rightConeColor = [0,50,255] #dark blue
+        self.coneLineWidth = 2 #pixels wide
+        
+        self.pathColor = [0,220,255] #light blue
+        self.pathLineWidth = 2 #pixels wide
+        #self.pathCenterPixelDiam = 
+        
+        self.floatingCone = [] #[ [[xpixel,ypixel], color] ] #note: x and y are in pixels, not meters. Translation to meters happens on final placement
+        
+        #the drawing stuff:
+        self.carColor = [50,200,50]
+        #polygon stuff (to be replaced by sprite?)
+        self.carPointRadius = None #will be calculated once the car is drawn for the first time
+        self.carPointAngle = None #will be calculated once the car is drawn for the first time
+        
+        self.movingViewOffset = False
+        self.prevViewOffset = self.viewOffset
+        self.movingViewOffsetMouseStart = [0,0]
+        
+        self.debugLines = [] #[[lineType, pos, pos/angles, color_index (0-2)], ] #third entry is: (lineType==0: straight line from two positions), (lineType==1: straight line from pos and [radius, angle]), (lineType==2: arc from pos and [radius, startAngle, endAngle])
+        self.debugLineColors = [[255,0,255],[255,255,255],[0,255,0], [255,160,255]] #purple, white, green, pink
+        self.debugLineWidth = 3
     
-    #drawing funtions
+    #pixel conversion functions (the most important functions in here)
+    def pixelsToRealPos(self, pixelPos):
+        if(self.carCam):
+            dist = 0; angle = 0; #init var
+            if(self.invertYaxis):
+                dist, angle = distAngleBetwPos([self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2], [pixelPos[0], self.drawOffset[1]+(self.drawOffset[1]+self.drawSize[1])-pixelPos[1]]) #get distance to, and angle with respect to, center of the screen (car)
+            else:
+                dist, angle = distAngleBetwPos([self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2], pixelPos) #get distance to, and angle with respect to, center of the screen (car)
+            return(distAnglePosToPos(dist/self.sizeScale, radRoll(angle+self.car.orient-self.carCamOrient), self.car.pos)) #use converted dist, correctly offset angle & the real car pos to get a new real point
+        else:
+            if(self.invertYaxis):
+                return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((self.drawSize[1]-pixelPos[1]+self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
+            else:
+                return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((pixelPos[1]-self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
+    
+    def realToPixelPos(self, realPos):
+        if(self.carCam):
+            dist, angle = distAngleBetwPos(self.car.pos, realPos) #get distance to, and angle with respect to, car
+            shiftedPixelPos = distAnglePosToPos(dist*self.sizeScale, radRoll(angle-self.car.orient+self.carCamOrient), (self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2)) #calculate new (pixel) pos from the car pos, at the same distance, and the angle, plus the angle that the entire scene is shifted
+            if(self.invertYaxis):
+                return([shiftedPixelPos[0], self.drawOffset[1]+((self.drawOffset[1]+self.drawSize[1])-shiftedPixelPos[1])]) #invert Y-axis for normal (0,0) at bottomleft display
+            else:
+                return(shiftedPixelPos)
+        else:
+            if(self.invertYaxis):
+                return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], self.drawSize[1]-((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]]) #invert Y-axis for normal (0,0) at bottomleft display
+            else:
+                return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], ((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]])
+    
+    #check if things need to be drawn at all
+    def isInsideWindowPixels(self, pixelPos):
+        return((pixelPos[0] < (self.drawSize[0] + self.drawOffset[0])) and (pixelPos[0] > self.drawOffset[0]) and (pixelPos[1] < (self.drawSize[1] + self.drawOffset[1])) and (pixelPos[1] > self.drawOffset[1]))
+    
+    def isInsideWindowReal(self, realPos):
+        return(self.isInsideWindowPixels(self.realToPixelPos(realPos))) #not very efficient, but simple
+    
+    #drawing functions
     def background(self):
-        self.window.fill(self.bgColor, (self.drawOffset[0], self.drawOffset[1], self.drawSize[0], self.drawSize[1])) #dont fill entire screen, allowing for multiple sims in one window
+        self.window.fill(self.bgColor, (self.drawOffset[0], self.drawOffset[1], self.drawSize[0], self.drawSize[1])) #dont fill entire screen, just this pygamesim's area (allowing for multiple sims in one window)
     
     def drawCones(self, drawLines=True):
         conePixelDiam = self.coneDiam * self.sizeScale
@@ -1038,9 +1062,29 @@ class pygamesim:
         if((self.finishLinePos[0] is not None) and (self.finishLinePos[1] is not None)):
             pygame.draw.line(self.window, self.finishLineColor, self.realToPixelPos(self.finishLinePos[0][1]), self.realToPixelPos(self.finishLinePos[1][1]), self.finishLineWidth)
     
-    def drawCars(self):
-        for car in self.cars:
-            car.draw(self)
+    def drawCar(self):
+        #drawing is currently done by calculating the position of the corners and drawing a polygon with those points. Not efficient, not pretty, just fun
+        if(self.car is not None):
+            if(self.isInsideWindowReal(self.car.pos)):
+                if(self.carPointRadius is None):
+                    self.carPointRadius = (((self.car.width**2)+(self.car.length**2))**0.5)/2 #Pythagoras
+                    self.carPointAngle = np.arctan2(self.car.width, self.car.length) #this is used to make corner point for polygon
+                polygonPoints = []
+                # polygonPoints.append(simSelf.realToPixelPos([np.cos(self.pointAngle+self.orient) * self.pointRadius + self.pos[0], np.sin(self.pointAngle+self.orient) * self.pointRadius + self.pos[1]]))
+                # polygonPoints.append(simSelf.realToPixelPos([np.cos(np.pi-self.pointAngle+self.orient) * self.pointRadius + self.pos[0], np.sin(np.pi-self.pointAngle+self.orient) * self.pointRadius + self.pos[1]]))
+                # polygonPoints.append(simSelf.realToPixelPos([np.cos(np.pi+self.pointAngle+self.orient) * self.pointRadius + self.pos[0], np.sin(np.pi+self.pointAngle+self.orient) * self.pointRadius + self.pos[1]]))
+                # polygonPoints.append(simSelf.realToPixelPos([np.cos(-self.pointAngle+self.orient) * self.pointRadius + self.pos[0], np.sin(-self.pointAngle+self.orient) * self.pointRadius + self.pos[1]]))
+                offsets = [[np.cos(self.carPointAngle+self.car.orient) * self.carPointRadius, np.sin(self.carPointAngle+self.car.orient) * self.carPointRadius],
+                            [np.cos(np.pi-self.carPointAngle+self.car.orient) * self.carPointRadius, np.sin(np.pi-self.carPointAngle+self.car.orient) * self.carPointRadius]]
+                polygonPoints.append(self.realToPixelPos([self.car.pos[0] + offsets[0][0], self.car.pos[1] + offsets[0][1]])) #front left
+                polygonPoints.append(self.realToPixelPos([self.car.pos[0] + offsets[1][0], self.car.pos[1] + offsets[1][1]])) #back left
+                polygonPoints.append(self.realToPixelPos([self.car.pos[0] - offsets[0][0], self.car.pos[1] - offsets[0][1]])) #back right
+                polygonPoints.append(self.realToPixelPos([self.car.pos[0] - offsets[1][0], self.car.pos[1] - offsets[1][1]])) #front right
+                pygame.draw.polygon(self.window, self.carColor, polygonPoints) #draw car
+                #arrow drawing (not needed, just handy to indicate direction of car)
+                arrowPoints = [self.realToPixelPos(self.car.pos), polygonPoints[1], polygonPoints[2]] #not as efficient as using the line below, but self.pos can vary
+                oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
+                pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
     
     def drawFloatingCone(self, drawPossibleConnections=True, drawConnectionThresholdCircle=False):
         if(len(self.floatingCone) == 2): #if there is a floating cone to be drawn
@@ -1109,7 +1153,7 @@ class pygamesim:
         self.drawCones(True) #boolean parameter is whether to draw lines between connected cones (track bounds) or not
         self.drawPathLines(True, True) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
         self.drawFinishLine()
-        self.drawCars()
+        self.drawCar()
         self.drawFloatingCone(True, False)
         self.drawDebugLines()
         if(self.logging):
@@ -1118,8 +1162,8 @@ class pygamesim:
         if(self.logging and (pygame.time.get_ticks() > self.rewriteLogTimer) and self.logFileChanged):
             self.rewriteLogfile()
         #this section SHOULDN'T be in redraw(), but instead in some form of general update(), but as there currently isn't one yet, and it's only needed for one thing (manual driving), i put it here
-        for car in self.cars:
-            car.updatePos()
+        if(self.car is not None):
+            self.car.updatePos()
     
     def updateWindowSize(self, drawSize = [1200, 600], drawOffset = [0,0], sizeScale=-1, autoMatchSizeScale=True):
         if(sizeScale > 0):
@@ -1128,8 +1172,13 @@ class pygamesim:
             self.sizeScale = min(drawSize[0]/self.drawSize[0], drawSize[1]/self.drawSize[1]) * self.sizeScale #auto update sizeScale to match previous size
         self.drawSize = (int(drawSize[0]), int(drawSize[1]))
         self.drawOffset = (int(drawOffset[0]), int(drawOffset[1]))
-    
 
+
+
+class pygamesimLocal(coneConnecter, pygameDrawer):
+    def __init__(self, window, car=None, drawSize=(1200,600), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=30, startWithCarCam=False, invertYaxis=True, importConeLogFilename='', logging=True, logname="coneLog"):
+        coneConnecter.__init__(self, car, importConeLogFilename, logging, logname)
+        pygameDrawer.__init__(self, window, drawSize, drawOffset, viewOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
 
 #cursor in the shape of a flag
 # flagCurs = ("XXX         XXXXXXXXX   ",
@@ -1223,7 +1272,7 @@ windowKeepRunning = False
 
 global pygamesimInputLast, oldWindowSize
 pygamesimInputLast = None #to be filled
-oldWindowSize = [1200,600]
+oldWindowSize = []
 
 def pygameInit():
     pygame.init()
@@ -1259,8 +1308,8 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                 pygamesimInput.setFinishCone(False, pygamesimInput.pixelsToRealPos(pos))
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
             else:
-                pygamesimInput.addCone(False, pygamesimInput.pixelsToRealPos(pos), connectNewCone=False, reconnectOverlappingCone=True)
-    elif(button==3): #right mouse button
+                pygamesimInput.addCone(False, pygamesimInput.pixelsToRealPos(pos), connectNewCone=(pygame.key.get_pressed()[pygame.K_LSHIFT]), reconnectOverlappingCone=True) #place a new cone, and connect if shift is held
+    if(button==3): #right mouse button
         if(buttonDown): #mouse pressed down
             pygamesimInput.floatingCone = [pos, True]
             pygame.event.set_grab(1)
@@ -1273,14 +1322,15 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                 pygamesimInput.setFinishCone(True, pygamesimInput.pixelsToRealPos(pos))
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
             else:
-                pygamesimInput.addCone(True, pygamesimInput.pixelsToRealPos(pos), connectNewCone=False, reconnectOverlappingCone=True)
+                pygamesimInput.addCone(True, pygamesimInput.pixelsToRealPos(pos), connectNewCone=(pygame.key.get_pressed()[pygame.K_LSHIFT]), reconnectOverlappingCone=True) #place a new cone, and connect if shift is held
     elif(button==2): #middle mouse button
         if(buttonDown): #mouse pressed down
-            pygame.event.set_grab(1)
-            pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_HAND)
-            pygamesimInput.movingViewOffset = True
-            pygamesimInput.movingViewOffsetMouseStart = pygame.mouse.get_pos()
-            pygamesimInput.prevViewOffset = (pygamesimInput.viewOffset[0], pygamesimInput.viewOffset[1])
+            if(not pygamesimInput.carCam):
+                pygame.event.set_grab(1)
+                pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_HAND)
+                pygamesimInput.movingViewOffset = True
+                pygamesimInput.movingViewOffsetMouseStart = pygame.mouse.get_pos()
+                pygamesimInput.prevViewOffset = (pygamesimInput.viewOffset[0], pygamesimInput.viewOffset[1])
         else:           #mouse released
             pygame.event.set_grab(0)
             pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_ARROW)
@@ -1308,6 +1358,17 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
     elif(key==pygame.K_l): # l
         if(keyDown):
             pygamesimInput.rewriteLogfile()
+    elif(key==pygame.K_c): # c
+        if(keyDown):
+            if(pygamesimInput.car is not None):
+                pygamesimInput.carCam = not pygamesimInput.carCam
+                if(pygamesimInput.carCam and pygamesimInput.movingViewOffset): #if you switched to carCam while you were moving viewOffset, just stop moving viewOffset (same as letting go of MMB)
+                    pygame.event.set_grab(0)
+                    pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                    pygamesimInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
+                    pygamesimInput.movingViewOffset = False
+            else:
+                print("can't switch to car-centered cam, there is no car")
 
 def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
     if(len(pygamesimInputList) > 1):
@@ -1321,7 +1382,7 @@ def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=Tr
                 if(pygamesimInput.isInsideWindowPixels(mousePos)):
                     pygamesimInputLast = pygamesimInput
                     return(pygamesimInput)
-        if(type(pygamesimInputLast) is not pygamesim): #if this is the first interaction
+        if(pygamesimInputLast is None): #if this is the first interaction
             pygamesimInputLast = pygamesimInputList[0]
         return(pygamesimInputLast)
     else:
@@ -1374,14 +1435,17 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
     elif((eventToHandle.type == pygame.KEYDOWN) or (eventToHandle.type == pygame.KEYUP)):
         #print("keypress:", eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key))
         handleKeyPress(currentPygamesimInput(pygamesimInputList, None, True), eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, eventToHandle)
-        
-    elif(eventToHandle.type == pygame.MOUSEWHEEL):
+    
+    elif(eventToHandle.type == pygame.MOUSEWHEEL): #scroll wheel (zooming / rotating)
         simToScale = currentPygamesimInput(pygamesimInputList, None, True)
-        simToScale.sizeScale += eventToHandle.y
+        if(pygame.key.get_pressed()[pygame.K_LCTRL] and simToScale.carCam): #if holding (left) CTRL while in carCam mode, rotate the view
+            simToScale.carCamOrient += (eventToHandle.y * np.pi/16)
+        else:
+            simToScale.sizeScale += eventToHandle.y #zooming
 
 def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D list of pygamesim objects or 2D list of pygamesim objects
     pygamesimInputList = []
-    if(type(pygamesimInput) is pygamesim): #if it's actually a single input, not a list
+    if(type(pygamesimInput) is (pygamesimLocal or pygamesimLocal)): #if it's actually a single input, not a list
         pygamesimInputList = [pygamesimInput] #convert to 1-sizes array
     elif(type(pygamesimInput) is list):
         if(len(pygamesimInput) > 0):
@@ -1401,46 +1465,49 @@ def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D li
     for eventToHandle in pygame.event.get(): #handle all events
         handleWindowEvent(pygamesimInputList, eventToHandle)
     #the manual keyboard driving (tacked on here, because doing it with the event system would require more variables, and this is temporary anyway)
-    carToDrive = currentPygamesimInput(pygamesimInputList, demandMouseFocus=False).cars[0] #get the active sim within the window
-    pressedKeyList = pygame.key.get_pressed()
-    speedAccelVal = 0.020
-    steerAccelVal = 0.004
-    #first for speed
-    if(pressedKeyList[pygame.K_UP]): #accelerate button
-        carToDrive.speed += speedAccelVal #accelerate
-    elif(pressedKeyList[pygame.K_DOWN]): #brake/reverse button
-        if(carToDrive.speed > (speedAccelVal*3)): #positive speed
-            carToDrive.speed -= speedAccelVal * 3 #fast brake
-        else:                               #near-zero or negative speed
-            carToDrive.speed -= speedAccelVal * 0.5 #reverse accelerate
-    else:                           #neither buttons
-        if(carToDrive.speed > speedAccelVal): #positive speed
-            carToDrive.speed -= speedAccelVal/2 #slow brake
-        elif(carToDrive.speed < -speedAccelVal): #negative speed
-            carToDrive.speed += speedAccelVal #brake
-        else:                           #near-zero speed
-            carToDrive.speed = 0
-    carToDrive.speed = max(-10, min(10, carToDrive.speed)) #limit speed
-    #now for steering
-    if(pressedKeyList[pygame.K_LEFT] and (not pressedKeyList[pygame.K_RIGHT])):
-        carToDrive.steering += steerAccelVal
-    elif(pressedKeyList[pygame.K_RIGHT] and (not pressedKeyList[pygame.K_LEFT])):
-        carToDrive.steering -= steerAccelVal
-    else:
-        if(carToDrive.steering > steerAccelVal):
-            carToDrive.steering -= steerAccelVal*2.5
-        elif(carToDrive.steering < -steerAccelVal):
-            carToDrive.steering += steerAccelVal*2.5
+    carToDrive = currentPygamesimInput(pygamesimInputList, demandMouseFocus=False).car #get the active sim within the window
+    if(carToDrive is not None):
+        pressedKeyList = pygame.key.get_pressed()
+        speedAccelVal = 0.025
+        steerAccelVal = 0.005
+        #first for speed
+        if(pressedKeyList[pygame.K_UP]): #accelerate button
+            carToDrive.speed += speedAccelVal #accelerate
+        elif(pressedKeyList[pygame.K_DOWN]): #brake/reverse button
+            if(carToDrive.speed > (speedAccelVal*3)): #positive speed
+                carToDrive.speed -= speedAccelVal * 3 #fast brake
+            else:                               #near-zero or negative speed
+                carToDrive.speed -= speedAccelVal * 0.5 #reverse accelerate
+        else:                           #neither buttons
+            if(carToDrive.speed > speedAccelVal): #positive speed
+                carToDrive.speed -= speedAccelVal/2 #slow brake
+            elif(carToDrive.speed < -speedAccelVal): #negative speed
+                carToDrive.speed += speedAccelVal #brake
+            else:                           #near-zero speed
+                carToDrive.speed = 0
+        carToDrive.speed = max(-10, min(10, carToDrive.speed)) #limit speed
+        #now for steering
+        if(pressedKeyList[pygame.K_LEFT] and (not pressedKeyList[pygame.K_RIGHT])):
+            carToDrive.steering += steerAccelVal
+        elif(pressedKeyList[pygame.K_RIGHT] and (not pressedKeyList[pygame.K_LEFT])):
+            carToDrive.steering -= steerAccelVal
         else:
-            carToDrive.steering = 0
-    carToDrive.steering = max(-np.pi/5, min(np.pi/5, carToDrive.steering)) #limit speed
-    
+            if(carToDrive.steering > steerAccelVal):
+                carToDrive.steering -= steerAccelVal*2.5
+            elif(carToDrive.steering < -steerAccelVal):
+                carToDrive.steering += steerAccelVal*2.5
+            else:
+                carToDrive.steering = 0
+        carToDrive.steering = max(-np.pi/5, min(np.pi/5, carToDrive.steering)) #limit speed
+
+
+
 
 
 if __name__ == '__main__':
     pygameInit()
     
-    sim1 = pygamesim(window) #just a basic class object with all default attributes
+    sim1 = pygamesimLocal(window, raceCar()) #just a basic class object with all default attributes
     ## auto import
     if(len(sys.argv) > 1):
         if(type(sys.argv[1]) is str):
@@ -1454,7 +1521,6 @@ if __name__ == '__main__':
     # ## alt
     # sim1.importConeLog('pygamesim_2020-11-04_15;38;48.csv')
     
-    sim1.addCar() #add a default car
     
     while windowKeepRunning:
         handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
