@@ -189,7 +189,6 @@ class Game:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         image_path = os.path.join(current_dir, "car_r_30.png")
         car_image = pygame.image.load(image_path)
-        img = pygame.image.load(image_path)
         
         image_path1 = os.path.join(current_dir, "target_r_t.png")
         target_image = pygame.image.load(image_path1)
@@ -261,13 +260,21 @@ class Game:
                     if mouse_pos in mouse_pos_list:
                         continue
                     else:
-                        target = Target(mouse_pos[0]/ppu,mouse_pos[1]/ppu)
-                        targets.append(target)
-                        non_passed_targets.append(target)
+                        make_target = True
+                        for i in range(len(mouse_pos_list)):
+                            if np.linalg.norm(tuple(x-y for x,y in zip(mouse_pos_list[i],mouse_pos))) < 25:
+                                make_target = False
+                                break
                         
-                    mouse_pos_list.append(mouse_pos)
-                    
-                    
+                        if make_target == True:
+                            
+                            target = Target(mouse_pos[0]/ppu,mouse_pos[1]/ppu)
+                            targets.append(target)
+                            non_passed_targets.append(target)
+                            
+                            mouse_pos_list.append(mouse_pos)
+                        
+                        
             # press l for left cone
             if pressed[pygame.K_l]:
                 mouse_pos = pygame.mouse.get_pos()
@@ -275,11 +282,19 @@ class Game:
                 if mouse_pos in mouse_pos_list:
                     continue
                 else:
-                    left_cone = Left_cone(mouse_pos[0]/ppu, mouse_pos[1]/ppu)
-                    left_cones.append(left_cone)
                     
-                mouse_pos_list.append(mouse_pos)
+                    make_cone = True
+                    for i in range(len(mouse_pos_list)):
+                        if np.linalg.norm(tuple(x-y for x,y in zip(mouse_pos_list[i],mouse_pos))) < 50:
+                            make_cone = False
+                            break
                     
+                    if make_cone == True:
+                        left_cone = Left_cone(mouse_pos[0]/ppu, mouse_pos[1]/ppu)
+                        left_cones.append(left_cone)
+                        mouse_pos_list.append(mouse_pos)
+                        
+                        
                     
             # press r for right cone
             if pressed[pygame.K_r]:
@@ -288,10 +303,17 @@ class Game:
                 if mouse_pos in mouse_pos_list:
                     continue
                 else:
-                    right_cone = Right_cone(mouse_pos[0]/ppu, mouse_pos[1]/ppu)
-                    right_cones.append(right_cone)
-                
-                mouse_pos_list.append(mouse_pos)
+                    
+                    make_cone = True
+                    for i in range(len(mouse_pos_list)):
+                        if np.linalg.norm(tuple(x-y for x,y in zip(mouse_pos_list[i],mouse_pos))) < 50:
+                            make_cone = False
+                            break
+                    
+                    if make_cone == True:
+                        right_cone = Right_cone(mouse_pos[0]/ppu, mouse_pos[1]/ppu)
+                        right_cones.append(right_cone)
+                        mouse_pos_list.append(mouse_pos)
             
             
             
@@ -464,7 +486,7 @@ class Game:
             #setting car_pos for angle calculations
             rotated = pygame.transform.rotate(car_image, car.angle)
             rect = rotated.get_rect()
-            car_pos = car.position - (rect.width / (2*ppu), rect.height /(2*ppu)) - (10/ppu,0)
+            car_pos = car.position# - (rect.width / (2*ppu), rect.height /(2*ppu)) - (10/ppu,0)
             
             
             #manual steering
@@ -523,7 +545,7 @@ class Game:
                     left_spline_linked = True
                     
                 tck, u = splprep([x,y], s=0, k = K)
-                unew = np.arange(0, 1.01, 0.17/(len(x)**1.2)) #more cones  = less final var
+                unew = np.arange(0, 1.01, 0.25/(len(x)**1.2)) #more cones  = less final var
                 left_spline = splev(unew, tck)
                 
 
@@ -551,7 +573,7 @@ class Game:
                     right_spline_linked = True
                     
                 tck, u = splprep([x,y], s=0, k = K)
-                unew = np.arange(0, 1.01, 0.17/(len(x)**1.2)) #more cones  = less final var
+                unew = np.arange(0, 1.01, 0.25/(len(x)**1.2)) #more cones  = less final var
                 right_spline = splev(unew, tck)
                 
             
@@ -643,11 +665,6 @@ class Game:
             if len(visible_targets) > 0 and car.auto == True:
                 draw_line_dashed(self.screen, (155,255,255),(pos_1,pos_2) , closest_target.position * ppu , width = 2, dash_length = 10, exclude_corners = True)
             
-          #  pygame.draw.circle(self.screen,(255,255,255), (pos_1,pos_2), car.fov, 1)
-            
-            # draw strange grey rectangle behind debug text on the left
-            pygame.draw.rect(self.screen,(np.abs(100 - 10*dist), np.abs(100 - 10*dist), np.abs(100 - 10*dist)),(10,120,12,dist*20 - 20)) 
-            
         
             if fullscreen == False:
                 text_font = pygame.font.Font(None, 30)
@@ -656,11 +673,11 @@ class Game:
              #   self.screen.blit(text_surf, text_pos)
                 
                 text_surf = text_font.render(f'Car angle : {round(car_angle,2)}', 1, (255, 255, 255))
-                text_pos = [10, 10]
+                text_pos = [10, 15]
                 self.screen.blit(text_surf, text_pos)
                 
                 text_surf = text_font.render(f'Steering : {round(car.steering,2)}', 1, (255, 255, 255))
-                text_pos = [10, 30]
+                text_pos = [10, 35]
                 self.screen.blit(text_surf, text_pos)
     
              #   text_surf = text_font.render(f'Distance to target : {round(dist,2)}', 1, (255, 255, 255))
@@ -676,21 +693,22 @@ class Game:
              #   self.screen.blit(text_surf, text_pos)
                 
                 text_surf = text_font.render(f'Track: {track}', 1, (255, 255, 255))
-                text_pos = [10, 60]
+                text_pos = [10, 80]
                 self.screen.blit(text_surf, text_pos)
                 
                 text_surf = text_font.render(f'Autonomous: {car.auto}', 1, (255, 255, 255))
-                text_pos = [10, 80]
+                text_pos = [10, 60]
                 self.screen.blit(text_surf, text_pos)
 
-                text_surf = text_font.render(f'Track number: {track_number}', 1, (255, 255, 255))
-                text_pos = [10, 100]
-                self.screen.blit(text_surf, text_pos)
+                if track == True:
+                    text_surf = text_font.render(f'Laps: {track_number}', 1, (255, 255, 255))
+                    text_pos = [10, 100]
+                    self.screen.blit(text_surf, text_pos)
                 
                 
-                text_surf = text_font.render(f'number of visible left cones: {len(visible_left_cones)}', 1, (255, 255, 255))
-                text_pos = [10, 120]
-                self.screen.blit(text_surf, text_pos)
+              #  text_surf = text_font.render(f'number of visible left cones: {len(visible_left_cones)}', 1, (255, 255, 255))
+              #  text_pos = [10, 120]
+              #  self.screen.blit(text_surf, text_pos)
                 
                # text_surf = text_font.render(f'Headlights: {car.headlights}', 1, (255, 255, 255))
                # text_pos = [10, 190]
@@ -749,4 +767,3 @@ class Game:
 if __name__ == '__main__':
     game = Game()
     game.run()
-    
