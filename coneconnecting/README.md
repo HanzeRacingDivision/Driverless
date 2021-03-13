@@ -1,12 +1,12 @@
 python requirements: <br/>
-pygame 2.0.0 (older versions dont have SDL2, which determines how cursor-sprite changes are handled) <br/>
-numpy (any version) <br/>
+- pygame 2.0.0 (older versions dont have SDL2, which determines how cursor-sprite changes are handled) <br/>
+- numpy (any version) <br/>
 
 how to run: <br/>
-run coneConnecting.py
+  run coneConnecting.py
 
 how to use: <br/>
-(you can resize the window by just dragging it like any other windows window) <br/>
+  (you can resize the window by just dragging it like any other windows window) <br/>
 cones:
 - left mouse button places left cones (yellow)
 - right mouse button places right cones (blue)
@@ -32,11 +32,11 @@ meaning of the colors and other visual aspects: <br/>
 
 
 how to run with a previously saved track (coneLog CSV file): <br/>
-either open the coneConnecting.py window and drag&drop the file in there  OR <br/>
-use the command line and enter the coneLog filepath as an argument   OR <br/>
-make a windows shortcut, put the location of your python installation at the start of the Target section of the properties of the windows shortcut and just drag&drop the file onto the shortcut <br/>
+- open the coneConnecting.py window and drag&drop the file in there  OR
+- use the command line and enter the coneLog filepath as an argument  OR
+- make a windows shortcut, put the location of your python installation at the start of the Target section of the properties of the windows shortcut and just drag&drop the file onto the shortcut <br/>
 
 running multiple ones in paralel: (not threaded (yet)) <br/>
-use coneConnecting multi.py <br/>
-it imports coneConnecting.py as a library and makes N by N instances of it <br/>
-you can also use the multi sketch to import several coneLogs at once. It will automatically make enough instances <br/>
+- use coneConnecting multi.py <br/>
+- it imports coneConnecting.py as a library and makes N by N instances of it <br/>
+- you can also use the multi sketch to import several coneLogs at once. It will automatically make enough instances <br/>
