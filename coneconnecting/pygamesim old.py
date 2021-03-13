@@ -1126,12 +1126,8 @@ class pygamesim:
             self.sizeScale = sizeScale
         elif(autoMatchSizeScale):
             self.sizeScale = min(drawSize[0]/self.drawSize[0], drawSize[1]/self.drawSize[1]) * self.sizeScale #auto update sizeScale to match previous size
-        self.drawSize[0] = drawSize[0]
-        self.drawSize[1] = drawSize[1]
-        if(self.drawOffset[0] != drawOffset[0]):
-            self.drawOffset[0] = int(drawOffset[0])
-        if(self.drawOffset[1] != drawOffset[1]):
-            self.drawOffset[1] = int(drawOffset[1])
+        self.drawSize = (int(drawSize[0]), int(drawSize[1]))
+        self.drawOffset = (int(drawOffset[0]), int(drawOffset[1]))
     
 
 

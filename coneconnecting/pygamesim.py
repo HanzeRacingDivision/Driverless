@@ -981,7 +981,7 @@ class pygamesim:
         return(isNewCone, indexInLRlist, returnLeftOrRight, returnConePointer) #return some useful data (note: returnConePointer contains all other data, but fuck it)
     
     def addCar(self, pos=[12.0, 4.0], orient=0.0, color=[50,200,50]): #note: the starting pos is just any number, should probably be 0
-        self.cars.append(raceCar([pos[0], pos[1]], orient, color=[color[0], color[1], color[2]]))
+        self.cars.append(raceCar([pos[0], pos[1]], orient, color=[color[0], color[1], color[2]])) #copy array, sothat cars dont have pointer to the same (default) array
         return(len(self.cars)-1) #return the length of the cars list minus 1, because that is the list index of this new car
     
     def setFinishCone(self, leftOrRight, pos, coneDataInput=[CD_FINISH]): #note: left=False, right=True
@@ -1144,12 +1144,8 @@ class pygamesim:
             self.sizeScale = sizeScale
         elif(autoMatchSizeScale):
             self.sizeScale = min(drawSize[0]/self.drawSize[0], drawSize[1]/self.drawSize[1]) * self.sizeScale #auto update sizeScale to match previous size
-        self.drawSize[0] = drawSize[0]
-        self.drawSize[1] = drawSize[1]
-        if(self.drawOffset[0] != drawOffset[0]):
-            self.drawOffset[0] = int(drawOffset[0])
-        if(self.drawOffset[1] != drawOffset[1]):
-            self.drawOffset[1] = int(drawOffset[1])
+        self.drawSize = (int(drawSize[0]), int(drawSize[1]))
+        self.drawOffset = (int(drawOffset[0]), int(drawOffset[1]))
     
 
 
@@ -1298,11 +1294,12 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                 pygamesimInput.addCone(True, pygamesimInput.pixelsToRealPos(pos), connectNewCone=False, reconnectOverlappingCone=True)
     elif(button==2): #middle mouse button
         if(buttonDown): #mouse pressed down
-            pygame.event.set_grab(1)
-            pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_HAND)
-            pygamesimInput.movingViewOffset = True
-            pygamesimInput.movingViewOffsetMouseStart = pygame.mouse.get_pos()
-            pygamesimInput.prevViewOffset = (pygamesimInput.viewOffset[0], pygamesimInput.viewOffset[1])
+            if(not pygamesimInput.carCam):
+                pygame.event.set_grab(1)
+                pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_HAND)
+                pygamesimInput.movingViewOffset = True
+                pygamesimInput.movingViewOffsetMouseStart = pygame.mouse.get_pos()
+                pygamesimInput.prevViewOffset = (pygamesimInput.viewOffset[0], pygamesimInput.viewOffset[1])
         else:           #mouse released
             pygame.event.set_grab(0)
             pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_ARROW)
@@ -1333,6 +1330,11 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
     elif(key==pygame.K_c): # c
         if(keyDown):
             pygamesimInput.carCam = not pygamesimInput.carCam
+            if(pygamesimInput.carCam and pygamesimInput.movingViewOffset): #if you switched to carCam while you were moving viewOffset, just stop moving viewOffset (same as letting go of MMB)
+                pygame.event.set_grab(0)
+                pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                pygamesimInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
+                pygamesimInput.movingViewOffset = False
 
 def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
     if(len(pygamesimInputList) > 1):
@@ -1400,12 +1402,12 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
         #print("keypress:", eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key))
         handleKeyPress(currentPygamesimInput(pygamesimInputList, None, True), eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, eventToHandle)
     
-    elif(eventToHandle.type == pygame.MOUSEWHEEL):
+    elif(eventToHandle.type == pygame.MOUSEWHEEL): #scroll wheel (zooming / rotating)
         simToScale = currentPygamesimInput(pygamesimInputList, None, True)
-        if(pygame.key.get_pressed()[pygame.K_LCTRL]):
+        if(pygame.key.get_pressed()[pygame.K_LCTRL] and simToScale.carCam): #if holding (left) CTRL while in carCam mode, rotate the view
             simToScale.carCamOrient += (eventToHandle.y * np.pi/16)
         else:
-            simToScale.sizeScale += eventToHandle.y
+            simToScale.sizeScale += eventToHandle.y #zooming
         for car in simToScale.cars: #the car polygons/sprites must be recalculated
             car.reCalcOrient = True #set flag
 
