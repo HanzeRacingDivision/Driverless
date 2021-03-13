@@ -1,13 +1,13 @@
-#TBD: 
+#TBD: split single class into drawing and function classes
 
 #note: for numpy sin/cos/tan angles, 0 is at 3 o'clock, positive values are CCW and the range returned by arctan2 is (-180,180) or (-pi, pi)
 
 
-import pygame
-import numpy as np
-import datetime
-import time
-import sys
+import pygame       #python game library, used for the visualization
+import numpy as np  #general math library
+import datetime     #used for naming log files
+import time         #used for (temporary) driving math in raceCar() class
+import sys          #used for importing files from commandline (DOS run argument)
 
 # Array Scalar Multiplication and Addition
 global ASM, ASA
@@ -115,6 +115,7 @@ NO_CONN_EXCL = 0
 EXCL_UNCONN = 1
 EXCL_SING_CONN = 2
 EXCL_DUBL_CONN = 3
+EXCL_ANY_CONN = 4
 
 global CD_FINISH, coneLogTableColumnDef
 CD_FINISH = 'finish'
@@ -455,7 +456,8 @@ class pygamesim:
                 coneConnections = [cone[2][0][1] >= 0, cone[2][1][1] >= 0]
                 if(((coneConnectionExclusions == EXCL_UNCONN) and not (coneConnections[0] or coneConnections[1])) or \
                    ((coneConnectionExclusions == EXCL_SING_CONN) and ((coneConnections[0] and not coneConnections[1]) or (not coneConnections[0] and coneConnections[1]))) or \
-                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1]))):
+                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1])) or \
+                   ((coneConnectionExclusions == EXCL_ANY_CONN) and (coneConnections[0] or coneConnections[1]))):
                     ignoreCone = True
                 elif((cone[2][0][1] >= 0) or (cone[2][1][1] >= 0)):
                     for coneIDtoIgnore in ignoreLinkedConeIDs:  #using "((cone[2][0][0] in ignoreLinkedConeIDs) or (cone[2][0][0] in ignoreLinkedConeIDs))" would search the array twice, a single forloop is faster
@@ -507,7 +509,8 @@ class pygamesim:
                 coneConnections = [cone[2][0][1] >= 0, cone[2][1][1] >= 0]
                 if(((coneConnectionExclusions == EXCL_UNCONN) and not (coneConnections[0] or coneConnections[1])) or \
                    ((coneConnectionExclusions == EXCL_SING_CONN) and ((coneConnections[0] and not coneConnections[1]) or (not coneConnections[0] and coneConnections[1]))) or \
-                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1]))):
+                   ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnections[0] and coneConnections[1])) or \
+                   ((coneConnectionExclusions == EXCL_ANY_CONN) and (coneConnections[0] or coneConnections[1]))):
                     ignoreCone = True
                 elif((cone[2][0][1] >= 0) or (cone[2][1][1] >= 0)):
                     for coneIDtoIgnore in ignoreLinkedConeIDs:  #using "((cone[2][0][0] in ignoreLinkedConeIDs) or (cone[2][0][0] in ignoreLinkedConeIDs))" would search the array twice, a single forloop is faster
@@ -1408,8 +1411,6 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
             simToScale.carCamOrient += (eventToHandle.y * np.pi/16)
         else:
             simToScale.sizeScale += eventToHandle.y #zooming
-        for car in simToScale.cars: #the car polygons/sprites must be recalculated
-            car.reCalcOrient = True #set flag
 
 def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D list of pygamesim objects or 2D list of pygamesim objects
     pygamesimInputList = []
