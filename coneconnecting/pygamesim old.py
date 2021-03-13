@@ -199,16 +199,14 @@ class raceCar:
     
 
 class pygamesim:
-    def __init__(self, window, cars=[], drawSize=(1200,600), drawOffset=(0,0), viewOffset=(0,0), carCamOrient=0, sizeScale=30, startWithCarCam=False, invertYaxis=True, importConeLogFilename='', logging=True, logname="pygamesim"):
+    def __init__(self, window, cars=[], drawSize=(1200,600), drawOffset=(0,0), viewOffset=(0,0), sizeScale=30, invertYaxis=True, importConeLogFilename='', logging=True, logname="pygamesim"):
         self.window = window #pass on the window object (pygame)
         self.cars = cars #list of cars in this simulation (normaly a list with only 1 entry)
         self.drawSize = (int(drawSize[0]),int(drawSize[1])) #width and height of the display area (does not have to be 100% of the window)
         self.drawOffset = (int(drawOffset[0]), int(drawOffset[1])) #draw position offset, (0,0) is topleft
         self.viewOffset = [float(viewOffset[0]), float(viewOffset[1])] #'camera' view offsets, changing this affects the real part of realToPixelPos()
-        self.carCamOrient = carCamOrient #orientation of the car (and therefore everything) on the screen. 0 is towards the right
         self.sizeScale = sizeScale #pixels per meter
-        self.carCam = startWithCarCam #it's either carCam (car-centered cam, with rotating but no viewOffset), or regular cam (with viewOffset, but no rotating)
-        self.invertYaxis = invertYaxis #pygame has pixel(0,0) in the topleft, so this just flips the y-axis when drawing things
+        self.invertYaxis = invertYaxis
         self.logging = logging
         self.logfilename = ''
         if(logging):
@@ -403,32 +401,16 @@ class pygamesim:
             print("exception in importConeLog()")
     
     def pixelsToRealPos(self, pixelPos):
-        if(self.carCam):
-            dist = 0; angle = 0; #init var
-            if(self.invertYaxis):
-                dist, angle = distAngleBetwPos([self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2], [pixelPos[0], self.drawOffset[1]+(self.drawOffset[1]+self.drawSize[1])-pixelPos[1]]) #get distance to, and angle with respect to, center of the screen (car)
-            else:
-                dist, angle = distAngleBetwPos([self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2], pixelPos) #get distance to, and angle with respect to, center of the screen (car)
-            return(distAnglePosToPos(dist/self.sizeScale, radRoll(angle+self.cars[0].orient-self.carCamOrient), self.cars[0].pos)) #use converted dist, correctly offset angle & the real car pos to get a new real point
+        if(self.invertYaxis):
+            return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((self.drawSize[1]-pixelPos[1]+self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
         else:
-            if(self.invertYaxis):
-                return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((self.drawSize[1]-pixelPos[1]+self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
-            else:
-                return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((pixelPos[1]-self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
+            return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((pixelPos[1]-self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
     
     def realToPixelPos(self, realPos):
-        if(self.carCam):
-            dist, angle = distAngleBetwPos(self.cars[0].pos, realPos) #get distance to, and angle with respect to, car
-            shiftedPixelPos = distAnglePosToPos(dist*self.sizeScale, radRoll(angle-self.cars[0].orient+self.carCamOrient), (self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2)) #calculate new (pixel) pos from the car pos, at the same distance, and the angle, plus the angle that the entire scene is shifted
-            if(self.invertYaxis):
-                return([shiftedPixelPos[0], self.drawOffset[1]+((self.drawOffset[1]+self.drawSize[1])-shiftedPixelPos[1])]) #invert Y-axis for normal (0,0) at bottomleft display
-            else:
-                return(shiftedPixelPos)
+        if(self.invertYaxis):
+            return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], self.drawSize[1]-((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]]) #invert Y-axis for normal (0,0) at bottomleft display
         else:
-            if(self.invertYaxis):
-                return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], self.drawSize[1]-((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]]) #invert Y-axis for normal (0,0) at bottomleft display
-            else:
-                return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], ((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]])
+            return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], ((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]])
     
     def isInsideWindowPixels(self, pixelPos):
         return((pixelPos[0] < (self.drawSize[0] + self.drawOffset[0])) and (pixelPos[0] > self.drawOffset[0]) and (pixelPos[1] < (self.drawSize[1] + self.drawOffset[1])) and (pixelPos[1] > self.drawOffset[1]))
@@ -980,8 +962,8 @@ class pygamesim:
             returnConePointer = listToAppend[indexInLRlist]
         return(isNewCone, indexInLRlist, returnLeftOrRight, returnConePointer) #return some useful data (note: returnConePointer contains all other data, but fuck it)
     
-    def addCar(self, pos=[12.0, 4.0], orient=0.0, color=[50,200,50]): #note: the starting pos is just any number, should probably be 0
-        self.cars.append(raceCar([pos[0], pos[1]], orient, color=[color[0], color[1], color[2]]))
+    def addCar(self, pos=[12.0, 4.0], orient=0.0, color=[50,200,50]):
+        self.cars.append(raceCar([pos[0], pos[1]], orient, color=[color[0], color[1], color[2]])) #copy array, sothat cars dont have pointer to the same (default) array
         return(len(self.cars)-1) #return the length of the cars list minus 1, because that is the list index of this new car
     
     def setFinishCone(self, leftOrRight, pos, coneDataInput=[CD_FINISH]): #note: left=False, right=True
@@ -1006,7 +988,7 @@ class pygamesim:
     
     #drawing funtions
     def background(self):
-        self.window.fill(self.bgColor, (self.drawOffset[0], self.drawOffset[1], self.drawSize[0], self.drawSize[1])) #dont fill entire screen, just this pygamesim's area (allowing for multiple sims in one window)
+        self.window.fill(self.bgColor, (self.drawOffset[0], self.drawOffset[1], self.drawSize[0], self.drawSize[1])) #dont fill entire screen, allowing for multiple sims in one window
     
     def drawCones(self, drawLines=True):
         conePixelDiam = self.coneDiam * self.sizeScale
@@ -1282,7 +1264,7 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
             else:
                 pygamesimInput.addCone(False, pygamesimInput.pixelsToRealPos(pos), connectNewCone=False, reconnectOverlappingCone=True)
-    if(button==3): #right mouse button
+    elif(button==3): #right mouse button
         if(buttonDown): #mouse pressed down
             pygamesimInput.floatingCone = [pos, True]
             pygame.event.set_grab(1)
@@ -1330,9 +1312,6 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
     elif(key==pygame.K_l): # l
         if(keyDown):
             pygamesimInput.rewriteLogfile()
-    elif(key==pygame.K_c): # c
-        if(keyDown):
-            pygamesimInput.carCam = not pygamesimInput.carCam
 
 def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
     if(len(pygamesimInputList) > 1):
@@ -1399,15 +1378,10 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
     elif((eventToHandle.type == pygame.KEYDOWN) or (eventToHandle.type == pygame.KEYUP)):
         #print("keypress:", eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key))
         handleKeyPress(currentPygamesimInput(pygamesimInputList, None, True), eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, eventToHandle)
-    
+        
     elif(eventToHandle.type == pygame.MOUSEWHEEL):
         simToScale = currentPygamesimInput(pygamesimInputList, None, True)
-        if(pygame.key.get_pressed()[pygame.K_LCTRL]):
-            simToScale.carCamOrient += (eventToHandle.y * np.pi/16)
-        else:
-            simToScale.sizeScale += eventToHandle.y
-        for car in simToScale.cars: #the car polygons/sprites must be recalculated
-            car.reCalcOrient = True #set flag
+        simToScale.sizeScale += eventToHandle.y
 
 def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D list of pygamesim objects or 2D list of pygamesim objects
     pygamesimInputList = []
@@ -1433,8 +1407,8 @@ def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D li
     #the manual keyboard driving (tacked on here, because doing it with the event system would require more variables, and this is temporary anyway)
     carToDrive = currentPygamesimInput(pygamesimInputList, demandMouseFocus=False).cars[0] #get the active sim within the window
     pressedKeyList = pygame.key.get_pressed()
-    speedAccelVal = 0.025
-    steerAccelVal = 0.005
+    speedAccelVal = 0.020
+    steerAccelVal = 0.004
     #first for speed
     if(pressedKeyList[pygame.K_UP]): #accelerate button
         carToDrive.speed += speedAccelVal #accelerate
@@ -1464,6 +1438,7 @@ def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D li
         else:
             carToDrive.steering = 0
     carToDrive.steering = max(-np.pi/5, min(np.pi/5, carToDrive.steering)) #limit speed
+    
 
 
 if __name__ == '__main__':
