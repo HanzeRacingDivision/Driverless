@@ -73,16 +73,16 @@ class Target:
         self.visible = False
         
         
-    def update(self, car, time_running, ppu, car_pos,car_angle): 
-        self.dist_car = np.linalg.norm(self.position-car_pos)
+    def update(self, car, time_running, ppu, car_angle): 
+        self.dist_car = np.linalg.norm(self.position-car.position)
         
-        if self.passed == False and np.linalg.norm(self.position-car_pos) <= 20/ppu: 
+        if self.passed == False and np.linalg.norm(self.position-car.position) <= 20/ppu: 
             self.passed = True
             self.visible = False
             
-        if np.linalg.norm(self.position-car_pos) < car.fov/ppu:
+        if np.linalg.norm(self.position-car.position) < car.fov/ppu:
             
-            a_b = self.position-car_pos
+            a_b = self.position-car.position
             a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
             
             rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
@@ -110,12 +110,12 @@ class Left_cone:
         self.position = Vector2(x, y)        
         self.visible = False        
         
-    def update(self, car, time_running, ppu, car_pos,car_angle): 
-        self.dist_car = np.linalg.norm(self.position-car_pos)
+    def update(self, car, time_running, ppu, car_angle): 
+        self.dist_car = np.linalg.norm(self.position-car.position)
         
-        if np.linalg.norm(self.position-car_pos) < car.fov/ppu and self.visible == False and car.auto == True:
+        if np.linalg.norm(self.position-car.position) < car.fov/ppu and self.visible == False and car.auto == True:
             
-            a_b = self.position-car_pos
+            a_b = self.position-car.position
             a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
             
             rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
@@ -144,12 +144,12 @@ class Right_cone:
         self.position = Vector2(x, y)        
         self.visible = False      
         
-    def update(self, car, time_running, ppu, car_pos,car_angle): 
-        self.dist_car = np.linalg.norm(self.position-car_pos)
+    def update(self, car, time_running, ppu, car_angle): 
+        self.dist_car = np.linalg.norm(self.position-car.position)
             
-        if np.linalg.norm(self.position-car_pos) < car.fov/ppu and self.visible == False and car.auto == True:
+        if np.linalg.norm(self.position-car.position) < car.fov/ppu and self.visible == False and car.auto == True:
             
-            a_b = self.position-car_pos
+            a_b = self.position-car.position
             a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
             
             rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
@@ -483,10 +483,10 @@ class Game:
                     target.passed = False
 
 
-            #setting car_pos for angle calculations
+            #setting car.position for angle calculations
             rotated = pygame.transform.rotate(car_image, car.angle)
             rect = rotated.get_rect()
-            car_pos = car.position# - (rect.width / (2*ppu), rect.height /(2*ppu)) - (10/ppu,0)
+            car.position = car.position# - (rect.width / (2*ppu), rect.height /(2*ppu)) - (10/ppu,0)
             
             
             #manual steering
@@ -497,7 +497,7 @@ class Game:
              
             #automatic steering
             
-            elif len(visible_targets) > 0 and np.linalg.norm(closest_target.position-car_pos) < car.fov/ppu and np.linalg.norm(closest_target.position-car_pos) > 20/ppu and car.auto == True and closest_target.passed == False:
+            elif len(visible_targets) > 0 and np.linalg.norm(closest_target.position-car.position) < car.fov/ppu and np.linalg.norm(closest_target.position-car.position) > 20/ppu and car.auto == True and closest_target.passed == False:
                 
                 dist = closest_target.dist_car
                 alpha = closest_target.alpha
@@ -581,14 +581,15 @@ class Game:
 
             # Logic
             car.update(dt)
+            
             for target in targets:
-                target.update(car, time_running, ppu, car_pos, car_angle)
+                target.update(car, time_running, ppu, car_angle)
                 
             for left_cone in left_cones:
-                left_cone.update(car, time_running, ppu, car_pos, car_angle)
+                left_cone.update(car, time_running, ppu, car_angle)
                 
             for right_cone in right_cones:
-                right_cone.update(car, time_running, ppu, car_pos, car_angle)
+                right_cone.update(car, time_running, ppu, car_angle)
             
 
             # Drawing
