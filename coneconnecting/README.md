@@ -6,23 +6,28 @@ how to run: <br/>
   run coneConnecting.py
 
 how to use: <br/>
-  (you can resize the window by just dragging it like any other windows window) <br/>
+  (you can resize the window by just dragging it like any other windows window)
+
 cones:
 - left mouse button places left cones (yellow)
 - right mouse button places right cones (blue)
 - holding shift while placing cones makes them attempt to connect to a nearby (suitable) cone
 - clicking on placed cones (with either mouse button) makes it try to connect to a nearby suitable cone
-- holding F while placing/clicking on a cone will make that cone a finish-line-cone (there can only be 1 left and 1 right finish cone) <br/>
+- holding F while placing/clicking on a cone will make that cone a finish-line-cone (there can only be 1 left and 1 right finish cone)
+
 camera:
 - press C to switch between regular and car-centered camera
 - scrolling zooms in and out
 - CTRL+scrolling rotates the screen (only in car-centered camera)
-- middle mouse buttom moves the viewpoint (dragging like google maps) (not in car-centered camera) <br/>
+- middle mouse buttom moves the viewpoint (dragging like google maps) (not in car-centered camera)
+
 other:
 - pressing R makes it try to find a path (requires connected cones on both side of track
-- pressing L makes it rewrite the coneLog immidielty (also happens automatically, but this just forces it to happen) <br/>
+- pressing L makes it rewrite the coneLog immidielty (also happens automatically, but this just forces it to happen)
+
 driving (temporary):
 - arrow keys
+
 
 meaning of the colors and other visual aspects: <br/>
 - yellow cones are yellow circles, connections between them are yellow lines. Same for blue cones except in blue...
