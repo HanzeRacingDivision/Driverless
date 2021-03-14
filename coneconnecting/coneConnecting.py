@@ -929,6 +929,18 @@ class coneConnecter:
         else:
             print(("right," if addConeResult[2] else "left,"), "finish cone already set")
             return(False)
+    
+    def resetPath(self, minIndex=0, maxIndex=-1):
+        if((maxIndex < 0) or (maxIndex >= 0)):
+            maxIndex = len(self.pathList)
+        if((minIndex < 0) or (minIndex >= 0) or (maxIndex < minIndex)):
+            print("you are trying to reset a path entry that doesn't exist, stop it")
+            return()
+        if(minIndex == maxIndex): #how a human might try to delete a single entry
+            maxIndex += 1         #how the forloop needs that to be formatted
+        for i in range(0, maxIndex-minIndex): #for(number of entries to reset)
+            self.pathList.pop(maxIndex-i-1)  #loop through the list from back to front, because removing entries shifts everything backwards
+            #self.pathList.pop(minIndex) #dont loop through list at all, just keep deleting the same index, becuase the list shifts as you do
 
 
 #------------------------------------------------------------------------------------------------------------------------- everything from this point is for visualization ---------------------------------------------
@@ -1408,19 +1420,18 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
                 pygamesimInput.updateWindowSize(localNewSize, localNewDrawPos, autoMatchSizeScale=False)
         oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
-    elif(eventToHandle.type == pygame.WINDOWEVENT):
-        if(eventToHandle.event == 6): #in SDL, SDL_WINDOWEVENT_SIZE_CHANGED is 6
-            newSize = window.get_size()
-            if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
-                print("video resize from", oldWindowSize, "to", newSize)
-                correctedSize = [newSize[0], newSize[1]]
-                for pygamesimInput in pygamesimInputList:
-                    localOldSize = [pygamesimInput.drawSize[0], pygamesimInput.drawSize[1]]
-                    localOldDrawPos = [pygamesimInput.drawOffset[0], pygamesimInput.drawOffset[1]]
-                    localNewSize = [int((localOldSize[0]*correctedSize[0])/oldWindowSize[0]), int((localOldSize[1]*correctedSize[1])/oldWindowSize[1])]
-                    localNewDrawPos = [int((localOldDrawPos[0]*correctedSize[0])/oldWindowSize[0]), int((localOldDrawPos[1]*correctedSize[1])/oldWindowSize[1])]
-                    pygamesimInput.updateWindowSize(localNewSize, localNewDrawPos, autoMatchSizeScale=False)
-            oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
+    elif(eventToHandle.type == pygame.WINDOWSIZECHANGED): #in SDL, SDL_WINDOWEVENT_SIZE_CHANGED is 6
+        newSize = window.get_size()
+        if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
+            print("video resize from", oldWindowSize, "to", newSize)
+            correctedSize = [newSize[0], newSize[1]]
+            for pygamesimInput in pygamesimInputList:
+                localOldSize = [pygamesimInput.drawSize[0], pygamesimInput.drawSize[1]]
+                localOldDrawPos = [pygamesimInput.drawOffset[0], pygamesimInput.drawOffset[1]]
+                localNewSize = [int((localOldSize[0]*correctedSize[0])/oldWindowSize[0]), int((localOldSize[1]*correctedSize[1])/oldWindowSize[1])]
+                localNewDrawPos = [int((localOldDrawPos[0]*correctedSize[0])/oldWindowSize[0]), int((localOldDrawPos[1]*correctedSize[1])/oldWindowSize[1])]
+                pygamesimInput.updateWindowSize(localNewSize, localNewDrawPos, autoMatchSizeScale=False)
+        oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
     elif(eventToHandle.type == pygame.DROPFILE): #drag and drop files to import them
         if((pygame.mouse.get_pos()[0] == 0) and (pygame.mouse.get_pos()[1] == 0) and (len(pygamesimInputList) > 1)):
@@ -1517,7 +1528,7 @@ if __name__ == '__main__':
             else:
                 print("found sys.argv[1] but does not have '.csv' extension, so NOT importing that shit")
     # ## manual import
-    # sim1 = pygamesim(window, importConeLogFilename='fixed problem.csv', logging=False)
+    # sim1 = pygamesimLocal(window, raceCar(), importConeLogFilename='fixed problem.csv', logging=False)
     # ## alt
     # sim1.importConeLog('pygamesim_2020-11-04_15;38;48.csv')
     
