@@ -1347,19 +1347,18 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
                 pygamesimInput.updateWindowSize(localNewSize, localNewDrawPos, autoMatchSizeScale=False)
         oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
-    elif(eventToHandle.type == pygame.WINDOWEVENT):
-        if(eventToHandle.event == 6): #in SDL, SDL_WINDOWEVENT_SIZE_CHANGED is 6
-            newSize = window.get_size()
-            if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
-                print("video resize from", oldWindowSize, "to", newSize)
-                correctedSize = [newSize[0], newSize[1]]
-                for pygamesimInput in pygamesimInputList:
-                    localOldSize = [pygamesimInput.drawSize[0], pygamesimInput.drawSize[1]]
-                    localOldDrawPos = [pygamesimInput.drawOffset[0], pygamesimInput.drawOffset[1]]
-                    localNewSize = [int((localOldSize[0]*correctedSize[0])/oldWindowSize[0]), int((localOldSize[1]*correctedSize[1])/oldWindowSize[1])]
-                    localNewDrawPos = [int((localOldDrawPos[0]*correctedSize[0])/oldWindowSize[0]), int((localOldDrawPos[1]*correctedSize[1])/oldWindowSize[1])]
-                    pygamesimInput.updateWindowSize(localNewSize, localNewDrawPos, autoMatchSizeScale=False)
-            oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
+    elif(eventToHandle.type == pygame.WINDOWSIZECHANGED): # pygame 2.0.1 compatible
+        newSize = window.get_size()
+        if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
+            print("video resize from", oldWindowSize, "to", newSize)
+            correctedSize = [newSize[0], newSize[1]]
+            for pygamesimInput in pygamesimInputList:
+                localOldSize = [pygamesimInput.drawSize[0], pygamesimInput.drawSize[1]]
+                localOldDrawPos = [pygamesimInput.drawOffset[0], pygamesimInput.drawOffset[1]]
+                localNewSize = [int((localOldSize[0]*correctedSize[0])/oldWindowSize[0]), int((localOldSize[1]*correctedSize[1])/oldWindowSize[1])]
+                localNewDrawPos = [int((localOldDrawPos[0]*correctedSize[0])/oldWindowSize[0]), int((localOldDrawPos[1]*correctedSize[1])/oldWindowSize[1])]
+                pygamesimInput.updateWindowSize(localNewSize, localNewDrawPos, autoMatchSizeScale=False)
+        oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
     elif(eventToHandle.type == pygame.DROPFILE): #drag and drop files to import them
         if((pygame.mouse.get_pos()[0] == 0) and (pygame.mouse.get_pos()[1] == 0) and (len(pygamesimInputList) > 1)):
