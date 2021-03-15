@@ -4,6 +4,7 @@ import os
 from simulation import *
 from network import Network
 from host import readData, genData
+from map import Map
 
 
 def jumble(mean, std):
@@ -34,7 +35,7 @@ def main():
 
         clock.tick(100)
 
-        window.fill(colors["GRAY"])
+        window.fill(colors["DARK_GRAY"])
 
         seen_yellows = []
         seen_blues = []
@@ -104,7 +105,8 @@ def main():
 
         c1.drive()
         c1.update()
-        updateWindow(window, colors["GRAY"], colors["GRAY"], c1, 0, 0)
+        updateWindow(window, colors["DARK_GRAY"], c1, 0, 0)
+        map.gen_map()
 
         pygame.display.update()
 
@@ -112,18 +114,24 @@ def main():
 if __name__ == '__main__':
     os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (5, 25)
 
+    colors = {
+        "GRAY": (110, 110, 110),
+        "DARK_GRAY": (50, 50, 50),
+        "YELLOW": (255, 255, 0),
+        "BLUE": (0, 0, 255),
+        "RED": (255, 0, 0)
+    }
+
     pygame.init()
 
-    window_dimensions = (900, 600)
-    window = pygame.display.set_mode(window_dimensions)
+    win_dim = (900, 600)
+    window = pygame.display.set_mode(win_dim)
     pygame.display.set_caption("SIMULATION VER2")
 
     objectNumber = 0
 
-    colors = {
-        "GRAY": (110, 110, 110),
-        "YELLOW": (255, 255, 0),
-        "BLUE": (0, 0, 255)
-    }
+    map_loc = {"top_left": (win_dim[0] // 2 - 300, win_dim[1] // 2 - 250),
+               "bottom_right": (win_dim[0] // 2 + 50, win_dim[0] // 2 + 50)}
+    map = Map(window, map_loc["top_left"], colors["GRAY"], colors["RED"], 30, colors["YELLOW"], colors["BLUE"])
 
     main()

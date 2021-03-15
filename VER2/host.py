@@ -49,7 +49,6 @@ def threadedClient(conn, object):
 	conn.close()
 
 
-currentObject = 0
 while True:
 	conn, ADDR = S.accept()
 	print("Connected to ", ADDR)

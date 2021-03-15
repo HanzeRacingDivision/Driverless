@@ -66,7 +66,6 @@ if __name__ == '__main__':
     # Handling connections
     # --------------------------------------------------------------------
     state = {"transmitter": (50, 50, 0, 0, 0), "receiver": (50, 50, 0, 0, 0)}
-    currentObject = 0
     while True:
         conn, ADDR = S.accept()
         print("Connected to", ADDR)

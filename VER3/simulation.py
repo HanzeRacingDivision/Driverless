@@ -15,7 +15,7 @@ class carSim:
         self.angVel = 1.5
         self.state = (self.x, self.y, self.velX, self.velY, self.angle)
 
-    def manifest(self, window):
+    def display(self, window):
         carSimImg = pygame.image.load('racing-car.png')
         sprite = pygame.transform.rotate(carSimImg, self.angle)
         width = int(sprite.get_width())
@@ -56,14 +56,15 @@ class carSim:
         self.state = (self.x, self.y, self.velX, self.velY, self.angle)
 
 
-class Cone():
-    def __init__(self, x, y, colour):
+class Cone:
+
+    def __init__(self, x, y, color):
         self.x = x
         self.y = y
-        self.colour = colour
+        self.color = color
 
     def place(self, window):
-        pygame.draw.circle(window, self.colour, (self.x, self.y), 10)
+        pygame.draw.circle(window, self.color, (self.x, self.y), 10)
 
 
 def getAngle(v1, v2):
@@ -109,18 +110,27 @@ def checkNew(lst, value, bound):
     return bool
 
 
-def display_data(data_str, data_val, x, y, font, colour, window):
-    display = font.render(data_str + str(data_val), True, colour)
+def display_data(data_str, data_val, x, y, font, color, window):
+    display = font.render(data_str + str(data_val), True, color)
     window.blit(display, (x, y))
 
 
-def genGrid(XD, YD, gap, window, colour):
-    for i in range(0, XD, gap):
-        pygame.draw.line(window, colour, (i, 0), (i, YD), 1)
-    for j in range(0, YD, gap):
-        pygame.draw.line(window, colour, (0, j), (XD, j), 1)
+def genGrid(X_len, Y_len, gap, window, color):
+    """
+    :param X_len: Length of the window along x-axis.
+    :param Y_len: Length of the window along y-axis.
+    :param gap: Distance between parallel lines. In other words, width/height of the cells in the window.
+    :param window:
+    :param color:
+    :return:
+    """
+    for i in range(0, X_len, gap):
+        pygame.draw.line(window, color, (i, 0), (i, Y_len), 1)
+    for j in range(0, Y_len, gap):
+        pygame.draw.line(window, color, (0, j), (X_len, j), 1)
 
 
-def updateWindow(window, colour1, colour2, object, XD, YD):
-    genGrid(XD, YD, 15, window, colour2)
-    object.manifest(window)
+# TODO: Check if the Grid really needs to be recreated in each step
+def updateWindow(window, color2, car_object, X_len, Y_len):
+    genGrid(X_len, Y_len, 15, window, color2)
+    car_object.display(window)
