@@ -29,7 +29,7 @@ class carMCU:
         self.unfinTimestamp = time.time()
         
         # sensor feedback data in First In First Out buffers, entry [0] is the newest, entry[len()-1] is the oldest
-        self.maxFIFOlength = 10
+        self.maxFIFOlength = 10 #can safely be changed at runtime (excess FIFO entries will be removed at next write-oppertunity (once the next datapoint comes in))
         self.feedbackTimestampFIFO = []
         self.speedFIFO = []
         self.distFIFO = []
@@ -125,7 +125,7 @@ class carMCU:
             print("carMCU serial already closed")
         return(True)
     
-    def sendSpeedAngle(self, speed, angle):
+    def sendSpeedAngle(self, speed, angle): #TBD: angle unit (radian/degree) conversion, depending on which ones we choose to use
         if(self.carMCUserial.is_open):
             dataString = str(round(float(speed), 2)) + ' ' + str(round(float(angle), 1)) + '\n' #convert floats to string ('\r' is not really needed)
             #print("sending:",dataString.encode())
@@ -249,7 +249,3 @@ class carMCU:
                 print("carMCU other exception:", excepVar)
                 carMCUconThreadkeepRunning = False
                 return()
-
-theCar = carMCU(True, 'COM5', False)
-
-theCar.runOnThread(True)
