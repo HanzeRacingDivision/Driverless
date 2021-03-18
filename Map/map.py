@@ -25,10 +25,10 @@ class Map:
 
             self.acceleration = 0.0
             self.steering = 0.0
-            self.fov = 175  # 150
+            self.fov = 175  # 150   #(thijs) this 'field of view' is actually a distancethreshold (in pixels, no less)
             self.turning_sharpness = 1.8
             self.breaks = True
-            self.fov_range = 60
+            self.fov_range = 60  #(thijs) this is the actual (camera) field of view variable
             self.auto = False
             self.headlights = False
 
