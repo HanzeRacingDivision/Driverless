@@ -9,6 +9,8 @@
 import serial
 import serial.tools.list_ports
 import time
+import mapClass as mp
+import numpy as np
 
 class carMCU:
     def __init__(self, connectAtInit=True, comPort=None, autoFind=True):
@@ -152,6 +154,7 @@ class carMCU:
         self._FIFOwrite(float(splitString[1]), self.distFIFO, self.maxFIFOlength)
         self._FIFOwrite(float(splitString[2]), self.angleFIFO, self.maxFIFOlength)
         self._FIFOwrite(self.distTotalFIFO[0]+self.distFIFO[0], self.distTotalFIFO, self.maxFIFOlength)
+        #print(self.speedFIFO[0], self.distFIFO[0], self.angleFIFO[0])
         return(True)
     
     def getFeedback(self): #run this function regularly
@@ -249,3 +252,85 @@ class carMCU:
                 print("carMCU other exception:", excepVar)
                 carMCUconThreadkeepRunning = False
                 return()
+
+
+#a TEMPORARY class, to be replaced by SLAM code (which uses real filtering and stuff)
+class realCar(carMCU, mp.Map.Car):
+    def __init__(self, pos=[5,11], angle=0, connectAtInit=True, comPort=None, autoFind=True):
+        mp.Map.Car.__init__(self, pos[0], pos[1], angle)
+        carMCU.__init__(self, connectAtInit, comPort, autoFind)
+        self.timeSinceLastUpdate = time.time()
+        self.skippedUpdateCheckVar = 0.0
+    
+    def update(self): #this update() overwrites the update() in Map.Car, but this has no dt argument (because why would you do that)
+        if((len(self.speedFIFO) > 0) and (self.feedbackTimestampFIFO[0] > self.timeSinceLastUpdate)): #if the newest entry ([0]) is newer than the last processed entry
+            updates = 0 #ideally, you'd only be dealing with a single new datapoint
+            for i in range(len(self.speedFIFO)):
+                if(self.feedbackTimestampFIFO[i] > self.timeSinceLastUpdate):
+                    updates += 1
+            updateOverflow = (updates == len(self.speedFIFO)) #if this is True, it means there is no previously processed datapoint in the FIFOs
+            if(updateOverflow):
+                if(len(self.speedFIFO) > 1):
+                    print("!!! updateOverflow !!!:", updates)
+                print("NOW", len(self.speedFIFO))
+                updates -= 1
+                dt = self.timeSinceLastUpdate-self.feedbackTimestampFIFO[updates] #old timestamp - new timestamp
+                stepVelocity = (self.velocity + self.speedFIFO[updates])/2
+                stepSteering = (self.steering + self.angleFIFO[updates])/2
+                stepDist = self.distTotalFIFO[updates] - self.skippedUpdateCheckVar #little tricky, but should work
+                
+                angularVelocity = 0 #init var
+                if(abs(stepSteering) > 0.001): #avoid divide by 0
+                    turningRadius = self.length / np.sin(stepSteering)
+                    angularVelocity = stepVelocity / turningRadius #(rework math for rotation around actual point of rotation?)
+                self.angle += (dt * angularVelocity) / 2 #half now...
+                self.position[0] += stepDist * np.cos(self.angle) #x
+                self.position[1] += stepDist * np.sin(self.angle) #y
+                self.angle += (dt * angularVelocity) / 2 #second half of angle change is added after linear movement is calulated, to (hopefully) increase accuracy slightly
+                self.skippedUpdateCheckVar += stepDist
+            #regular forloop to get through
+            for i in range(updates):
+                dt = self.feedbackTimestampFIFO[updates-i]-self.feedbackTimestampFIFO[updates-i-1] #old timestamp - new timestamp
+                stepVelocity = (self.speedFIFO[updates-i]+self.speedFIFO[updates-i-1])/2 #idk, average speed between datapoints i guess
+                stepSteering = (self.angleFIFO[updates-i]+self.angleFIFO[updates-i-1])/2 #idk, average steering angle between datapoints i guess
+                stepDist = self.distFIFO[updates-i-1] #distance traveled (wheel encoder difference)
+                
+                angularVelocity = 0 #init var
+                if(abs(stepSteering) > 0.001): #avoid divide by 0
+                    turningRadius = self.length / np.sin(stepSteering)
+                    angularVelocity = stepVelocity / turningRadius #(rework math for rotation around actual point of rotation?)
+                self.angle += (dt * angularVelocity) / 2 #half now...
+                self.position[0] += stepDist * np.cos(self.angle) #x
+                self.position[1] += stepDist * np.sin(self.angle) #y
+                self.angle += (dt * angularVelocity) / 2 #second half of angle change is added after linear movement is calulated, to (hopefully) increase accuracy slightly
+                self.skippedUpdateCheckVar += stepDist
+                if(abs(self.skippedUpdateCheckVar - self.distTotalFIFO[updates-i-1]) > 0.1): #both variables hold the total (summed up) distance traveled
+                    print("you should run car.update() more often, because you are missing important data")
+                    print("traveled dist (car.update()):", self.skippedUpdateCheckVar)
+                    print("traveled dist (distTotalFIFO["+str(updates-i-1)+"]):", self.distTotalFIFO[updates-i-1])
+                    self.skippedUpdateCheckVar = self.distTotalFIFO[updates-i-1]
+            self.velocity = self.speedFIFO[0] #just take the most recent velocity
+            self.timeSinceLastUpdate = self.feedbackTimestampFIFO[0]
+            #print([round(self.position[0], 2), round(self.position[1], 2)], round(self.angle,2), round(self.velocity,2), round(self.skippedUpdateCheckVar,2))
+
+
+## testing code, turn on a print() inside a function of interest (like car.update()) to see it working
+# someCar = realCar(comPort='COM5')
+# try:
+#     while(True):
+#         someCar.getFeedback()
+#         someCar.update()
+# except KeyboardInterrupt as excep:
+#     try:
+#         print("disconnecting")
+#         someCar.disconnect()
+#     except:
+#         print("couldn't disconnect")
+#     #raise excep
+# except Exception as excep:
+#     try:
+#         print("disconnecting")
+#         someCar.disconnect()
+#     except:
+#         print("couldn't disconnect")
+#     raise excep
