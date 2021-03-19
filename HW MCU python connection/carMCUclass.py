@@ -9,7 +9,7 @@
 import serial
 import serial.tools.list_ports
 import time
-import mapClass as mp
+import mapClassTemp as mp
 import numpy as np
 
 class carMCU:
@@ -270,10 +270,9 @@ class realCar(carMCU, mp.Map.Car):
                     updates += 1
             updateOverflow = (updates == len(self.speedFIFO)) #if this is True, it means there is no previously processed datapoint in the FIFOs
             if(updateOverflow):
-                if(len(self.speedFIFO) > 1):
+                if(len(self.speedFIFO) > 1): #dont report error if the program only just started, or if maxFIFOlength is only 1
                     print("!!! updateOverflow !!!:", updates)
-                print("NOW", len(self.speedFIFO))
-                updates -= 1
+                updates -= 1 #updates is equal to the length of the array, which is not a valid index (and doing -1 is the whole point of the overflow exception)
                 dt = self.timeSinceLastUpdate-self.feedbackTimestampFIFO[updates] #old timestamp - new timestamp
                 stepVelocity = (self.velocity + self.speedFIFO[updates])/2
                 stepSteering = (self.steering + self.angleFIFO[updates])/2
@@ -312,25 +311,39 @@ class realCar(carMCU, mp.Map.Car):
             self.velocity = self.speedFIFO[0] #just take the most recent velocity
             self.timeSinceLastUpdate = self.feedbackTimestampFIFO[0]
             #print([round(self.position[0], 2), round(self.position[1], 2)], round(self.angle,2), round(self.velocity,2), round(self.skippedUpdateCheckVar,2))
+    
+    def runOnThread(self, autoreconnect=False): #overwrites runOnThread() in carMCU class
+        carMCUconThreadkeepRunning = True
+        while(carMCUconThreadkeepRunning): #super robust, might cause CPU overload though
+            try:
+                while((not self.carMCUserial.is_open) and autoreconnect):
+                    print("carMCU reconnecting with port:", self.carMCUserial.port)
+                    self.connect(self.carMCUserial.port, False) #try to connect again with the same comPort
+                    if(not self.carMCUserial.is_open):
+                        time.sleep(0.5) #wait a bit between connection attempts
+                while(self.carMCUserial.is_open):
+                    self.getFeedback() #run this to get the data
+                    self.update()
+                    time.sleep(self.defaultGetFeedbackInterval) #wait just a little bit, as to not needlessly overload the CPU
+                if(not autoreconnect):
+                    print("carMCU connection on thread stopped becuase is_open:", self.carMCUserial.is_open)
+                    return()
+            except serial.SerialException as excepVar:
+                print("carMCU serial exception")
+                if(excepVar.args[0].find("Access is denied.")): #this is in the error message that happens when you unplug an active device
+                    self.connect(self.carMCUserial.port, False, True) #try to connect again with the same comPort (will probably result in just disconnecting)
+                time.sleep(0.25)
+            except KeyboardInterrupt:
+                print("attempting to close carMCU serial connection...")
+                self.disconnect()
+                carMCUconThreadkeepRunning = False
+                return()
+            except Exception as excepVar:
+                print("carMCU other exception:", excepVar)
+                carMCUconThreadkeepRunning = False
+                return()
 
 
 ## testing code, turn on a print() inside a function of interest (like car.update()) to see it working
 # someCar = realCar(comPort='COM5')
-# try:
-#     while(True):
-#         someCar.getFeedback()
-#         someCar.update()
-# except KeyboardInterrupt as excep:
-#     try:
-#         print("disconnecting")
-#         someCar.disconnect()
-#     except:
-#         print("couldn't disconnect")
-#     #raise excep
-# except Exception as excep:
-#     try:
-#         print("disconnecting")
-#         someCar.disconnect()
-#     except:
-#         print("couldn't disconnect")
-#     raise excep
+# someCar.runOnThread()
