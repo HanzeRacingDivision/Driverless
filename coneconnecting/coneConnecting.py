@@ -9,7 +9,7 @@ import datetime     #used for naming log files
 import time         #used for (temporary) driving math in raceCar() class
 import sys          #used for importing files from commandline (DOS run argument)
 
-# Array Scalar Multiplication and Addition
+# Array Scalar Multiplication and Addition (numpy probably also has these, but whatever)
 global ASM, ASA
 ASM = lambda scalar, inputArray : [scalar * entry for entry in inputArray]
 ASA = lambda scalar, inputArray : [scalar + entry for entry in inputArray]
@@ -103,6 +103,25 @@ def maxIndex(inputList):
         return(returnIndex, maxVal)
     else:
         return(-1, 0)
+
+def deepCopy(source): #can copy any list, variable or class (copy values, not pointers)
+    #print(type(source))
+    if(source.__class__.__module__ == 'builtins'): #python builtin types, like <int> and <list> and such
+        if((type(source) is list) or (type(source) is bytearray)):
+            returnList = source.__class__() #make new list/bytearray (same class as source)
+            for entry in source:
+                returnList.append(deepCopy(entry))
+            return(returnList)
+        else:
+            return(source)
+    else: #custom classes (__module__ returns something like '__main__')
+        returnObject = source.__class__() #make new instance of same class as source
+        classAttributs = dir(source) #returs a list of all class attributes
+        # alternatively, you might be able to retrieve an attribute name list with: getattr(getattr(getattr(source, '__init__'), '__code__'), 'co_names')
+        for entry in classAttributs:
+            if((not entry.startswith('_')) and (not callable(getattr(source, entry)))): #if the attribute is not private (low level stuff) or a function (method)
+                setattr(returnObject, entry, deepCopy(getattr(source, entry))) #copy attribute
+        return(returnObject)
 
 global DONT_SORT, SORTBY_DIST, SORTBY_ANGL, SORTBY_ANGL_DELT, SORTBY_ANGL_DELT_ABS
 DONT_SORT = 0
@@ -930,17 +949,17 @@ class coneConnecter:
             print(("right," if addConeResult[2] else "left,"), "finish cone already set")
             return(False)
     
-    def resetPath(self, minIndex=0, maxIndex=-1):
-        if((maxIndex < 0) or (maxIndex >= 0)):
-            maxIndex = len(self.pathList)
-        if((minIndex < 0) or (minIndex >= 0) or (maxIndex < minIndex)):
+    def resetPath(self, startFromIndex=0, stopAtIndex=-1):
+        if((stopAtIndex < 0) or (stopAtIndex >= 0)):
+            stopAtIndex = len(self.pathList)
+        if((startFromIndex < 0) or (startFromIndex >= 0) or (stopAtIndex < startFromIndex)):
             print("you are trying to reset a path entry that doesn't exist, stop it")
             return()
-        if(minIndex == maxIndex): #how a human might try to delete a single entry
-            maxIndex += 1         #how the forloop needs that to be formatted
-        for i in range(0, maxIndex-minIndex): #for(number of entries to reset)
-            self.pathList.pop(maxIndex-i-1)  #loop through the list from back to front, because removing entries shifts everything backwards
-            #self.pathList.pop(minIndex) #dont loop through list at all, just keep deleting the same index, becuase the list shifts as you do
+        if(startFromIndex == stopAtIndex): #how a human might try to delete a single entry
+            stopAtIndex += 1         #how the forloop needs that to be formatted
+        for i in range(0, stopAtIndex-startFromIndex): #for(number of entries to reset)
+            self.pathList.pop(stopAtIndex-i-1)  #loop through the list from back to front, because removing entries shifts everything backwards
+            #self.pathList.pop(startFromIndex) #dont loop through list at all, just keep deleting the same index, becuase the list shifts as you do
 
 
 #------------------------------------------------------------------------------------------------------------------------- everything from this point is for visualization ---------------------------------------------
@@ -956,6 +975,8 @@ class pygameDrawer:
         self.sizeScale = sizeScale #pixels per meter
         self.carCam = startWithCarCam #it's either carCam (car-centered cam, with rotating but no viewOffset), or regular cam (with viewOffset, but no rotating)
         self.invertYaxis = invertYaxis #pygame has pixel(0,0) in the topleft, so this just flips the y-axis when drawing things
+        
+        #self.mapToDraw = self #TBD
         
         self.bgColor = [50,50,50] #grey
         
@@ -985,6 +1006,11 @@ class pygameDrawer:
         self.debugLines = [] #[[lineType, pos, pos/angles, color_index (0-2)], ] #third entry is: (lineType==0: straight line from two positions), (lineType==1: straight line from pos and [radius, angle]), (lineType==2: arc from pos and [radius, startAngle, endAngle])
         self.debugLineColors = [[255,0,255],[255,255,255],[0,255,0], [255,160,255]] #purple, white, green, pink
         self.debugLineWidth = 3
+        
+        # try: #if there's no car object, this will not crash the entire program
+        #     self.viewOffset = [(-self.car.pos[0]) + ((self.drawSize[0]/self.sizeScale)/2), (-self.car.pos[1]) + ((self.drawSize[1]/self.sizeScale)/2)]
+        # except Exception as theExcept:
+        #     print("couldn't set viewOffset to car pos:", theExcept)
     
     #pixel conversion functions (the most important functions in here)
     def pixelsToRealPos(self, pixelPos):
@@ -1339,13 +1365,13 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
         if(buttonDown): #mouse pressed down
             if(not pygamesimInput.carCam):
                 pygame.event.set_grab(1)
-                pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_HAND)
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
                 pygamesimInput.movingViewOffset = True
                 pygamesimInput.movingViewOffsetMouseStart = pygame.mouse.get_pos()
                 pygamesimInput.prevViewOffset = (pygamesimInput.viewOffset[0], pygamesimInput.viewOffset[1])
         else:           #mouse released
             pygame.event.set_grab(0)
-            pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_ARROW)
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             pygamesimInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
             pygamesimInput.movingViewOffset = False
 
@@ -1359,7 +1385,7 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
                 flagCursorSet = True
         else:
             pygame.event.set_grab(0)
-            pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_ARROW)
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             flagCursorSet = False
     elif(key==pygame.K_r): # r
         if(keyDown):
@@ -1376,7 +1402,7 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
                 pygamesimInput.carCam = not pygamesimInput.carCam
                 if(pygamesimInput.carCam and pygamesimInput.movingViewOffset): #if you switched to carCam while you were moving viewOffset, just stop moving viewOffset (same as letting go of MMB)
                     pygame.event.set_grab(0)
-                    pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
                     pygamesimInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
                     pygamesimInput.movingViewOffset = False
             else:
@@ -1420,7 +1446,7 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
                 pygamesimInput.updateWindowSize(localNewSize, localNewDrawPos, autoMatchSizeScale=False)
         oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
-    elif(eventToHandle.type == pygame.WINDOWSIZECHANGED): #in SDL, SDL_WINDOWEVENT_SIZE_CHANGED is 6
+    elif(eventToHandle.type == pygame.WINDOWSIZECHANGED): # pygame 2.0.1 compatible
         newSize = window.get_size()
         if((oldWindowSize[0] != newSize[0]) or (oldWindowSize[1] != newSize[1])): #if new size is actually different
             print("video resize from", oldWindowSize, "to", newSize)
@@ -1452,7 +1478,13 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
         if(pygame.key.get_pressed()[pygame.K_LCTRL] and simToScale.carCam): #if holding (left) CTRL while in carCam mode, rotate the view
             simToScale.carCamOrient += (eventToHandle.y * np.pi/16)
         else:
+            dif = [simToScale.drawSize[0]/simToScale.sizeScale, simToScale.drawSize[1]/simToScale.sizeScale]
             simToScale.sizeScale += eventToHandle.y #zooming
+            #if(not simToScale.carCam): #viewOffset is not used in carCam mode, but it won't hurt to change it anyway
+            dif[0] -= (simToScale.drawSize[0]/simToScale.sizeScale)
+            dif[1] -= (simToScale.drawSize[1]/simToScale.sizeScale)
+            simToScale.viewOffset[0] -= dif[0]/2 #equalizes from the zoom to 'happen' from the middle of the screen
+            simToScale.viewOffset[1] -= dif[1]/2
 
 def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D list of pygamesim objects or 2D list of pygamesim objects
     pygamesimInputList = []
