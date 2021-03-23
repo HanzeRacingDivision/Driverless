@@ -256,7 +256,7 @@ class carMCU:
 
 #a TEMPORARY class, to be replaced by SLAM code (which uses real filtering and stuff)
 class realCar(carMCU, mp.Map.Car):
-    def __init__(self, pos=[5,11], angle=0, connectAtInit=True, comPort=None, autoFind=True):
+    def __init__(self, pos=[0,0], angle=0, connectAtInit=True, comPort=None, autoFind=True):
         mp.Map.Car.__init__(self, pos[0], pos[1], angle)
         carMCU.__init__(self, connectAtInit, comPort, autoFind)
         self.timeSinceLastUpdate = time.time()
