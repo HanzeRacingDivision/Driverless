@@ -11,6 +11,27 @@ class Map:
         self.left_cone_list = [self.Cone(10, 10, 'left'), self.Cone(10, 20, 'left')]
         self.right_cone_list = [self.Cone(10, 15, 'right'), self.Cone(10, 25, 'right')]
 
+    # (thijs) get_angle_between can also just be: return(np.arctan2(obj_2.y-obj_1.y, obj_2.x-obj_1.x)-obj_2_angle)
+    @staticmethod
+    def get_angle_between(obj_1, obj_2, obj_2_angle):
+        a_b = obj_1.position - obj_2.position
+        a_b = np.transpose(np.array([a_b.x, -1 * a_b.y]))
+
+        rotate = np.array([[np.cos(-obj_2_angle * np.pi / 180), -1 * np.sin(-obj_2_angle * np.pi / 180)],
+                           [np.sin(-obj_2_angle * np.pi / 180), np.cos(-obj_2_angle * np.pi / 180)]])
+
+        a_b = rotate * a_b
+
+        a = a_b[0]
+        b = a_b[1]
+
+        beta = np.arctan(b / a) * (
+                    180 / np.pi)  # (thijs) doing arctan(y/x) can result in divide by 0, which arctan2(y, x) solves
+        alpha = beta + 90 * (b / np.abs(b)) * np.abs((a / np.abs(a)) - 1)
+        alpha = alpha[0, 0]
+
+        return alpha
+
     class Car:
         def __init__(self, x, y, angle=0, length=2, max_steering=80, max_acceleration=4.0):
             self.position = Vector2(x, y)
@@ -60,7 +81,7 @@ class Map:
             self.dist_car = np.linalg.norm(self.position - car.position)
             # calculating angle between car angle and cone
             if np.linalg.norm(self.position - car.position) < car.fov / ppu and not self.visible and car.auto:
-                self.alpha = get_angle_between(self, car, car_angle)
+                self.alpha = Map.get_angle_between(self, car, car_angle)
                 # if cone within car fov, set to visible
                 if np.abs(self.alpha) < car.fov_range:
                     self.visible = True
@@ -85,7 +106,7 @@ class Map:
 
             # calculating angle between car angle and target
             if np.linalg.norm(self.position - car.position) < car.fov / ppu:
-                self.alpha = get_angle_between(self, car, car_angle)
+                self.alpha = Map.get_angle_between(self, car, car_angle)
                 # if the target is outside the car fov, it is no longer visible
                 if np.abs(self.alpha) < car.fov_range and not self.passed:
                     self.visible = True
@@ -93,24 +114,3 @@ class Map:
                     self.visible = False
             else:
                 self.visible = False
-
-
-def get_angle_between(obj_1, obj_2, obj_2_angle):
-    a_b = obj_1.position - obj_2.position
-    a_b = np.transpose(np.array([a_b.x, -1 * a_b.y]))
-
-    rotate = np.array([[np.cos(-obj_2_angle * np.pi / 180), -1 * np.sin(-obj_2_angle * np.pi / 180)],
-                       [np.sin(-obj_2_angle * np.pi / 180), np.cos(-obj_2_angle * np.pi / 180)]])
-
-    a_b = rotate * a_b
-
-    a = a_b[0]
-    b = a_b[1]
-
-    beta = np.arctan(b / a) * (180 / np.pi) #(thijs) doing arctan(y/x) can result in divide by 0, which arctan2(y, x) solves
-    alpha = beta + 90 * (b / np.abs(b)) * np.abs((a / np.abs(a)) - 1)
-    alpha = alpha[0, 0]
-
-    return alpha
-
-#(thijs) get_angle_between can also just be: return(np.arctan2(obj_2.y-obj_1.y, obj_2.x-obj_1.x)-obj_2_angle)
