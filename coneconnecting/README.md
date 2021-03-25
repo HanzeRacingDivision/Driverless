@@ -3,7 +3,7 @@ python requirements: <br/>
 - numpy (any version) <br/>
 
 how to run: <br/>
-  run coneConnecting.py
+  run coneConnecting_old.py
 
 how to use: <br/>
   (you can resize the window by just dragging it like any other windows window)
