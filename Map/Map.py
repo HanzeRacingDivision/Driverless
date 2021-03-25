@@ -24,6 +24,8 @@ class Map:
         self.right_cone_list = []
         self.finish_line_cones = [] #holds 2 Cone objects, 1 left and 1 right (redundant, becuase Cone.isFinish attribute, but this will save a lot of list-searching time)
         
+        self.target_list = [] #list of Target objects, the order of the list is the order in which they need to be driven
+        
         #self.newConeID = 0 #add 1 after adding a cone #TO BE REPLACED BY PANDAS INDEXING
 
     class Car:
