@@ -120,7 +120,7 @@ class Map:
         """ Class for storing the coordinates and visibility of each cone """
         coneDiam = 0.2 #cone diameter in meters (constant)
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
-            self.coneID = coneID  #TO BE REPLACED BY PANDAS INDEXING
+            self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
             self.position = np.array([pos[0], pos[1]])
             self.LorR = leftOrRight #boolean to indicate which side of the track (which color) the code is. True=right, False=left
             self.isFinish = isFinish
@@ -151,7 +151,7 @@ class Map:
         for cone in conelist:
             #cone stucture:  [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)]
             ignoreCone = False
-            if(cone.coneID in ignoreConeIDs):
+            if(cone.ID in ignoreConeIDs):
                 ignoreCone = True
             coneConnectionCount = len(cone.connections)
             if(((coneConnectionExclusions == EXCL_UNCONN) and (coneConnectionCount == 0)) or \
@@ -162,7 +162,7 @@ class Map:
             elif(coneConnectionCount > 0):
                 for coneIDtoIgnore in ignoreLinkedConeIDs: #check if the cone needs to be ignored because of its connections
                     for connectedCone in cone.connections:
-                        if(connectedCone.coneID == coneIDtoIgnore):
+                        if(connectedCone.ID == coneIDtoIgnore):
                             ignoreCone = True
             if(not ignoreCone):
                 squaredDistance = (pos[0]-cone.position[0])**2 + (pos[1]-cone.position[1])**2  #A^2 + B^2 = C^2
@@ -187,7 +187,7 @@ class Map:
         hasAngleThreshRange = (len(angleThreshRange) == 2) #init var
         for cone in conelist:
             ignoreCone = False
-            if(cone.coneID in ignoreConeIDs):
+            if(cone.ID in ignoreConeIDs):
                 ignoreCone = True
             coneConnectionCount = len(cone.connections)
             if(((coneConnectionExclusions == EXCL_UNCONN) and (coneConnectionCount == 0)) or \
@@ -198,7 +198,7 @@ class Map:
             elif(coneConnectionCount > 0):
                 for coneIDtoIgnore in ignoreLinkedConeIDs: #check if the cone needs to be ignored because of its connections
                     for connectedCone in cone.connections:
-                        if(connectedCone.coneID == coneIDtoIgnore):
+                        if(connectedCone.ID == coneIDtoIgnore):
                             ignoreCone = True
             if(not ignoreCone):
                 distance, angle = GF.distAngleBetwPos(pos, cone.position) #math obove was moved to a handy function
