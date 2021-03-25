@@ -763,7 +763,7 @@ class coneConnecter:
                                 bestCandidateIndex = i
                     if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(firstConeCandidates[LorR]) == candidatesDiscarded)):
                         print("it seems no suitible candidates for first "+("right" if (LorR==1) else "left")+" cone were found at all... bummer.", len(firstConeCandidates[LorR]), candidatesDiscarded, bestCandidateIndex, highestStrength)
-                        return(False, [])
+                        return(False)
                     ## if the code makes it here, a suitable first cone has been selected.
                     #print("first "+("right" if (LorR==1) else "left")+" cone found!", highestStrength, bestCandidateIndex, len(firstConeCandidates[LorR]), candidatesDiscarded)
                     firstCone[LorR] = firstConeCandidates[LorR][bestCandidateIndex][2]
