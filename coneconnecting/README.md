@@ -37,11 +37,11 @@ meaning of the colors and other visual aspects: <br/>
 
 
 how to run with a previously saved track (coneLog CSV file): <br/>
-- open the coneConnecting.py window and drag&drop the file in there  OR
+- open the coneConnecting_old.py window and drag&drop the file in there  OR
 - use the command line and enter the coneLog filepath as an argument  OR
 - make a windows shortcut, put the location of your python installation at the start of the Target section of the properties of the windows shortcut and just drag&drop the file onto the shortcut <br/>
 
 running multiple ones in paralel: (not threaded (yet)) <br/>
-- use coneConnecting multi.py <br/>
+- use coneConnecting_old multi.py <br/>
 - it imports coneConnecting.py as a library and makes N by N instances of it <br/>
 - you can also use the multi sketch to import several coneLogs at once. It will automatically make enough instances <br/>
