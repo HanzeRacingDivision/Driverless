@@ -127,7 +127,7 @@ class Map:
             
             self.connections = [] #appendable list, max 2 entries. will contain pointers to cones if succesfully connected
             
-            self.coneConData = None #extra data specifically for cone-connection
+            self.coneConData = [] #extra data specifically for cone-connection
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
 
@@ -243,7 +243,7 @@ class Map:
     def overlapConeCheck(self, posToCheck):
         boolAnswer = False;   coneListPointer=None #boolAnswer MUST default to False, the other variables dont matter as much
         coneDistToler = self.Cone.coneDiam*2 #overlap tolerance  NOTE: area is square, not round
-        combinedConeList =  (self.right_cone_list + self.left_cone_list)
+        combinedConeList = (self.right_cone_list + self.left_cone_list)
         for cone in combinedConeList:
             if((posToCheck[0] > (cone.position[0]-coneDistToler)) and (posToCheck[0] < (cone.position[0]+coneDistToler)) and (posToCheck[1] > (cone.position[1]-coneDistToler)) and (posToCheck[1] < (cone.position[1]+coneDistToler))):
                 if(boolAnswer): #if an overlapping cone was already found
