@@ -1,5 +1,5 @@
 import numpy as np
-import generalFunctions as FF
+import generalFunctions as GF
 
 #constants for distanceToConeSquared, can be replaced with strings, but this is faster
 global DONT_SORT, SORTBY_DIST, SORTBY_ANGL, SORTBY_ANGL_DELT, SORTBY_ANGL_DELT_ABS
@@ -30,10 +30,10 @@ class Map:
         def __init__(self, pos=[0,0], angle=0):
             self.position = np.array([pos[0], pos[1]])
             self.angle = angle #car orientation in radians
-            self.length = 2 #meters
-            self.width = 1 #meters (mostly used for drawing)
             self.velocity = 0.0 #measured and filtered car 'forward' (wheel) speed in meters/second (used to update position)
             self.steering = 0.0 #measured and filtered steering angle in radians (used to update position)
+            self.length = 2 #meters
+            self.width = 1 #meters (mostly used for drawing)
             
             self.desired_velocity = 0.0 #desired velocity in m/s (sent to car MCU)
             self.desired_steering = 0.0 #desired steering angle in radians (sent to car MCU)
@@ -41,6 +41,9 @@ class Map:
             self.max_velocity = 5 #in m/s
             self.max_acceleration = 4.0 #in m/s^2
             self.max_steering = np.radians(30) #max angle (in either direction) in radians
+            
+            #self.rearAxlePos = GF.distAnglePosToPos(self.length/2, GF.radInv(self.angle), self.position) #updates in Car.update()
+            ## there is no need for rearAxlePos to be stored, but it would make Car.update() slightly faster IF (and only if) Car.update() is the ONLY function in which the position is altered
             
             #self.acceleration = 0.0 #acceleration in meters/second^2
             #self.fov_range = 60  #(thijs) this is the actual (camera) field of view variable, but it's only useful for the simulation, so delete this?
@@ -59,23 +62,35 @@ class Map:
             #self.velocity += self.acceleration * dt #only for keyboard driving, unless carMCU control system changes
             #self.velocity = max(-self.max_velocity, min(self.velocity, self.max_velocity)) #constraining velocity should not be done here!
             
-            ## TO BE FIXED (by math that considers the center of the turning point correctly, ask Thijs to hurry up if you need it now)
-            angular_velocity = 0 #init local variable
-            if(abs(self.velocity) > 0.001): #avoid divide by 0 error
-                angular_velocity = self.velocity * (np.tan(self.steering)/self.length)
-            
-            if self.steering:
-                turning_radius = self.length / np.sin(self.steering)
-                angular_velocity = self.velocity / turning_radius
+            #turning math
+            if((abs(self.steering) > 0.001) and (abs(self.velocity) > 0.001)): #avoid divide by 0 (and avoid complicated math in a simple situation)
+                rearAxlePos = GF.distAnglePosToPos(self.length/2, GF.radInv(self.angle), self.position)
+                turning_radius = self.length/np.tan(self.steering)
+                angular_velocity = self.velocity/turning_radius
+                arcMov = angular_velocity * dt
+                
+                #one way to do it
+                # turning_center = GF.distAnglePosToPos(turning_radius, carAngle+(np.pi/2), rearAxlePos) #get point around which car turns
+                # rearAxlePos = GF.distAnglePosToPos(turning_radius, carAngle+arcMov-(np.pi/2), turning_center)      #the car has traveled a a certain distancec (velocity*dt) along the circumference of the turning circle, that arc is arcMov radians long
+                
+                #another way of doing it
+                forwardMov = np.sin(arcMov)*turning_radius #sin(arc)*turning radius = movement paralel with (old) carAngle
+                lateralMov = turning_radius - (np.cos(arcMov)*turning_radius) #sin(arc)*turning radius = movement perpendicular to (old) carAngle
+                movAngle = np.arctan2(lateralMov, forwardMov) #
+                diagonalMov = forwardMov/np.cos(movAngle) #the length of a line between the start of the arc and the end of the arc
+                rearAxlePos = GF.distAnglePosToPos(diagonalMov, self.angle+movAngle, rearAxlePos)
+                # rearAxlePos[0] = rearAxlePos[0] + diagonalMov * np.cos(self.angle+movAngle) #same as using distAnglePosToPos
+                # rearAxlePos[1] = rearAxlePos[1] + diagonalMov * np.sin(self.angle+movAngle)
+                
+                #update position
+                self.angle += arcMov
+                self.position = GF.distAnglePosToPos(self.length/2, self.angle, rearAxlePos)
             else:
-                angular_velocity = 0
-
-            self.position[0] += dt * self.velocity * np.cos(self.angle)
-            self.position[1] += dt * self.velocity * np.sin(self.angle)
-            self.angle += angular_velocity * dt
+                self.position[0] += dt * self.velocity * np.cos(self.angle)
+                self.position[1] += dt * self.velocity * np.sin(self.angle)
         
         def distanceToCar(self, pos): #a more comprehensive/accurate function for getting the SHORTEST distance to the NEAREST surface of the car
-            translatedDistance = FF.vectorProjectDist(self.position, pos, self.angle)
+            translatedDistance = GF.vectorProjectDist(self.position, pos, self.angle)
             #simSelf.debugLines.append([0, simSelf.realToPixelPos(self.pos), simSelf.realToPixelPos(pos), 0])
             if((abs(translatedDistance[0]) < (self.length/2)) and (abs(translatedDistance[1]) < (self.width/2))): #if pos lies within the car
                 return(True, 0) #return(yes pos overlaps car, 0 distance to car)
@@ -186,8 +201,8 @@ class Map:
                         if(connectedCone.coneID == coneIDtoIgnore):
                             ignoreCone = True
             if(not ignoreCone):
-                distance, angle = FF.distAngleBetwPos(pos, cone.position) #math obove was moved to a handy function
-                if(((distance < simpleThreshold) if (simpleThreshold > 0) else True) and ((FF.radRange(angle, angleThreshRange[0], angleThreshRange[1])) if (hasAngleThreshRange) else True)): #note: (method if boolean else method) used to make sure angleThreshRange isnt used if it's empty
+                distance, angle = GF.distAngleBetwPos(pos, cone.position) #math obove was moved to a handy function
+                if(((distance < simpleThreshold) if (simpleThreshold > 0) else True) and ((GF.radRange(angle, angleThreshRange[0], angleThreshRange[1])) if (hasAngleThreshRange) else True)): #note: (method if boolean else method) used to make sure angleThreshRange isnt used if it's empty
                     #if it gets here, the cone fits the requirements and needs to be placed in returnList
                     if(sortBySomething == SORTBY_DIST):
                         insertionDone = False
@@ -208,7 +223,7 @@ class Map:
                     elif(sortBySomething == SORTBY_ANGL_DELT):
                         insertionDone = False
                         for i in range(len(returnList)):
-                            if((FF.radDiff(angle, angleDeltaTarget) < FF.radDiff(returnList[i][1][1], angleDeltaTarget)) and (not insertionDone)): #if the new entry is larger
+                            if((GF.radDiff(angle, angleDeltaTarget) < GF.radDiff(returnList[i][1][1], angleDeltaTarget)) and (not insertionDone)): #if the new entry is larger
                                 returnList.insert(i, [cone, [distance, angle]])
                                 insertionDone = True
                         if(not insertionDone): #if the new entry is larger than the last entry, append it
@@ -216,7 +231,7 @@ class Map:
                     elif(sortBySomething == SORTBY_ANGL_DELT_ABS):
                         insertionDone = False
                         for i in range(len(returnList)):
-                            if((abs(FF.radDiff(angle, angleDeltaTarget)) < abs(FF.radDiff(returnList[i][1][1], angleDeltaTarget))) and (not insertionDone)): #if the new entry is larger
+                            if((abs(GF.radDiff(angle, angleDeltaTarget)) < abs(GF.radDiff(returnList[i][1][1], angleDeltaTarget))) and (not insertionDone)): #if the new entry is larger
                                 returnList.insert(i, [cone, [distance, angle]])
                                 insertionDone = True
                         if(not insertionDone): #if the new entry is larger than the last entry, append it
