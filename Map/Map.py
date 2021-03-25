@@ -146,6 +146,26 @@ class Map:
             self.slamData = None    #extra data specifically for SLAM
     
     
+    def getConeChainLen(self, currentCone, prevCone=None, lengthMem=1): #(itteratively) determine the lenght of a sequence of connected cones (note: uses Cone.ID)
+        connectionCount = len(currentCone.connections)
+        if((connectionCount > 1) and (prevCone is None)):
+            print("incorrect usage of getConeChainLen()")
+            return(-1)
+        if(connectionCount == 0):
+            return(0) #you could just return lengthMem, but it should never arrive here sequentially
+        elif(connectionCount == 1):
+            if(prevCone is None): #start of a sequence
+                return(self.getConeChainLen(currentCone.connections[0], currentCone, lengthMem+1)) #start sequence
+            else:
+                if(currentCone.connections[0].ID == prevCone.ID): #safety check (if prevCone is not None, its ID MUST be equal to the only connection on currentCone)
+                    return(lengthMem) #end reached
+                else:
+                    print("serious error in getConeChainLen(). bad data in Cone.connections?:", currentCone.connections, prevCone.connections)
+        else: #technically, this does allow more that 2 connections per cone, but what maniac would do that
+            return(self.getConeChainLen(currentCone.connections[(1 if (currentCone.connections[0].ID == prevCone.ID) else 0)], currentCone, lengthMem+1)) #continue sequence
+        
+    
+    
     def distanceToConeSquared(self, pos, conelist=None, sortByDistance=False, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, coneConnectionExclusions=NO_CONN_EXCL, ignoreLinkedConeIDs=[]):
         if(conelist is None): #if no conelist was entered (probably should do this)
             conelist = self.left_cone_list + self.right_cone_list #then search both lists
