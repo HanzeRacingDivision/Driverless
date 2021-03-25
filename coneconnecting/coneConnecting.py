@@ -1,6 +1,5 @@
 #TBD: add spoof coneConnecter class that gets data from network, to run visualization for non-local coneConnecter
-#adopt mapClassTemp.py
-#seperate pathfinding and coneconnecting classes
+#TBD: consider the length of a track-boundry in connectCone() (longer = better)
 
 #note: for numpy sin/cos/tan angles, 0 is at 3 o'clock, positive values are CCW and the range returned by arctan2 is (-180,180) or (-pi, pi)
 
@@ -45,7 +44,7 @@ class coneConnection: #a class to go in Map.Cone.coneConData
 
 class coneConnecter(Map):
     def __init__(self, importConeLogFilename='', logging=True, logname="coneLog"):
-        Map.__init__(self) #init map class
+        #Map.__init__(self) #init map class
         self.coneConnectionThreshold = 5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
         self.coneConnectionThresholdSquared = self.coneConnectionThreshold**2
         self.coneConnectionHighAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
@@ -53,18 +52,8 @@ class coneConnecter(Map):
         self.coneConnectionRestrictiveAngleChangeThreshold = np.deg2rad(20) # the most-restrictive-angle code only switches if angle is this much more restrictive
         self.coneConnectionRestrictiveAngleStrengthThreshold = 0.5 # the strength of the more restrictive cone needs to be at least this proportion of the old (less restrictive angle) strength
         
-        self.pathConnectionThreshold = 10 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
-        self.pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
-        
-        self.pathFirstLineCarAngleDeltaMax = np.deg2rad(45) #if the radDiff() between car (.orient) and the first line's connections is bigger than this, switch conneections or stop
-        self.pathFirstLineCarSideAngleDelta = np.deg2rad(80) #left cones should be within +- pathFirstLineCarSideAngleDelta radians of the side of the car (asin, car.orient + or - pi/2, depending on left/right side)
-        self.pathFirstLinePosDist = 4 # simple center to center distance, hard threshold, used to filter out very far cones
-        self.pathFirstLineCarDist = 3 # real distance, not hard threshold, just distance at which lowest strength-score is given
-        
         #self.leftConesFullCircle = False  #TBD: no checking function yet, and because connectCone() can connect a cone to the 0th cone at any time without completing the circle, a special function this is required
         #self.rightConesFullCircle = False
-        self.pathFullCircle = False
-    
     
     
     def connectCone(self, coneToConnect, applyResult=True): #
@@ -107,7 +96,7 @@ class coneConnecter(Map):
                     if(currentConnectionCount > 0):
                         angleDif = GF.radDiff(currentExistingAngle, angleToCone) #radians to add to currentExistingAngle to get to angleToCone (abs value is most interesting)
                         coneCandidateStrength *= 1.5- min(abs(angleDif)/self.coneConnectionHighAngleDelta, 1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
-                        ## (Vincent's) most-restrictive angle could be implemented here, or at the end, by using SORTBY_ANGL_DELT and scrolling through the list from bestCandidateIndex to one of the ends of the list (based on left/right-edness), however, this does require a previous connection (preferably a connection that is in, or leads to, the pathList) to get angleDeltaTarget
+                        ## (Vincent's) most-restrictive angle could be implemented here, or at the end, by using SORTBY_ANGL_DELT and scrolling through the list from bestCandidateIndex to one of the ends of the list (based on left/right-edness), however, this does require a previous connection (preferably a connection that is in, or leads to, the target_list) to get angleDeltaTarget
                         coneCandidateStrength *= 1 + (0.5 if coneToConnect.LorR else -0.5)*max(min(angleDif/self.coneConnectionHighAngleDelta, 1), -1)  #high angle delta, low strength. Linear. worst>0.5 best<1.5
                         ## if most-restrictive angle is applied at the end, when all candidates have been reviewed
                         candidateList.append([i, angleDif, coneCandidateStrength])
@@ -176,243 +165,265 @@ class coneConnecter(Map):
                 winningCone.connections.append(coneToConnect)
                 winningCone.coneConData.append(coneConnection(0.0, nearbyConeList[bestCandidateIndex][1], highestStrength))
             return(True, winningCone) #return the cone you connected with (or are capable of connecting with, if applyResult=False)
-    
-    
-    
-    # def makePath(self):
-    #     # pathList content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
-    #     # left/right-ConeList content: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]
-    #     if(self.pathFullCircle):
-    #         print("not gonna make path, already full circle")
-    #         return(False)
-    #     if(self.car is None):
-    #         print("cant make path, there is no car")
-    #         return(False)
-    #     if(len(self.pathList) == 0):
-    #         if((len(self.rightConeList) < 2) or (len(self.leftConeList) < 2)): #first pathLine can only be made between 2 connected cones
-    #             print("not enough cones in one or more coneLists, cant place first pathLine")
-    #             return(False)
-            
-    #         #search cones here
-    #         firstCone = [None, None]
-    #         firstConeIndexInArray = [-1,-1]
-    #         if((self.finishLinePos[0] is not None) or (self.finishLinePos[1] is not None)):
-    #             print("using finish cones to make first pathLine")
-    #             if((self.finishLinePos[0] is not None) and (self.finishLinePos[1] is not None)):
-    #                 firstCone = self.finishLinePos #finishLinePos is already a list of 2 pointers, so it should be fine to go without copying them(, right?)
-    #                 firstConeIndexInArray = [findIndexBy2DEntry(self.leftConeList, 0, firstCone[0][0]), findIndexBy2DEntry(self.rightConeList, 0, firstCone[1][0])]
-    #             else:
-    #                 print("only 1 finish cone set, makePath can just wait untill the second is found, right?")
-    #                 return(False)
-    #         else: #if there aren't already finish cones, then find it the old-fashioned way, by looking for cones near the car
-    #             sideAngleRanges = [[self.car.orient+(np.pi/2)-self.pathFirstLineCarSideAngleDelta, self.car.orient+(np.pi/2)+self.pathFirstLineCarSideAngleDelta], [self.car.orient-(np.pi/2)-self.pathFirstLineCarSideAngleDelta, self.car.orient-(np.pi/2)+self.pathFirstLineCarSideAngleDelta]] #left side is car.orient +pi/2, right side is car.orient -pi/2
-    #             firstConeCandidates = self.distanceToCone(self.car.pos, [self.leftConeList, self.rightConeList], SORTBY_DIST, False, [], self.pathFirstLinePosDist, EXCL_UNCONN, [], self.car.orient, sideAngleRanges)
-    #             for LorR in range(2):
-    #                 bestCandidateIndex = -1;   highestStrength = 0;   candidatesDiscarded = 0
-    #                 #carPerpAngle = self.car.orient + (np.pi*(0.5 if (LorR == 1) else -0.5))
-    #                 carPerpAngle = self.car.orient - (np.pi/2) #always get CW perpendicular
-    #                 for i in range(len(firstConeCandidates[LorR])):
-    #                     cone = firstConeCandidates[LorR][i][2]
-    #                     connectionsFilled = [(cone[2][0][1] >= 0), (cone[2][1][1] >= 0)] #2-size list of booleans
-    #                     connectionAnglesAllowed = [((abs(radDiff(cone[2][0][2], self.car.orient)) < self.pathFirstLineCarAngleDeltaMax) if connectionsFilled[0] else False), ((abs(radDiff(cone[2][1][2], self.car.orient)) < self.pathFirstLineCarAngleDeltaMax) if connectionsFilled[1] else False)]
-    #                     ## it's important to note that the distance calculated by distanceToCone() is between the center of the car and the cone, and therefore not the shortest path, or real distance to the car (a cone next to a wheel will have a higher distance than a cone next to the middle of the car, which is illogical)
-    #                     ## this illogical distance can still be used to help filter out candidates, but for an accurate strength-rating, distanceToCar() (a function of the raceCar class) should be used
-    #                     coneOverlapsCar, distToCar = self.car.distanceToCar(cone[1])
-    #                     #print("evaluating "+("right" if (LorR==1) else "left")+" cone:", cone[0], connectionsFilled, connectionAnglesAllowed, coneOverlapsCar, distToCar)
-    #                     if(not (connectionsFilled[0] or connectionsFilled[1])):
-    #                         ## somehow, an unconnected cone slipped past the filer in distanceToCone(). this should be impossible, but i wrote the filter code in a hurry, so little debugging cant hurt
-    #                         print("impossible filter slip 1")
-    #                         candidatesDiscarded += 1
-    #                     elif(not (connectionAnglesAllowed[0] or connectionAnglesAllowed[1])):
-    #                         ## neither of the connections on this candidate 
-    #                         print("neither connections have acceptable angles")
-    #                         candidatesDiscarded += 1
-    #                     elif(connectionAnglesAllowed[0] and connectionAnglesAllowed[1]):
-    #                         ## somehow, both connections are alligned with the car, and since coneConnectionMaxAngleDelta exists, that should be impossible
-    #                         print("impossible angle sitch 1")
-    #                         candidatesDiscarded += 1
-    #                     elif(coneOverlapsCar):
-    #                         print("cone overlaps car")
-    #                         candidatesDiscarded += 1
-    #                     else:
-    #                         coneCandidateStrength = 1 #init var
-    #                         coneCandidateStrength *= 1.5-min(distToCar/self.pathFirstLineCarDist, 1)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5
-    #                         coneCandidateStrength *= 1.5-abs(radDiff(cone[2][(0 if connectionAnglesAllowed[0] else 1)][2], self.car.orient))/self.pathFirstLineCarAngleDeltaMax  #high angle delta, low strength. Linear. worst>0.5 best<1.5
-    #                         ## this following check makes sure the pathline is perpendicular to the car
-    #                         conePerpAngle = 0 #init var
-    #                         if(connectionsFilled[0] and connectionsFilled[1]):
-    #                             conePerpAngle = radMidd(cone[2][0][2], cone[2][1][2]) #note: radMidd() has inputs (lowBound, upBound), so for right cones this will give an angle that points AWAY from the car, and for left cones it points towards the car (both in the same direction if they're paralel)
-    #                         else:
-    #                             connectionToUse = (1 if connectionsFilled[1] else 0)
-    #                             conePerpAngle = radRoll(cone[2][connectionToUse][2] + (np.pi*(0.5 if (connectionToUse == 0) else -0.5))) #see note on claculation with double connection
-    #                         coneCandidateStrength *= 1.5-min(abs(radDiff(conePerpAngle, carPerpAngle))/self.pathConnectionMaxAngleDelta, 1)
-    #                         ## using existing chosen firstCone, only works for the right cone (this is an unequal check, so i hate it, but it does work to make sure the first line is straight (not diagonal))
-    #                         if(LorR == 1): #TO BE IMPROVED, but i dont know quite how yet
-    #                             leftFirstConeConnectionsFilled = [(firstCone[0][2][0][1] >= 0), (firstCone[0][2][1][1] >= 0)]
-    #                             leftPerpAngle = 0 #init var
-    #                             if(leftFirstConeConnectionsFilled[0] and leftFirstConeConnectionsFilled[1]):
-    #                                 leftPerpAngle = radMidd(firstCone[0][2][0][2], firstCone[0][2][1][2])
-    #                             else:
-    #                                 connectionToUse = (1 if leftFirstConeConnectionsFilled[1] else 0)
-    #                                 leftPerpAngle = radRoll(firstCone[0][2][connectionToUse][2] + (np.pi*(0.5 if (connectionToUse == 0) else -0.5)))
-    #                             tempPathWidth, tempPathAngle = distAngleBetwPos(firstCone[0][1], cone[1])
-    #                             coneCandidateStrength *= 1.5-min(abs(radDiff(tempPathAngle, leftPerpAngle))/self.pathConnectionMaxAngleDelta, 1)
-    #                             #you could also even do distance, but whatever
-    #                         if(coneCandidateStrength > highestStrength):
-    #                             highestStrength = coneCandidateStrength
-    #                             bestCandidateIndex = i
-    #                 if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(firstConeCandidates[LorR]) == candidatesDiscarded)):
-    #                     print("it seems no suitible candidates for first "+("right" if (LorR==1) else "left")+" cone were found at all... bummer.", len(firstConeCandidates[LorR]), candidatesDiscarded, bestCandidateIndex, highestStrength)
-    #                     return(False, [])
-    #                 ## if the code makes it here, a suitable first cone has been selected.
-    #                 #print("first "+("right" if (LorR==1) else "left")+" cone found!", highestStrength, bestCandidateIndex, len(firstConeCandidates[LorR]), candidatesDiscarded)
-    #                 firstCone[LorR] = firstConeCandidates[LorR][bestCandidateIndex][2]
-    #                 firstConeIndexInArray[LorR] = firstConeCandidates[LorR][bestCandidateIndex][1] #could be eliminated in favor of pointers?
-            
-    #         ## angle checks and swithing connections if possible
-    #         for LorR in range(2):
-    #             firstConeConnectionIndex = 1 #try to use the 'front' connection by default
-    #             firstConnectionsFilled = [firstCone[LorR][2][0][1] >= 0, firstCone[LorR][2][1][1] >= 0]
-    #             if(not (firstConnectionsFilled[0] or firstConnectionsFilled[1])): #if it has no conenctions at all (this SHOULD NEVER HAPPEN, because distanceToCone() filters out unconnected cones, but might as well check
-    #                 #first cone is unconnected
-    #                 print("no connections on "+("right" if (LorR==1) else "left")+" firstCone:", firstCone[LorR])
-    #                 return(False)
-    #             elif(not firstConnectionsFilled[firstConeConnectionIndex]): #if it only has a 'back' connection, just move the back one to the front
-    #                 #first, switch connection data to make preferable (front) the only valid one
-    #                 #print("whipping lastLeft (1):", lastLeftCone[2])
-    #                 tempConVal = firstCone[LorR][2][0] #one of these is an empty connection
-    #                 firstCone[LorR][2][0] = firstCone[LorR][2][1]
-    #                 firstCone[LorR][2][1] = tempConVal
-    #                 self.logFileChanged = True #set flag
-    #                 #then check the angle of that connection. If it is too far off from the car angle then something is terribly wrong (or 
-    #                 if(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.car.orient)) > self.pathFirstLineCarAngleDeltaMax):
-    #                     print("only first "+("right" if (LorR==1) else "left")+" connection angle larger than allowed:", firstConeConnectionIndex, round(np.rad2deg(firstCone[LorR][2][firstConeConnectionIndex][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.car.orient))),2))
-    #                     return(False)
-    #             elif(firstConnectionsFilled[intBoolInv(firstConeConnectionIndex)]): #if it has both connections:
-    #                 if(abs(radDiff(firstCone[LorR][2][firstConeConnectionIndex][2], self.car.orient)) > self.pathFirstLineCarAngleDeltaMax):
-    #                     if(abs(radDiff(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.car.orient)) > self.pathFirstLineCarAngleDeltaMax):
-    #                         print("second left angle also larger than allowed", round(np.rad2deg(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(firstCone[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.car.orient))),2))
-    #                         return(False)
-    #                     else: #first angle was large, but second angle wasnt, just switch the connections around and we're good to go
-    #                         #print("whipping lastLeft (2):", lastLeftCone[2])
-    #                         tempConVal = firstCone[LorR][2][0] #one of these is an empty connection
-    #                         firstCone[LorR][2][0] = firstCone[LorR][2][1]
-    #                         firstCone[LorR][2][1] = tempConVal
-    #                         self.logFileChanged = True #set flag
-    #             ## else do nothing, everything is allready good and there's no need to worry
-    #         ## and now just put the first cones into the pathlist
-    #         pathWidth, lineAngle = distAngleBetwPos(firstCone[0][1], firstCone[1][1])
-    #         carAngle = radRoll(lineAngle + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
-    #         centerPoint = [firstCone[1][1][0] + (firstCone[0][1][0]-firstCone[1][1][0])/2, firstCone[1][1][1] + (firstCone[0][1][1]-firstCone[1][1][1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
-    #         self.pathList.append([centerPoint, [lineAngle, carAngle], pathWidth, [firstCone[0][0], firstCone[0][1], firstConeIndexInArray[0]], [firstCone[1][0], firstCone[1][1], firstConeIndexInArray[1]], 69.420])
+
+
+
+
+class pathFinderData: #a class to go in Map.Cone.coneConData or Map.Cone.pathFolData, if Alex approves
+    def __init__(self, heading=0, track_width=0, cones=[None, None], strength=0):
+        #self.position = np.array([pos[0], pos[1]])
+        self.heading = heading #angle the car should (roughly) face when crossing this target
+        self.track_width = track_width #width of the track at that point (target is a point between 2 cones, so width is NOT very accurate if the cones are not on exactly opposite sides (shifted forw/backw))
+        self.cones = [cones[0], cones[1]]
+        self.strength = strength #path-finding strength (highest strength option was used)
+
+
+class pathFinder(Map):
+    def __init__(self):
+        self.pathConnectionThreshold = 10 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
+        self.pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         
-    #     else: #if len(pathList) > 0
-    #         lastPathLine = self.pathList[-1] # -1 gets the last item in list, you could also use (len(pathList)-1)
-    #         coneLists = [self.leftConeList, self.rightConeList];  lastCone = [];  lastConeConnectionIndex = [];  lastConePerpAngle = [];  prospectCone = [];  prospectConeConnectionIndex = [];  
-    #         for LorR in range(2):
-    #             lastCone.append(coneLists[LorR][lastPathLine[3+LorR][2]])
-    #             lastConeConnectionIndex.append(1) #try to use the 'front' connection by default
-    #             lastConnectionsFilled = [lastCone[LorR][2][0][1] >= 0, lastCone[LorR][2][1][1] >= 0]
-    #             #most of the code below is sanity checks, but some of it is for the purpouses of flipping connections to fit the 'back','front' model. This can be done differently, by putting it in the connectCone() function, for example. Threre might be some useless redundancy in the code below, but fuck it, it works (for now)
-    #             if(not lastConnectionsFilled[lastConeConnectionIndex[LorR]]): #if it doesnt have a connected cone on the 
-    #                 #print("no preferable (front) connection on lastLeftCone")
-    #                 if(not lastConnectionsFilled[intBoolInv(lastConeConnectionIndex[LorR])]):
-    #                     print("no connections on lastCone["+("right" if (LorR==1) else "left")+"] (impossible):", lastCone[LorR])
-    #                     return(False)
-    #                 else:
-    #                     if(findIndexBy3DEntry(self.pathList, 3+LorR, 0, lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][0]) >= 0): #check if that isnt already in pathlist
-    #                         ## if it is, then we just stop here. no more path generation can be done for now
-    #                         print("single lastCone["+("right" if (LorR==1) else "left")+"] connection already in pathList (path at end of cone line, make more connections)")
-    #                         return(False)
-    #                     else: #if not, then the 'back' connection is the next (prospect) one, and this (last) cone has it all backwards. Switch the connection data for this cone around
-    #                         #print("whipping lastCone["+("right" if (LorR==1) else "left")+"] (3):", lastLeftCone[2])
-    #                         tempConVal = lastCone[LorR][2][0]
-    #                         lastCone[LorR][2][0] = lastCone[LorR][2][1]
-    #                         lastCone[LorR][2][1] = tempConVal
-    #                         self.logFileChanged = True #set flag
-    #             #super safety check for first-pathLine code
-    #             if(len(self.pathList) == 1): #now check both angles again, just to be sure:
-    #                 if(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.car.orient) > self.pathFirstLineCarAngleDeltaMax)):
-    #                     print("post correction first "+("right" if (LorR==1) else "left")+" angle large:", lastConeConnectionIndex[LorR], round(np.rad2deg(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.car.orient))),2))
-    #                     if(((lastConnectionsFilled[intBoolInv(lastConeConnectionIndex[LorR])])) and (abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.car.orient) > self.pathFirstLineCarAngleDeltaMax))):
-    #                         print("post correction second angle also large", round(np.rad2deg(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.car.orient))),2))
-    #                     return(False)
-    #             lastConePerpAngle.append(radMidd(lastCone[LorR][2][LorR][2], lastCone[LorR][2][intBoolInv(LorR)][2]) if (lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][1] >= 0) else radRoll(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2] + (np.pi*(0.5 if (lastConeConnectionIndex[LorR]==LorR) else -0.5)))) #note: addition or subtraction of half pi is a bit strange, dont worry about it :)
-    #             #note: currently i am using radInv() when calculating angle delta, because angles are from left cone to right cone, but if you reverse radMidd(lastRightCone[2][1][2], lastRightCone[2][0][2]) to be radMidd(lastRightCone[2][0][2], lastRightCone[2][1][2]) it will give an inverted angle already. less human, more efficient
-    #             #and now the prospect cones
-    #             prospectCone.append(coneLists[LorR][lastCone[LorR][2][lastConeConnectionIndex[LorR]][1]])
-            
-    #         #check if you've gone full circle
-    #         if(((prospectCone[0][0] == self.pathList[0][3][0]) and (prospectCone[1][0] == self.pathList[0][4][0])) \
-    #            or ((lastCone[0][0] == self.pathList[0][3][0]) and (prospectCone[1][0] == self.pathList[0][4][0])) \
-    #            or ((prospectCone[0][0] == self.pathList[0][3][0]) and (lastCone[1][0] == self.pathList[0][4][0]))):
-    #             print("path full circle (by default)")
-    #             self.pathFullCircle = True
-    #             return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
-            
-    #         prospectConeConnectionIndex = [];  prospectConePerpAngle = []
-    #         for LorR in range(2):
-    #             prospectConeConnectionIndex.append(0 if (prospectCone[LorR][2][0][0] == lastCone[LorR][0]) else (1 if (prospectCone[LorR][2][1][0] == lastCone[LorR][0]) else -1)) #match connection. In simple, regular situations you could assume that the 'front' connection of the lastCone is the 'back' connection of prospectCone, but this is not a simple system, now is it :)
-    #             if(prospectConeConnectionIndex[LorR] == -1):
-    #                 print("BIG issue: lastCone["+("right" if (LorR==1) else "left")+"] pointed to this prospect cone, but this prospect cone does not point back", lastCone[LorR][2], prospectCone[LorR][2])
-    #             elif(prospectConeConnectionIndex[LorR] == 1): #prospect cone has its connections switched around (lastLeftCone's 'front' should connect to prospectLeftCone's 'back')
-    #                 #print("whipping prospect left:", prospectLeftCone[2])
-    #                 tempConVal = prospectCone[LorR][2][0]
-    #                 prospectCone[LorR][2][0] = prospectCone[LorR][2][1]
-    #                 prospectCone[LorR][2][1] = tempConVal
-    #                 prospectConeConnectionIndex[LorR] = 0
-    #                 self.logFileChanged = True #set flag
-                
-    #             prospectConePerpAngle.append(radMidd(prospectCone[LorR][2][LorR][2], prospectCone[LorR][2][intBoolInv(LorR)][2]) if (prospectCone[LorR][2][intBoolInv(prospectConeConnectionIndex[LorR])][1] >= 0) else radRoll(prospectCone[LorR][2][prospectConeConnectionIndex[LorR]][2] + (np.pi*(0.5 if (prospectConeConnectionIndex[LorR] == LorR) else -0.5))))
-    #             #note: currently i am using radInv() when calculating angle delta, because angles are from left cone to right cone, but if you reverse radMidd(lastRightCone[2][1][2], lastRightCone[2][0][2]) to be radMidd(lastRightCone[2][0][2], lastRightCone[2][1][2]) it will give an inverted angle already. less human, more efficient
-            
-    #         # self.debugLines = [] #clear debugLines
-    #         # for LorR in range(2):
-    #         #     self.debugLines.append([1, self.realToPixelPos(lastCone[LorR][1]), [4, lastConePerpAngle[LorR]], 1+LorR])
-    #         #     self.debugLines.append([1, self.realToPixelPos(prospectCone[LorR][1]), [4, prospectConePerpAngle[LorR]], 1+LorR])
-            
-    #         ## all of could really be in a forloop of some kind, but fuck it; manual it is
-    #         strengths = [1,1,1] #4 possible path lines, one of which already exists (between lastLeftCone and lastRightCone), so calculate the strengths for the remaining three possible pathlines
-    #         pathWidths = [0,0,0];   pathAngles = [0,0,0]
-    #         allCones = lastCone + prospectCone  #combine lists
-    #         allPerpAngles = lastConePerpAngle + prospectConePerpAngle #combine lists
-    #         maxStrengthIndex = -1; maxStrengthVal = -1;  winningCone = [None, None]
-    #         for i in range(3):
-    #             pathWidths[i], pathAngles[i] = distAngleBetwPos(allCones[(0 if (i==0) else 2)][1], allCones[(1 if (i==1) else 3)][1]) #last left to next right (for left (CCW) corners, where one left cone (lastLeftCone) connects to several right cones  (lastRightCone AND prospectRightCone))
-    #             strengths[i] *= 1.5-min(pathWidths[i]/self.pathConnectionThreshold, 1) #strength based on distance, the threshold just determines minimum score, distance can be larger than threshold without math errors
-    #             strengths[i] *= 1.5-min(abs(radDiff(pathAngles[i], allPerpAngles[(0 if (i==0) else 2)]))/self.pathConnectionMaxAngleDelta, 1) #strength based on angle delta from lastLeftConePerpAngle, the maxAngleDelta just determines minimum score, angle can be larger than threshold without math errors
-    #             strengths[i] *= 1.5-min(abs(radDiff(radInv(pathAngles[i]), allPerpAngles[(1 if (i==1) else 3)]))/self.pathConnectionMaxAngleDelta, 1) #strength based on angle delta from prospectRightConePerpAngle, the maxAngleDelta just determines minimum score, angle can be larger than threshold without math errors
-    #             if(strengths[i] >= maxStrengthVal):
-    #                 maxStrengthVal = strengths[i]
-    #                 maxStrengthIndex = i
-    #                 winningCone[0] = allCones[(0 if (i==0) else 2)];  winningCone[1] = allCones[(1 if (i==1) else 3)]
-            
-    #         print("path found:", maxStrengthIndex, "at strength:", round(maxStrengthVal, 2))
-    #         carAngle = radRoll(pathAngles[maxStrengthIndex] + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
-    #         ## the next section could especially benefit from a forloop, as none of these values are in lists/arrays and they absolutely could be. At least it is slightly legible, i guess
-    #         winningConeIndex = []
-    #         if(maxStrengthIndex == 0):
-    #             winningConeIndex.append(lastPathLine[3][2]);  winningConeIndex.append(lastCone[1][2][lastConeConnectionIndex[1]][1])
-    #         elif(maxStrengthIndex == 1):
-    #             winningConeIndex.append(lastCone[0][2][lastConeConnectionIndex[0]][1]);  winningConeIndex.append(lastPathLine[4][2])
-    #         else: #(maxStrengthIndex == 2)
-    #             winningConeIndex.append(lastCone[0][2][lastConeConnectionIndex[0]][1]);  winningConeIndex.append(lastCone[1][2][lastConeConnectionIndex[1]][1])
-    #         #check if you've gone full circle
-    #         if((winningCone[0][0] == self.pathList[0][3][0]) and (winningCone[1][0] == self.pathList[0][4][0])):
-    #             print("path full circle (from winning cones)")
-    #             self.pathFullCircle = True
-    #             return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
-    #         else:
-    #             centerPoint = [winningCone[1][1][0] + (winningCone[0][1][0]-winningCone[1][1][0])/2, winningCone[1][1][1] + (winningCone[0][1][1]-winningCone[1][1][1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
-    #             self.pathList.append([centerPoint, [pathAngles[maxStrengthIndex], carAngle], pathWidths[maxStrengthIndex], [winningCone[0][0], winningCone[0][1], winningConeIndex[0]], [winningCone[1][0], winningCone[1][1], winningConeIndex[1]], maxStrengthVal])
-    #     return(True)
+        self.pathFirstLineCarAngleDeltaMax = np.deg2rad(45) #if the radDiff() between car (.angle) and the first line's connections is bigger than this, switch conneections or stop
+        self.pathFirstLineCarSideAngleDelta = np.deg2rad(80) #left cones should be within +- pathFirstLineCarSideAngleDelta radians of the side of the car (asin, car.angle + or - pi/2, depending on left/right side)
+        self.pathFirstLinePosDist = 4 # simple center to center distance, hard threshold, used to filter out very far cones
+        self.pathFirstLineCarDist = 3 # real distance, not hard threshold, just distance at which lowest strength-score is given
+        
+        self.pathFullCircle = False
     
+    
+    def makePath(self):
+        # target_list content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
+        # left/right-ConeList content: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]
+        if(self.pathFullCircle):
+            print("not gonna make path, already full circle")
+            return(False)
+        if(len(self.target_list) == 0): #if there is no existing path to go on
+            if((len(self.right_cone_list) < 2) or (len(self.left_cone_list) < 2)): #first pathLine can only be made between 2 connected cones
+                print("not enough cones in one or more coneLists, cant place first pathLine")
+                return(False)
+            
+            #search cones here
+            firstCones = [None, None]
+            strengths = [0.0, 0.0]
+            if(len(self.finish_line_cones) > 0):
+                print("using finish cone(s) to make first pathLine")
+                if(self.finish_line_cones[0].LorR):
+                    firstCones[1] = self.finish_line_cones[0]
+                else:
+                    firstCones[0] = self.finish_line_cones[0]
+                if(len(self.finish_line_cones) > 1): #if both finish cones are set
+                    if(self.finish_line_cones[1].LorR):
+                        firstCones[1] = self.finish_line_cones[1]
+                    else:
+                        firstCones[0] = self.finish_line_cones[1]
+            for LorR in range(2):
+                if(firstCones[LorR] is None):
+                    bestCandidateIndex = -1;   highestStrength = 0;   candidatesDiscarded = 0
+                    sideAngleRange = [self.car.angle +((-np.pi/2) if LorR else (np.pi/2)) -self.pathFirstLineCarSideAngleDelta, self.car.angle +((-np.pi/2) if LorR else (np.pi/2)) +self.pathFirstLineCarSideAngleDelta] #left side is car.angle +pi/2, right side is car.angle -pi/2
+                    firstConeCandidates = self.distanceToCone(self.car.position, self.right_cone_list if LorR else self.left_cone_list, SORTBY_DIST, [], self.pathFirstLinePosDist, EXCL_UNCONN, [], self.car.angle, sideAngleRange) #sorting is unnecessarry
+                    for i in range(len(firstConeCandidates)):
+                        cone = firstConeCandidates[i][0]
+                        connectionCount = len(cone.connections) #due to the EXCL_UNCONN filtering, this value should never be 0
+                        connectionAnglesAllowed = [((abs(GF.radDiff(cone.coneConData[0].angle, self.car.angle)) < self.pathFirstLineCarAngleDeltaMax) if (connectionCount > 0) else False), ((abs(GF.radDiff(cone.coneConData[1].angle, self.car.angle)) < self.pathFirstLineCarAngleDeltaMax) if (connectionCount > 1) else False)]
+                        ## it's important to note that the distance calculated by distanceToCone() is between the center of the car and the cone, and therefore not the shortest path, or real distance to the car (a cone next to a wheel will have a higher distance than a cone next to the middle of the car, which is illogical)
+                        ## this illogical distance can still be used to help filter out candidates, but for an accurate strength-rating, distanceToCar() (a function of the raceCar class) should be used
+                        coneOverlapsCar, distToCar = self.car.distanceToCar(cone.position)
+                        #print("evaluating "+("right" if (LorR==1) else "left")+" cone:", cone[0], connectionsFilled, connectionAnglesAllowed, coneOverlapsCar, distToCar)
+                        if(connectionCount < 1):
+                            ## somehow, an unconnected cone slipped past the filer in distanceToCone(). this should be impossible, but i wrote the filter code in a hurry, so little debugging cant hurt
+                            print("impossible filter slip 1")
+                            candidatesDiscarded += 1
+                        elif(not (connectionAnglesAllowed[0] or connectionAnglesAllowed[1])):
+                            ## neither of the connections on this candidate 
+                            print("neither connections have acceptable angles")
+                            candidatesDiscarded += 1
+                        elif(connectionAnglesAllowed[0] and connectionAnglesAllowed[1]):
+                            ## somehow, both connections are alligned with the car, and since coneConnectionMaxAngleDelta exists, that should be impossible
+                            print("impossible angle sitch 1")
+                            candidatesDiscarded += 1
+                        elif(coneOverlapsCar):
+                            print("cone overlaps car")
+                            candidatesDiscarded += 1
+                        else:
+                            coneCandidateStrength = 1 #init var
+                            coneCandidateStrength *= 1.5-min(distToCar/self.pathFirstLineCarDist, 1)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5
+                            coneCandidateStrength *= 1.5-abs(GF.radDiff(cone.coneConData[(0 if connectionAnglesAllowed[0] else 1)].angle, self.car.angle))/self.pathFirstLineCarAngleDeltaMax  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                            ## this following check makes sure the pathline is perpendicular to the car
+                            coneAvgConnAngle = 0 #init var
+                            if(connectionCount >= 2):
+                                coneAvgConnAngle = GF.radMidd(GF.radInv(cone.coneConData[0].angle), cone.coneConData[1].angle) #note: radMidd() has inputs (lowBound, upBound), so for right cones this will give an angle that points AWAY from the car, and for left cones it points towards the car (both in the same direction if they're paralel)
+                            else:
+                                connectionToUse = (1 if (connectionCount >= 2) else 0)
+                                coneAvgConnAngle = cone.coneConData[connectionToUse].angle #see note on calculation with double connection above
+                            coneCandidateStrength *= 1.5-min(min(abs(GF.radDiff(GF.radInv(coneAvgConnAngle), self.car.angle)), abs(GF.radDiff(GF.radInv(coneAvgConnAngle), self.car.angle)))/self.pathConnectionMaxAngleDelta, 1)
+                            ## using existing chosen firstCone, only works for the right cone (this is an unequal check, so i hate it, but it does work to make sure the first line is straight (not diagonal))
+                            if(LorR == 1): #TO BE IMPROVED, but i dont know quite how yet
+                                leftFirstConeConnectionCount = len(firstCones[0].connections) #this could technically be 0, if an unconnected finish cone was used
+                                if(leftFirstConeConnectionCount > 0):
+                                    leftAvgConnAngle = 0 #init var
+                                    if(leftFirstConeConnectionCount >= 2):
+                                        leftAvgConnAngle = GF.radMidd(GF.radInv(firstCones[0].coneConData[0].angle), firstCones[0].coneConData[1].angle)
+                                    else:
+                                        connectionToUse = (1 if (leftFirstConeConnectionCount >= 2) else 0)
+                                        leftAvgConnAngle = firstCones[0].coneConData[connectionToUse].angle
+                                    tempPathWidth, tempPathAngle = GF.distAngleBetwPos(firstCones[0].position, cone.position)
+                                    coneCandidateStrength *= 1.5-min(min(abs(GF.radDiff(GF.radInv(leftAvgConnAngle), tempPathAngle)), abs(GF.radDiff(GF.radInv(leftAvgConnAngle), tempPathAngle)))/self.pathConnectionMaxAngleDelta, 1)
+                                    #you could also even do distance, but whatever
+                            if(coneCandidateStrength > highestStrength):
+                                highestStrength = coneCandidateStrength
+                                bestCandidateIndex = i
+                    if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(firstConeCandidates) == candidatesDiscarded)):
+                        print("it seems no suitible candidates for first "+("right" if (LorR==1) else "left")+" cone were found at all... bummer.", len(firstConeCandidates), candidatesDiscarded, bestCandidateIndex, highestStrength)
+                        return(False)
+                    ## if the code makes it here, a suitable first cone has been selected.
+                    #print("first "+("right" if (LorR==1) else "left")+" cone found!", highestStrength, bestCandidateIndex, len(firstConeCandidates), candidatesDiscarded)
+                    firstCones[LorR] = firstConeCandidates[bestCandidateIndex][0]
+                    strengths[LorR] = highestStrength
+            
+            # ## angle checks and swithing connections if possible
+            # for LorR in range(2):
+            #     firstConeConnectionIndex = 1 #try to use the 'front' connection by default
+            #     firstConnectionCount = len(firstCones[LorR].connections)
+            #     if(firstConnectionCount < 1): #if it has no connections at all (this can only happen is finish cones were used, because distanceToCone() filters out unconnected cones, but might as well check
+            #         #first cone is unconnected
+            #         print("no connections on "+("right" if (LorR==1) else "left")+" firstCone:", firstCones[LorR])
+            #         return(False)
+            #     elif(not firstConnectionsFilled[firstConeConnectionIndex]): #if it only has a 'back' connection, just move the back one to the front
+            #         #first, switch connection data to make preferable (front) the only valid one
+            #         #print("whipping lastLeft (1):", lastLeftCone[2])
+            #         tempConVal = firstCones[LorR][2][0] #one of these is an empty connection
+            #         firstCones[LorR][2][0] = firstCones[LorR][2][1]
+            #         firstCones[LorR][2][1] = tempConVal
+            #         self.logFileChanged = True #set flag
+            #         #then check the angle of that connection. If it is too far off from the car angle then something is terribly wrong (or 
+            #         if(abs(radDiff(firstCones[LorR][2][firstConeConnectionIndex][2], self.car.angle)) > self.pathFirstLineCarAngleDeltaMax):
+            #             print("only first "+("right" if (LorR==1) else "left")+" connection angle larger than allowed:", firstConeConnectionIndex, round(np.rad2deg(firstCones[LorR][2][firstConeConnectionIndex][2]), 2), round(np.rad2deg(self.car.angle), 2), round(np.rad2deg(abs(radDiff(firstCones[LorR][2][firstConeConnectionIndex][2], self.car.angle))),2))
+            #             return(False)
+            #     elif(firstConnectionsFilled[intBoolInv(firstConeConnectionIndex)]): #if it has both connections:
+            #         if(abs(radDiff(firstCones[LorR][2][firstConeConnectionIndex][2], self.car.angle)) > self.pathFirstLineCarAngleDeltaMax):
+            #             if(abs(radDiff(firstCones[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.car.angle)) > self.pathFirstLineCarAngleDeltaMax):
+            #                 print("second left angle also larger than allowed", round(np.rad2deg(firstCones[LorR][2][intBoolInv(firstConeConnectionIndex)][2]), 2), round(np.rad2deg(self.car.angle), 2), round(np.rad2deg(abs(radDiff(firstCones[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.car.angle))),2))
+            #                 return(False)
+            #             else: #first angle was large, but second angle wasnt, just switch the connections around and we're good to go
+            #                 #print("whipping lastLeft (2):", lastLeftCone[2])
+            #                 tempConVal = firstCones[LorR][2][0] #one of these is an empty connection
+            #                 firstCones[LorR][2][0] = firstCones[LorR][2][1]
+            #                 firstCones[LorR][2][1] = tempConVal
+            #                 self.logFileChanged = True #set flag
+            #     ## else do nothing, everything is allready good and there's no need to worry
+            
+            ## and now just put the first cones into the target_list
+            pathWidth, lineAngle = GF.distAngleBetwPos(firstCones[0].position, firstCones[1].position)
+            carAngle = GF.radRoll(lineAngle + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
+            centerPoint = [firstCones[1].position[0] + (firstCones[0].position[0]-firstCones[1].position[0])/2, firstCones[1].position[1] + (firstCones[0].position[1]-firstCones[1].position[1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
+            newTarget = Map.Target(centerPoint, (firstCones[0].isFinish or firstCones[1].isFinish))
+            newTarget.coneConData = pathFinderData(carAngle, pathWidth, [firstCones[0], firstCones[1]], max(strengths))
+            self.target_list.append(newTarget)
+        else: #if len(target_list) > 0
+            lastPathLine = self.target_list[-1] # -1 gets the last item in list, you could also use (len(target_list)-1)
+            lastCones = [];  lastConeAvgConnAngle = [];  prospectCones = [];
+            for LorR in range(2):
+                lastCones.append(lastPathLine.coneConData.cones[LorR])
+                lastConnectionCount = len(lastCones[LorR].connections)
+                if(lastConnectionCount < 1):
+                    print("no connections on lastCones["+("right" if (LorR==1) else "left")+"] (impossible):", lastCones[LorR])
+                    return(False)
+                connectedConesProspectable = [];  prospectConnectionIndex = 0
+                for i in range(lastConnectionCount):
+                    connectedConesProspectable.append(True)
+                    for target in self.target_list: #look through the entire list of targets (you could also just look at self.target_list[-2])
+                        if(lastCones[LorR].connections[i].ID == target.coneConData.cones[LorR].ID): #if the only connected cone is ALSO (already) in the target_list, then you cant make any more path
+                            connectedConesProspectable[i] = False;
+                if((lastConnectionCount == 1) and (not connectedConesProspectable[0])):
+                    print("single lastCones["+("right" if (LorR==1) else "left")+"] connection already in target_list (path at end of cone line, make more connections)")
+                    return(False)
+                elif(lastConnectionCount >= 2):
+                    if(connectedConesProspectable[0] and connectedConesProspectable[1]):
+                        ##in this (somewhat rare) scenario, the correct cone needs to be chosen to make sure the path propagates in the same direction as the car drives
+                        ##right now i can only think of 2 ways, by considering the orientation of the car (which should(?) be nearby)
+                        ## or by considering the number of subsequently connected cones (longer = better)
+                        strengths = []
+                        angleDeltas = []
+                        connectionSeqLengths = []
+                        for i in range(lastConnectionCount):
+                            angleDeltas.append(abs(GF.radDiff(lastCones[LorR].coneConData[i].angle, self.car.angle)))
+                            connectionSeqLengths.append(self.getConeChainLen(lastCones[LorR].connections[i], lastCones[LorR]))
+                        for i in range(lastConnectionCount):
+                            strengths.append(1.0)
+                            strengths[i] *= 1.5-min(angleDeltas[i]/max(angleDeltas), 1) #lower delta = better
+                            strengths[i] *= 0.5+min(connectionSeqLengths[i]/max(connectionSeqLengths), 1) #longer chain = better
+                        prospectConnectionIndex = (1 if (strengths[1] > strengths[0]) else 0)
+                        print("deciding direction of path", prospectConnectionIndex, strengths, angleDeltas, connectionSeqLengths)
+                    elif(connectedConesProspectable[0]):
+                        prospectConnectionIndex = 0
+                    elif(connectedConesProspectable[1]):
+                        prospectConnectionIndex = 1
+                    else:
+                        print("both lastCones["+("right" if (LorR==1) else "left")+"] connections already in target_list, something is very wrong")
+                        return(False)
+                lastConeAvgConnAngle.append((GF.radMidd(GF.radInv(lastCones[LorR].coneConData[0].angle), lastCones[LorR].coneConData[1].angle)) if (lastConnectionCount >= 2) else (lastCones[LorR].coneConData[0].angle))
+                #and now the prospect cones
+                prospectCones.append(lastCones[LorR].connections[prospectConnectionIndex])
+            
+            #check if you've gone full circle
+            if(((prospectCones[0].ID == self.target_list[0].coneConData.cones[0].ID) and (prospectCones[1].ID == self.target_list[0].coneConData.cones[1].ID)) \
+                or ((lastCones[0].ID == self.target_list[0].coneConData.cones[0].ID) and (prospectCones[1].ID == self.target_list[0].coneConData.cones[1].ID)) \
+                or ((prospectCones[0].ID == self.target_list[0].coneConData.cones[0].ID) and (lastCones[1].ID == self.target_list[0].coneConData.cones[1].ID))):
+                print("path full circle (by default)")
+                self.pathFullCircle = True
+                return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
+            
+            prospectConeAvgConnAngle = []
+            for LorR in range(2):
+                prospectConeConnectionCount = len(prospectCones[LorR].connections)
+                if(prospectConeConnectionCount < 1):
+                    print("BIG issue: lastCones["+("right" if (LorR==1) else "left")+"] pointed to this prospect cone, but this prospect cone has no connections?!?", lastCones[LorR].connections, prospectCones[LorR].connections)
+                elif(not ((prospectCones[LorR].connections[0].ID == lastCones[LorR].ID) or ((prospectCones[LorR].connections[1].ID == lastCones[LorR].ID) if (prospectConeConnectionCount >= 2) else False))):
+                    print("BIG issue: lastCones["+("right" if (LorR==1) else "left")+"] pointed to this prospect cone, but this prospect cone does not point back", lastCones[LorR].connections, prospectCones[LorR].connections)
+                
+                prospectConeAvgConnAngle.append(((GF.radMidd(GF.radInv(prospectCones[LorR].coneConData[0].angle), prospectCones[LorR].coneConData[1].angle)) if (prospectConeConnectionCount >= 2) else (prospectCones[LorR].coneConData[0].angle)))
+            
+            # self.debugLines = [] #clear debugLines
+            # for LorR in range(2):
+            #     self.debugLines.append([1, self.realToPixelPos(lastCones[LorR].position), [4, lastConeAvgConnAngle[LorR]], 1+LorR])
+            #     self.debugLines.append([1, self.realToPixelPos(prospectCones[LorR].position), [4, prospectConeAvgConnAngle[LorR]], 1+LorR])
+            
+            ## all of could really be in a forloop of some kind, but fuck it; manual it is
+            strengths = [1,1,1] #4 possible path lines, one of which already exists (between lastLeftCone and lastRightCone), so calculate the strengths for the remaining three possible pathlines
+            pathWidths = [0,0,0];   pathAngles = [0,0,0]
+            allCones = lastCones + prospectCones  #combine lists
+            allAvgConnAngles = lastConeAvgConnAngle + prospectConeAvgConnAngle #combine lists
+            maxStrengthIndex = -1; maxStrengthVal = -1;  winningCones = [None, None]
+            for i in range(3):
+                pathWidths[i], pathAngles[i] = GF.distAngleBetwPos(allCones[(0 if (i==0) else 2)].position, allCones[(1 if (i==1) else 3)].position) #last left to next right (for left (CCW) corners, where one left cone (lastLeftCone) connects to several right cones  (lastRightCone AND prospectRightCone))
+                pathAngles[i] += np.pi/2 #angle is always from left-cone to right-cone, so adding 90deg (CCW rotation) will make it face the direction the car is heading in
+                strengths[i] *= 1.5-min(pathWidths[i]/self.pathConnectionThreshold, 1) #strength based on distance, the threshold just determines minimum score, distance can be larger than threshold without math errors
+                strengths[i] *= 1.5-min(min(abs(GF.radDiff(pathAngles[i], allAvgConnAngles[(0 if (i==0) else 2)])), abs(GF.radDiff(pathAngles[i], GF.radInv(allAvgConnAngles[(0 if (i==0) else 2)]))))/self.pathConnectionMaxAngleDelta, 1) #strength based on angle delta from lastLeftConePerpAngle, the maxAngleDelta just determines minimum score, angle can be larger than threshold without math errors
+                strengths[i] *= 1.5-min(min(abs(GF.radDiff(GF.radInv(pathAngles[i]), allAvgConnAngles[(1 if (i==1) else 3)])), abs(GF.radDiff(GF.radInv(pathAngles[i]), GF.radInv(allAvgConnAngles[(1 if (i==1) else 3)]))))/self.pathConnectionMaxAngleDelta, 1) #strength based on angle delta from prospectRightConePerpAngle, the maxAngleDelta just determines minimum score, angle can be larger than threshold without math errors
+                if(strengths[i] >= maxStrengthVal):
+                    maxStrengthVal = strengths[i]
+                    maxStrengthIndex = i
+                    winningCones[0] = allCones[(0 if (i==0) else 2)];  winningCones[1] = allCones[(1 if (i==1) else 3)]
+            
+            print("path found:", maxStrengthIndex, "at strength:", round(maxStrengthVal, 2))
+            #check if you've gone full circle
+            if((winningCones[0].ID == self.target_list[0].coneConData.cones[0].ID) and (winningCones[1].ID == self.target_list[0].coneConData.cones[1].ID)):
+                print("path full circle (from winning cones)")
+                self.pathFullCircle = True
+                return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
+            else:
+                centerPoint = [winningCones[1].position[0] + (winningCones[0].position[0]-winningCones[1].position[0])/2, winningCones[1].position[1] + (winningCones[0].position[1]-winningCones[1].position[1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
+                newTarget = Map.Target(centerPoint, (winningCones[0].isFinish or winningCones[1].isFinish))
+                newTarget.coneConData = pathFinderData(pathAngles[maxStrengthIndex], pathWidths[maxStrengthIndex], [winningCones[0], winningCones[1]], maxStrengthVal)
+                self.target_list.append(newTarget)
+        return(True)
+
 
 
 #------------------------------------------------------------------------------------------------------------------------- everything from this point is for visualization ---------------------------------------------
 
 #drawing funtions
-class pygameDrawer:
+class pygameDrawer(Map):
     def __init__(self, window, drawSize=(1200,600), drawOffset=(0,0), viewOffset=(0,0), carCamOrient=0, sizeScale=30, startWithCarCam=False, invertYaxis=True):
         self.window = window #pass on the window object (pygame)
         self.drawSize = (int(drawSize[0]),int(drawSize[1])) #width and height of the display area (does not have to be 100% of the window)
@@ -524,22 +535,22 @@ class pygameDrawer:
             conePos = GF.ASA(-(conePixelDiam/2), conePos) #bounding box of ellipse is positioned in topleft corner, so shift cone half a conesize to the topleft.
             pygame.draw.ellipse(self.window, coneColor, [conePos, [conePixelDiam, conePixelDiam]]) #draw cone
     
-    # def drawPathLines(self, drawConeLines=True, drawCenterPoints=False):
-    #     # pathList content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
-    #     pathCenterPixelDiam = self.coneDiam * self.sizeScale
-    #     for i in range(len(self.pathList)):
-    #         if(self.isInsideWindowReal(self.pathList[i][0])):
-    #             if(drawCenterPoints):
-    #                 #centerPixelPos = self.realToPixelPos(self.pathList[i][0])
-    #                 #pygame.draw.circle(self.window, self.pathColor, [int(centerPixelPos[0]), int(centerPixelPos[1])], int(pathCenterPixelDiam/2)) #draw center point (as filled circle, not ellipse)
-    #                 pygame.draw.ellipse(self.window, self.pathColor, [ASA(-(pathCenterPixelDiam/2), self.realToPixelPos(self.pathList[i][0])), [pathCenterPixelDiam, pathCenterPixelDiam]]) #draw center point
-    #             if(drawConeLines):
-    #                 pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.pathList[i][3][1]), self.realToPixelPos(self.pathList[i][4][1]), self.pathLineWidth) #line from left cone to right cone
-    #             if(i > 0):#if more than one path point exists (and the forloop is past the first one)
-    #                 #draw line between center points of current pathline and previous pathline (to make a line that the car should (sort of) follow)
-    #                 pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.pathList[i-1][0]), self.realToPixelPos(self.pathList[i][0]), self.pathLineWidth) #line from center pos to center pos
-    #     if(self.pathFullCircle):
-    #         pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.pathList[-1][0]), self.realToPixelPos(self.pathList[0][0]), self.pathLineWidth) #line that loops around to start
+    def drawPathLines(self, drawConeLines=True, drawCenterPoints=False):
+        # target_list content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
+        pathCenterPixelDiam = Map.Cone.coneDiam * self.sizeScale
+        for i in range(len(self.target_list)):
+            #if(self.isInsideWindowReal(self.target_list[i].position)):
+            if(drawCenterPoints):
+                #centerPixelPos = self.realToPixelPos(self.target_list[i][0])
+                #pygame.draw.circle(self.window, self.pathColor, [int(centerPixelPos[0]), int(centerPixelPos[1])], int(pathCenterPixelDiam/2)) #draw center point (as filled circle, not ellipse)
+                pygame.draw.ellipse(self.window, self.pathColor, [GF.ASA(-(pathCenterPixelDiam/2), self.realToPixelPos(self.target_list[i].position)), [pathCenterPixelDiam, pathCenterPixelDiam]]) #draw center point
+            if(drawConeLines):
+                pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.target_list[i].coneConData.cones[0].position), self.realToPixelPos(self.target_list[i].coneConData.cones[1].position), self.pathLineWidth) #line from left cone to right cone
+            if(i > 0):#if more than one path point exists (and the forloop is past the first one)
+                #draw line between center points of current pathline and previous pathline (to make a line that the car should (sort of) follow)
+                pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.target_list[i-1].position), self.realToPixelPos(self.target_list[i].position), self.pathLineWidth) #line from center pos to center pos
+        if(self.pathFullCircle):
+            pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.target_list[-1].position), self.realToPixelPos(self.target_list[0].position), self.pathLineWidth) #line that loops around to start
     
     def drawFinishLine(self):
         if(len(self.finish_line_cones) >= 2):
@@ -621,7 +632,7 @@ class pygameDrawer:
         self.updateViewOffset()
         self.background()
         self.drawCones(True) #boolean parameter is whether to draw lines between connected cones (track bounds) or not
-        #self.drawPathLines(True, True) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
+        self.drawPathLines(True, True) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
         self.drawFinishLine()
         self.drawCar()
         self.drawMouseCone(True, False)
@@ -641,9 +652,11 @@ class pygameDrawer:
 
 
 
-class pygamesimLocal(coneConnecter, pygameDrawer):
+class pygamesimLocal(coneConnecter, pathFinder, pygameDrawer):
     def __init__(self, window, drawSize=(1200,600), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=30, startWithCarCam=False, invertYaxis=True, importConeLogFilename='', logging=True, logname="coneLog"):
+        Map.__init__(self) #init map class
         coneConnecter.__init__(self, importConeLogFilename, logging, logname)
+        pathFinder.__init__(self)
         pygameDrawer.__init__(self, window, drawSize, drawOffset, viewOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
 
 #cursor in the shape of a flag
@@ -731,7 +744,24 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
             pygame.event.set_grab(0)
             pygamesimInput.mouseCone = None
             if(pygame.key.get_pressed()[102]):
-                pygamesimInput.setFinishCone(False, pygamesimInput.pixelsToRealPos(pos))
+                if(len(pygamesimInput.finish_line_cones) < 2):
+                    posToPlace = pygamesimInput.pixelsToRealPos(pos)
+                    overlaps, overlappingCone = pygamesimInput.overlapConeCheck(posToPlace)
+                    if(overlaps):
+                        if((pygamesimInput.finish_line_cones[0].LorR != overlappingCone.LorR) if (len(pygamesimInput.finish_line_cones) > 0) else True):
+                            overlappingCone.isFinish = True
+                            pygamesimInput.finish_line_cones.append(overlappingCone)
+                        else:
+                            print("can't set (existing) cone as finish, there's aready a left-sided finish cone")
+                    else:
+                        if((pygamesimInput.finish_line_cones[0].LorR == True) if (len(pygamesimInput.finish_line_cones) > 0) else True):
+                            newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
+                            aNewCone = Map.Cone(newConeID+1, posToPlace, False, True)
+                            pygamesimInput.left_cone_list.append(aNewCone)
+                            if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
+                                pygamesimInput.connectCone(aNewCone)
+                        else:
+                            print("can't set (new) cone as finish, there's aready a left-sided finish cone")
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
             else:
                 posToPlace = pygamesimInput.pixelsToRealPos(pos)
@@ -754,7 +784,24 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
             pygame.event.set_grab(0)
             pygamesimInput.mouseCone = None
             if(pygame.key.get_pressed()[102]):
-                pygamesimInput.setFinishCone(True, pygamesimInput.pixelsToRealPos(pos))
+                if(len(pygamesimInput.finish_line_cones) < 2):
+                    posToPlace = pygamesimInput.pixelsToRealPos(pos)
+                    overlaps, overlappingCone = pygamesimInput.overlapConeCheck(posToPlace)
+                    if(overlaps):
+                        if((pygamesimInput.finish_line_cones[0].LorR != overlappingCone.LorR) if (len(pygamesimInput.finish_line_cones) > 0) else True):
+                            overlappingCone.isFinish = True
+                            pygamesimInput.finish_line_cones.append(overlappingCone)
+                        else:
+                            print("can't set (existing) cone as finish, there's aready a right-sided finish cone")
+                    else:
+                        if((pygamesimInput.finish_line_cones[0].LorR == False) if (len(pygamesimInput.finish_line_cones) > 0) else True):
+                            newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
+                            aNewCone = Map.Cone(newConeID+1, posToPlace, True, True)
+                            pygamesimInput.right_cone_list.append(aNewCone)
+                            if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
+                                pygamesimInput.connectCone(aNewCone)
+                        else:
+                            print("can't set (new) cone as finish, there's aready a right-sided finish cone")
                 pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
             else:
                 posToPlace = pygamesimInput.pixelsToRealPos(pos)
@@ -793,15 +840,12 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
             pygame.event.set_grab(0)
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             flagCursorSet = False
-    # elif(key==pygame.K_r): # r
-    #     if(keyDown):
-    #         pygamesimInput.makePath()
-    #         # doesNothing = 0
-    #         # while(pygamesimInput.makePath()): #stops when path can no longer be advanced
-    #         #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
-    # elif(key==pygame.K_l): # l
-    #     if(keyDown):
-    #         pygamesimInput.rewriteLogfile()
+    elif(key==pygame.K_r): # r
+        if(keyDown):
+            pygamesimInput.makePath()
+            # doesNothing = 0
+            # while(pygamesimInput.makePath()): #stops when path can no longer be advanced
+            #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
     elif(key==pygame.K_c): # c
         if(keyDown):
             pygamesimInput.carCam = not pygamesimInput.carCam
