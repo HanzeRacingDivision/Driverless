@@ -126,7 +126,7 @@ def findIndexByClassAttr(listToSearch, attrName, valueToFind): #finds matching a
 def findMinAttrIndex(inputList, attrName): #finds smallest attribute in 1D list of classes and returns index
     if(len(inputList) > 0):
         returnIndex = 0
-        minVal = inputList[0]
+        minVal = getattr(inputList[0], attrName)
         for i in range(len(inputList)):
             val = getattr(inputList[i], attrName)
             if(val < minVal):
@@ -139,7 +139,7 @@ def findMinAttrIndex(inputList, attrName): #finds smallest attribute in 1D list 
 def findMaxAttrIndex(inputList, attrName): #finds biggest attribute in 1D list of classes and returns index
     if(len(inputList) > 0):
         returnIndex = 0
-        maxVal = inputList[0]
+        maxVal = getattr(inputList[0], attrName)
         for i in range(len(inputList)):
             val = getattr(inputList[i], attrName)
             if(val > maxVal):
