@@ -832,9 +832,9 @@ class coneConnecter:
                             self.logFileChanged = True #set flag
                 #super safety check for first-pathLine code
                 if(len(self.pathList) == 1): #now check both angles again, just to be sure:
-                    if(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.car.orient) > self.pathFirstLineCarAngleDeltaMax)):
+                    if(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.car.orient)) > self.pathFirstLineCarAngleDeltaMax):
                         print("post correction first "+("right" if (LorR==1) else "left")+" angle large:", lastConeConnectionIndex[LorR], round(np.rad2deg(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2], self.car.orient))),2))
-                        if(((lastConnectionsFilled[intBoolInv(lastConeConnectionIndex[LorR])])) and (abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.car.orient) > self.pathFirstLineCarAngleDeltaMax))):
+                        if(((lastConnectionsFilled[intBoolInv(lastConeConnectionIndex[LorR])])) and (abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.car.orient)) > self.pathFirstLineCarAngleDeltaMax)):
                             print("post correction second angle also large", round(np.rad2deg(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2]), 2), round(np.rad2deg(self.car.orient), 2), round(np.rad2deg(abs(radDiff(lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][2], self.car.orient))),2))
                         return(False)
                 lastConePerpAngle.append(radMidd(lastCone[LorR][2][LorR][2], lastCone[LorR][2][intBoolInv(LorR)][2]) if (lastCone[LorR][2][intBoolInv(lastConeConnectionIndex[LorR])][1] >= 0) else radRoll(lastCone[LorR][2][lastConeConnectionIndex[LorR]][2] + (np.pi*(0.5 if (lastConeConnectionIndex[LorR]==LorR) else -0.5)))) #note: addition or subtraction of half pi is a bit strange, dont worry about it :)
