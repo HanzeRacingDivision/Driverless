@@ -122,7 +122,7 @@ class Map:
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.coneID = coneID  #TO BE REPLACED BY PANDAS INDEXING
             self.position = np.array([pos[0], pos[1]])
-            self.LorR = leftOrRight #boolean to indicate which side of the track (which color) the code is
+            self.LorR = leftOrRight #boolean to indicate which side of the track (which color) the code is. True=right, False=left
             self.isFinish = isFinish
             
             self.connections = [] #appendable list, max 2 entries. will contain pointers to cones if succesfully connected
