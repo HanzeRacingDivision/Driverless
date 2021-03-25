@@ -161,6 +161,7 @@ class Map:
                     return(lengthMem) #end reached
                 else:
                     print("serious error in getConeChainLen(). bad data in Cone.connections?:", currentCone.connections, prevCone.connections)
+                    return(-1)
         else: #technically, this does allow more that 2 connections per cone, but what maniac would do that
             return(self.getConeChainLen(currentCone.connections[(1 if (currentCone.connections[0].ID == prevCone.ID) else 0)], currentCone, lengthMem+1)) #continue sequence
         
