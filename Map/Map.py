@@ -243,7 +243,7 @@ class Map:
     def overlapConeCheck(self, posToCheck):
         boolAnswer = False;   coneListPointer=None #boolAnswer MUST default to False, the other variables dont matter as much
         coneDistToler = self.Cone.coneDiam*2 #overlap tolerance  NOTE: area is square, not round
-        combinedConeList = (self.rightConeList + self.leftConeList)
+        combinedConeList =  (self.right_cone_list + self.left_cone_list)
         for cone in combinedConeList:
             if((posToCheck[0] > (cone.position[0]-coneDistToler)) and (posToCheck[0] < (cone.position[0]+coneDistToler)) and (posToCheck[1] > (cone.position[1]-coneDistToler)) and (posToCheck[1] < (cone.position[1]+coneDistToler))):
                 if(boolAnswer): #if an overlapping cone was already found
