@@ -147,11 +147,6 @@ class Map:
     
     
     def getConeChainLen(self, currentCone, prevCone=None, lengthMem=1): #(itteratively) determine the lenght of a sequence of connected cones (note: uses Cone.ID)
-        if(lengthMem >= len((self.right_cone_list if currentCone.LorR else self.left_cone_list))): #a crude way of checking if the chain loops
-            print(("right" if currentCone.LorR else "left"), "cone chain is full circle")
-            ## alternatively, you could just set a (Map class) boolean to indicate that a full cone circle chain has been reached (and skip all this itteration)
-            ## or, you could store (pass on as argument) the start of the chain, and just check if currentCone==startingCone
-            return(lengthMem)
         connectionCount = len(currentCone.connections)
         if((connectionCount > 1) and (prevCone is None)):
             print("incorrect usage of getConeChainLen()")
@@ -168,7 +163,13 @@ class Map:
                     print("serious error in getConeChainLen(). bad data in Cone.connections?:", currentCone.connections, prevCone.connections)
                     return(-1)
         else: #technically, this does allow more that 2 connections per cone, but what maniac would do that
-            return(self.getConeChainLen(currentCone.connections[(1 if (currentCone.connections[0].ID == prevCone.ID) else 0)], currentCone, lengthMem+1)) #continue sequence
+            if(lengthMem >= len((self.right_cone_list if currentCone.LorR else self.left_cone_list))): #a crude way of checking if the chain loops
+                print(("right" if currentCone.LorR else "left"), "cone chain is full circle")
+                ## alternatively, you could just set a (Map class) boolean to indicate that a full cone circle chain has been reached (and skip all this itteration)
+                ## or, you could store (pass on as argument) the start of the chain, and just check if currentCone==startingCone
+                return(lengthMem)
+            else:
+                return(self.getConeChainLen(currentCone.connections[(1 if (currentCone.connections[0].ID == prevCone.ID) else 0)], currentCone, lengthMem+1)) #continue sequence
         
     
     
