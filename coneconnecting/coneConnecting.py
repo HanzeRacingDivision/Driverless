@@ -6,39 +6,18 @@
 
 import pygame       #python game library, used for the visualization
 import numpy as np  #general math library
-import datetime     #used for naming log files
 import time         #used for (temporary) driving math in raceCar() class
 
 from mapClassTemp import Map
 import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
-global DONT_SORT, SORTBY_DIST, SORTBY_ANGL, SORTBY_ANGL_DELT, SORTBY_ANGL_DELT_ABS
-DONT_SORT = 0
-SORTBY_DIST = 1
-SORTBY_ANGL = 2
-SORTBY_ANGL_DELT = 3
-SORTBY_ANGL_DELT_ABS = 4
-global NO_CONN_EXCL, EXCL_UNCONN, EXCL_SING_CONN, EXCL_DUBL_CONN
-NO_CONN_EXCL = 0
-EXCL_UNCONN = 1
-EXCL_SING_CONN = 2
-EXCL_DUBL_CONN = 3
-EXCL_ANY_CONN = 4
-
-#to be removed once csv f
-global CD_FINISH, coneLogTableColumnDef
-CD_FINISH = 'finish'
-coneLogTableColumnDef = "cone ID,leftOrRight,Xpos,Ypos,prev ID,next ID,coneData\n"
-
-
-class coneConnection: #a class to go in Map.Cone.coneConData
+class coneConnection: #a class to go in Map.Cone.coneConData. This carries some extra data which is only used by the coneConnecter functions
     def __init__(self, angle=0, dist=0, strength=0):
         #self.cone = conePointer #(pointer to) connected cone (ALREADY IN Cone CLASS UNDER Cone.connections)
         self.angle = angle #angle between cones
         self.dist = dist #distance between cones
         self.strength = strength #connection strength (highest strength option was used)
-
 
 
 
@@ -64,14 +43,14 @@ class coneConnecter(Map):
         #more parameters to be added later, in non-simulation code
         currentConnectionCount = len(coneToConnect.connections)
         if(currentConnectionCount >= 2):#if cone is already doubly connected
-            print("input cone already doubly connected?!:", coneToConnect.coneConData)
+            print("input cone already doubly connected:")
             return(False, None)
         else:
             currentExistingAngle = 0.0
             if((currentConnectionCount>0) and (coneToConnect.coneConData is not None)): #only 1 of the 2 checks should be needed, but just to be safe
                 currentExistingAngle = GF.radRoll(GF.radInv(coneToConnect.coneConData[0].angle))
             
-            nearbyConeList = self.distanceToCone(coneToConnect.position, self.right_cone_list if coneToConnect.LorR else self.left_cone_list, SORTBY_DIST, [coneToConnect.ID], self.coneConnectionThreshold, EXCL_DUBL_CONN, [coneToConnect.ID])  #note: list is sorted by distance, but that's not really needed given the (CURRENT) math
+            nearbyConeList = self.distanceToCone(coneToConnect.position, self.right_cone_list if coneToConnect.LorR else self.left_cone_list, 'SORTBY_DIST', [coneToConnect.ID], self.coneConnectionThreshold, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by distance, but that's not really needed given the (CURRENT) math
             # nearbyConeList structure: [[cone, [dist, angle]], ]
             if(len(nearbyConeList) < 1):
                 print("nearbyConeList empty")
@@ -138,7 +117,7 @@ class coneConnecter(Map):
             print("input cone already doubly connected?!:", coneToConnect.coneConData)
             return(False, None)
         else:
-            nearbyConeList = self.distanceToConeSquared(coneToConnect.position, self.right_cone_list if coneToConnect.LorR else self.left_cone_list, True, [coneToConnect.ID], self.coneConnectionThresholdSquared, EXCL_DUBL_CONN, [coneToConnect.ID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
+            nearbyConeList = self.distanceToConeSquared(coneToConnect.position, self.right_cone_list if coneToConnect.LorR else self.left_cone_list, True, [coneToConnect.ID], self.coneConnectionThresholdSquared, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
             if(len(nearbyConeList) < 1):
                 print("nearbyConeList empty")
                 return(False, None)
@@ -220,7 +199,7 @@ class pathFinder(Map):
                 if(firstCones[LorR] is None):
                     bestCandidateIndex = -1;   highestStrength = 0;   candidatesDiscarded = 0
                     sideAngleRange = [self.car.angle +((-np.pi/2) if LorR else (np.pi/2)) -self.pathFirstLineCarSideAngleDelta, self.car.angle +((-np.pi/2) if LorR else (np.pi/2)) +self.pathFirstLineCarSideAngleDelta] #left side is car.angle +pi/2, right side is car.angle -pi/2
-                    firstConeCandidates = self.distanceToCone(self.car.position, self.right_cone_list if LorR else self.left_cone_list, SORTBY_DIST, [], self.pathFirstLinePosDist, EXCL_UNCONN, [], self.car.angle, sideAngleRange) #sorting is unnecessarry
+                    firstConeCandidates = self.distanceToCone(self.car.position, self.right_cone_list if LorR else self.left_cone_list, 'SORTBY_DIST', [], self.pathFirstLinePosDist, 'EXCL_UNCONN', [], self.car.angle, sideAngleRange) #sorting is unnecessarry
                     for i in range(len(firstConeCandidates)):
                         cone = firstConeCandidates[i][0]
                         connectionCount = len(cone.connections) #due to the EXCL_UNCONN filtering, this value should never be 0
@@ -280,38 +259,6 @@ class pathFinder(Map):
                     firstCones[LorR] = firstConeCandidates[bestCandidateIndex][0]
                     strengths[LorR] = highestStrength
             
-            # ## angle checks and swithing connections if possible
-            # for LorR in range(2):
-            #     firstConeConnectionIndex = 1 #try to use the 'front' connection by default
-            #     firstConnectionCount = len(firstCones[LorR].connections)
-            #     if(firstConnectionCount < 1): #if it has no connections at all (this can only happen is finish cones were used, because distanceToCone() filters out unconnected cones, but might as well check
-            #         #first cone is unconnected
-            #         print("no connections on "+("right" if (LorR==1) else "left")+" firstCone:", firstCones[LorR])
-            #         return(False)
-            #     elif(not firstConnectionsFilled[firstConeConnectionIndex]): #if it only has a 'back' connection, just move the back one to the front
-            #         #first, switch connection data to make preferable (front) the only valid one
-            #         #print("whipping lastLeft (1):", lastLeftCone[2])
-            #         tempConVal = firstCones[LorR][2][0] #one of these is an empty connection
-            #         firstCones[LorR][2][0] = firstCones[LorR][2][1]
-            #         firstCones[LorR][2][1] = tempConVal
-            #         self.logFileChanged = True #set flag
-            #         #then check the angle of that connection. If it is too far off from the car angle then something is terribly wrong (or 
-            #         if(abs(radDiff(firstCones[LorR][2][firstConeConnectionIndex][2], self.car.angle)) > self.pathFirstLineCarAngleDeltaMax):
-            #             print("only first "+("right" if (LorR==1) else "left")+" connection angle larger than allowed:", firstConeConnectionIndex, round(np.rad2deg(firstCones[LorR][2][firstConeConnectionIndex][2]), 2), round(np.rad2deg(self.car.angle), 2), round(np.rad2deg(abs(radDiff(firstCones[LorR][2][firstConeConnectionIndex][2], self.car.angle))),2))
-            #             return(False)
-            #     elif(firstConnectionsFilled[intBoolInv(firstConeConnectionIndex)]): #if it has both connections:
-            #         if(abs(radDiff(firstCones[LorR][2][firstConeConnectionIndex][2], self.car.angle)) > self.pathFirstLineCarAngleDeltaMax):
-            #             if(abs(radDiff(firstCones[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.car.angle)) > self.pathFirstLineCarAngleDeltaMax):
-            #                 print("second left angle also larger than allowed", round(np.rad2deg(firstCones[LorR][2][intBoolInv(firstConeConnectionIndex)][2]), 2), round(np.rad2deg(self.car.angle), 2), round(np.rad2deg(abs(radDiff(firstCones[LorR][2][intBoolInv(firstConeConnectionIndex)][2], self.car.angle))),2))
-            #                 return(False)
-            #             else: #first angle was large, but second angle wasnt, just switch the connections around and we're good to go
-            #                 #print("whipping lastLeft (2):", lastLeftCone[2])
-            #                 tempConVal = firstCones[LorR][2][0] #one of these is an empty connection
-            #                 firstCones[LorR][2][0] = firstCones[LorR][2][1]
-            #                 firstCones[LorR][2][1] = tempConVal
-            #                 self.logFileChanged = True #set flag
-            #     ## else do nothing, everything is allready good and there's no need to worry
-            
             ## and now just put the first cones into the target_list
             pathWidth, lineAngle = GF.distAngleBetwPos(firstCones[0].position, firstCones[1].position)
             carAngle = GF.radRoll(lineAngle + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
@@ -331,6 +278,9 @@ class pathFinder(Map):
                 connectedConesProspectable = [];  prospectConnectionIndex = 0
                 for i in range(lastConnectionCount):
                     connectedConesProspectable.append(True)
+                    # if(len(self.target_list) > 1):
+                    #     if(lastCones[LorR].connections[i].ID == self.target_list[-2].coneConData.cones[LorR].ID): #only check second to last path point
+                    #         connectedConesProspectable[i] = False;
                     for target in self.target_list: #look through the entire list of targets (you could also just look at self.target_list[-2])
                         if(lastCones[LorR].connections[i].ID == target.coneConData.cones[LorR].ID): #if the only connected cone is ALSO (already) in the target_list, then you cant make any more path
                             connectedConesProspectable[i] = False;
@@ -358,9 +308,19 @@ class pathFinder(Map):
                         prospectConnectionIndex = 0
                     elif(connectedConesProspectable[1]):
                         prospectConnectionIndex = 1
-                    else:
-                        print("both lastCones["+("right" if (LorR==1) else "left")+"] connections already in target_list, something is very wrong")
-                        return(False)
+                    else: #both of the cones connected to lastCone are already used in pathList
+                        #either something is very wrong, OR the path is about to go full-circle
+                        if(lastCones[LorR].connections[0].ID == self.target_list[0].coneConData.cones[LorR].ID): #if the 0th connection is the first Target
+                            #about to go full-circle, use connections[0] as prospectCone
+                            prospectConnectionIndex = 0
+                        elif(lastCones[LorR].connections[1].ID == self.target_list[0].coneConData.cones[LorR].ID): #if the 0th connection is the first Target
+                            #about to go full-circle, use connections[1] as prospectCone
+                            prospectConnectionIndex = 1
+                        elif(lastCones[LorR].ID == self.target_list[0].coneConData.cones[LorR].ID): #the prospectcone on this side doesnt matter, it all about this lastCone
+                            print("nearing a full circle")
+                        else: #something is just very wrong
+                            print("both lastCones["+("right" if (LorR==1) else "left")+"].connections already in target_list, something is very wrong")
+                            return(False)
                 lastConeAvgConnAngle.append((GF.radMidd(GF.radInv(lastCones[LorR].coneConData[0].angle), lastCones[LorR].coneConData[1].angle)) if (lastConnectionCount >= 2) else (lastCones[LorR].coneConData[0].angle))
                 #and now the prospect cones
                 prospectCones.append(lastCones[LorR].connections[prospectConnectionIndex])
@@ -467,6 +427,10 @@ class pygameDrawer(Map):
         
         #DELETE ME
         self.timeSinceLastUpdate = time.time()
+        self.drawTargetConeLines = True #just for UI purposes, to toggle between showing and not showing how the targets are made
+        self.carKeyboardControlTimer = time.time()
+        self.carHistTimer = time.time()
+        self.carHistPoints = []
         
         # try: #if there's no car object, this will not crash the entire program
         #     self.viewOffset = [(-self.car.pos[0]) + ((self.drawSize[0]/self.sizeScale)/2), (-self.car.pos[1]) + ((self.drawSize[1]/self.sizeScale)/2)]
@@ -574,6 +538,15 @@ class pygameDrawer(Map):
         arrowPoints = [self.realToPixelPos(self.car.position), polygonPoints[1], polygonPoints[2]] #not as efficient as using the line below, but self.pos can vary
         oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
         pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
+        
+        if((time.time() - self.carHistTimer) > 0.1):
+            self.carHistTimer = time.time()
+            self.carHistPoints.append([[self.car.position[0] + offsets[0][0], self.car.position[1] + offsets[0][1]], [self.car.position[0] - offsets[1][0], self.car.position[1] - offsets[1][1]], GF.distAnglePosToPos(self.car.length/2, GF.radInv(self.car.angle), self.car.position)])
+        
+        if(len(self.carHistPoints) > 1):
+            for i in range(1, len(self.carHistPoints)):
+                for j in range(len(self.carHistPoints[i])):
+                    pygame.draw.line(self.window, [200, 200, 200], self.realToPixelPos(self.carHistPoints[i-1][j]), self.realToPixelPos(self.carHistPoints[i][j]), 1)
     
     def drawMouseCone(self, drawPossibleConnections=True, drawConnectionThresholdCircle=False):
         if(self.mouseCone is not None): #if there is a floating cone to be drawn
@@ -585,13 +558,13 @@ class pygameDrawer(Map):
                     pygame.draw.circle(self.window, coneColor, [int(conePos[0]), int(conePos[1])], self.coneConnectionThreshold * self.sizeScale, self.coneLineWidth) #draw circle with coneConnectionThreshold radius 
                 overlapsCone, overlappingCone = self.overlapConeCheck(self.pixelsToRealPos(conePos))
                 if(overlapsCone and drawPossibleConnections): #if mouse is hovering over existing cone
-                    nearbyConeList = self.distanceToConeSquared(overlappingCone.position, self.right_cone_list if overlappingCone.LorR else self.left_cone_list, False, [overlappingCone.ID], self.coneConnectionThresholdSquared, EXCL_DUBL_CONN, [overlappingCone.ID])
+                    nearbyConeList = self.distanceToConeSquared(overlappingCone.position, self.right_cone_list if overlappingCone.LorR else self.left_cone_list, False, [overlappingCone.ID], self.coneConnectionThresholdSquared, 'EXCL_DUBL_CONN', [overlappingCone.ID])
                     overlappingConePixelPos = self.realToPixelPos(overlappingCone.position)
                     for cone in nearbyConeList:
                         pygame.draw.line(self.window, coneColor, overlappingConePixelPos, self.realToPixelPos(cone[0].position), int(self.coneLineWidth/2))
                 else:
                     if(drawPossibleConnections):
-                        nearbyConeList = self.distanceToConeSquared(self.pixelsToRealPos(conePos), self.right_cone_list if self.mouseCone else self.left_cone_list, False, [], self.coneConnectionThresholdSquared, EXCL_DUBL_CONN, [])
+                        nearbyConeList = self.distanceToConeSquared(self.pixelsToRealPos(conePos), self.right_cone_list if self.mouseCone else self.left_cone_list, False, [], self.coneConnectionThresholdSquared, 'EXCL_DUBL_CONN', [])
                         for cone in nearbyConeList:
                             pygame.draw.line(self.window, coneColor, conePos, self.realToPixelPos(cone[0].position), int(self.coneLineWidth/2))
                     #pygame.draw.circle(self.window, coneColor, [int(conePos[0]), int(conePos[1])], int(conePixelDiam/2)) #draw cone (as filled circle, not ellipse)
@@ -632,7 +605,7 @@ class pygameDrawer(Map):
         self.updateViewOffset()
         self.background()
         self.drawCones(True) #boolean parameter is whether to draw lines between connected cones (track bounds) or not
-        self.drawPathLines(True, True) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
+        self.drawPathLines(self.drawTargetConeLines, True) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
         self.drawFinishLine()
         self.drawCar()
         self.drawMouseCone(True, False)
@@ -700,10 +673,11 @@ flagCurs16  =  ("oooooooooooooooo", #1
                 "oo              ",
                 "oo              ",
                 "oo              ") #16
-global flagCurs24Data, flagCurs16Data, flagCursorSet
+global flagCurs24Data, flagCurs16Data, flagCursorSet, deleteCursorSet
 flagCurs24Data = ((24,24),(0,23)) + pygame.cursors.compile(flagCurs, 'X', '.', 'o')
 flagCurs16Data = ((16,16),(0,15)) + pygame.cursors.compile(flagCurs16, 'X', '.', 'o')
 flagCursorSet = False
+deleteCursorSet = False
 
 global windowKeepRunning, windowStarted
 windowStarted = False
@@ -734,86 +708,65 @@ def frameRefresh():
     pygame.display.flip() #send (finished) frame to display
 
 def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
-    if(button==1): #left mouse button
-        if(buttonDown): #mouse pressed down
-            pygamesimInput.mouseCone = False #left cone
-            pygame.event.set_grab(1)
-            if(pygame.key.get_pressed()[102]):
-                pygame.mouse.set_cursor(flagCurs16Data[0], flagCurs16Data[1], flagCurs16Data[2], flagCurs16Data[3])
-        else:           #mouse released
-            pygame.event.set_grab(0)
-            pygamesimInput.mouseCone = None
-            if(pygame.key.get_pressed()[102]):
-                if(len(pygamesimInput.finish_line_cones) < 2):
-                    posToPlace = pygamesimInput.pixelsToRealPos(pos)
-                    overlaps, overlappingCone = pygamesimInput.overlapConeCheck(posToPlace)
-                    if(overlaps):
-                        if((pygamesimInput.finish_line_cones[0].LorR != overlappingCone.LorR) if (len(pygamesimInput.finish_line_cones) > 0) else True):
-                            overlappingCone.isFinish = True
-                            pygamesimInput.finish_line_cones.append(overlappingCone)
-                        else:
-                            print("can't set (existing) cone as finish, there's aready a left-sided finish cone")
-                    else:
-                        if((pygamesimInput.finish_line_cones[0].LorR == True) if (len(pygamesimInput.finish_line_cones) > 0) else True):
-                            newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
-                            aNewCone = Map.Cone(newConeID+1, posToPlace, False, True)
-                            pygamesimInput.left_cone_list.append(aNewCone)
-                            if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
-                                pygamesimInput.connectCone(aNewCone)
-                        else:
-                            print("can't set (new) cone as finish, there's aready a left-sided finish cone")
-                pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
-            else:
+    if(buttonDown and ((button == 1) or (button == 3))): #left/rigth mouse button pressed (down)
+        pygame.event.set_grab(1)
+        leftOrRight = (True if (button == 3) else False)
+        if(not pygame.key.get_pressed()[pygame.K_r]):
+            pygamesimInput.mouseCone = leftOrRight
+        if(pygame.key.get_pressed()[pygame.K_f]):
+            pygame.mouse.set_cursor(flagCurs16Data[0], flagCurs16Data[1], flagCurs16Data[2], flagCurs16Data[3]) #smaller flag cursor
+    elif((button == 1) or (button == 3)): #if left/right mouse button released
+        leftOrRight = (True if (button == 3) else False)
+        pygame.event.set_grab(0)
+        pygamesimInput.mouseCone = None
+        if(pygame.key.get_pressed()[pygame.K_r]):
+            overlaps, overlappingCone = pygamesimInput.overlapConeCheck(pygamesimInput.pixelsToRealPos(pos))
+            if(overlaps):
+                deleting = True
+                for target in pygamesimInput.target_list: #look through the entire list of targets (you could also just look at self.target_list[-2])
+                    if(overlappingCone.ID == target.coneConData.cones[overlappingCone.LorR].ID): #if the only connected cone is ALSO (already) in the target_list, then you cant make any more path
+                        print("can't delete cone, it's in pathList") #just a lot easier, not impossible
+                        deleting = False
+                if(deleting):
+                    print("deleting cone:", overlappingCone.ID)
+                    for connectedCone in overlappingCone.connections:
+                        connectedCone.coneConData.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
+                        connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
+                    listToRemoveFrom = (pygamesimInput.right_cone_list if overlappingCone.LorR else pygamesimInput.left_cone_list)
+                    listToRemoveFrom.pop(GF.findIndexByClassAttr(listToRemoveFrom, 'ID', overlappingCone.ID))
+        elif(pygame.key.get_pressed()[pygame.K_f]): #if setting finish line cone
+            if(len(pygamesimInput.finish_line_cones) < 2):
                 posToPlace = pygamesimInput.pixelsToRealPos(pos)
                 overlaps, overlappingCone = pygamesimInput.overlapConeCheck(posToPlace)
                 if(overlaps):
-                    pygamesimInput.connectCone(overlappingCone)
-                else:
-                    newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
-                    aNewCone = Map.Cone(newConeID+1, posToPlace, False, False)
-                    pygamesimInput.left_cone_list.append(aNewCone)
-                    if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
-                        pygamesimInput.connectCone(aNewCone)
-    if(button==3): #right mouse button
-        if(buttonDown): #mouse pressed down
-            pygamesimInput.mouseCone = True  #right cone
-            pygame.event.set_grab(1)
-            if(pygame.key.get_pressed()[102]):
-                pygame.mouse.set_cursor(flagCurs16Data[0], flagCurs16Data[1], flagCurs16Data[2], flagCurs16Data[3])
-        else:           #mouse released
-            pygame.event.set_grab(0)
-            pygamesimInput.mouseCone = None
-            if(pygame.key.get_pressed()[102]):
-                if(len(pygamesimInput.finish_line_cones) < 2):
-                    posToPlace = pygamesimInput.pixelsToRealPos(pos)
-                    overlaps, overlappingCone = pygamesimInput.overlapConeCheck(posToPlace)
-                    if(overlaps):
-                        if((pygamesimInput.finish_line_cones[0].LorR != overlappingCone.LorR) if (len(pygamesimInput.finish_line_cones) > 0) else True):
-                            overlappingCone.isFinish = True
-                            pygamesimInput.finish_line_cones.append(overlappingCone)
-                        else:
-                            print("can't set (existing) cone as finish, there's aready a right-sided finish cone")
+                    if((pygamesimInput.finish_line_cones[0].LorR != overlappingCone.LorR) if (len(pygamesimInput.finish_line_cones) > 0) else True):
+                        overlappingCone.isFinish = True
+                        pygamesimInput.finish_line_cones.append(overlappingCone)
                     else:
-                        if((pygamesimInput.finish_line_cones[0].LorR == False) if (len(pygamesimInput.finish_line_cones) > 0) else True):
-                            newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
-                            aNewCone = Map.Cone(newConeID+1, posToPlace, True, True)
-                            pygamesimInput.right_cone_list.append(aNewCone)
-                            if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
-                                pygamesimInput.connectCone(aNewCone)
-                        else:
-                            print("can't set (new) cone as finish, there's aready a right-sided finish cone")
-                pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
-            else:
-                posToPlace = pygamesimInput.pixelsToRealPos(pos)
-                overlaps, overlappingCone = pygamesimInput.overlapConeCheck(posToPlace)
-                if(overlaps):
-                    pygamesimInput.connectCone(overlappingCone)
+                        print("can't set (existing) cone as finish, there's aready a "+("right" if leftOrRight else "left")+"-sided finish cone")
                 else:
-                    newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
-                    aNewCone = Map.Cone(newConeID+1, posToPlace, True, False)
-                    pygamesimInput.right_cone_list.append(aNewCone)
-                    if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
-                        pygamesimInput.connectCone(aNewCone)
+                    if((pygamesimInput.finish_line_cones[0].LorR == leftOrRight) if (len(pygamesimInput.finish_line_cones) > 0) else True):
+                        newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
+                        aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, True)
+                        coneListToAppend = (pygamesimInput.right_cone_list if leftOrRight else pygamesimInput.left_cone_list)
+                        coneListToAppend.append(aNewCone)
+                        if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
+                            pygamesimInput.connectCone(aNewCone)
+                    else:
+                        print("can't set (new) cone as finish, there's aready a left-sided finish cone")
+            pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
+        else:
+            posToPlace = pygamesimInput.pixelsToRealPos(pos)
+            overlaps, overlappingCone = pygamesimInput.overlapConeCheck(posToPlace)
+            if(overlaps):
+                pygamesimInput.connectCone(overlappingCone)
+            else:
+                newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
+                aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, False)
+                coneListToAppend = (pygamesimInput.right_cone_list if leftOrRight else pygamesimInput.left_cone_list)
+                coneListToAppend.append(aNewCone)
+                if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
+                    pygamesimInput.connectCone(aNewCone)
     elif(button==2): #middle mouse button
         if(buttonDown): #mouse pressed down
             if(not pygamesimInput.carCam):
@@ -840,12 +793,26 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
             pygame.event.set_grab(0)
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             flagCursorSet = False
-    elif(key==pygame.K_r): # r
+    if(key==pygame.K_r): # r
+        global deleteCursorSet
+        if(keyDown):
+            if(not deleteCursorSet): #in pygame SDL2, holding a button makes it act like a keyboard button, and event gets spammed.
+                pygame.event.set_grab(1)
+                pygame.mouse.set_cursor(*pygame.cursors.broken_x)
+                deleteCursorSet = True
+        else:
+            pygame.event.set_grab(0)
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+            deleteCursorSet = False
+    elif(key==pygame.K_p): # p
         if(keyDown):
             pygamesimInput.makePath()
             # doesNothing = 0
             # while(pygamesimInput.makePath()): #stops when path can no longer be advanced
             #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
+    elif(key==pygame.K_t): # t
+        if(keyDown):
+            pygamesimInput.drawTargetConeLines = not pygamesimInput.drawTargetConeLines
     elif(key==pygame.K_c): # c
         if(keyDown):
             pygamesimInput.carCam = not pygamesimInput.carCam
@@ -953,16 +920,19 @@ def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D li
     for eventToHandle in pygame.event.get(): #handle all events
         handleWindowEvent(pygamesimInputList, eventToHandle)
     #the manual keyboard driving (tacked on here, because doing it with the event system would require more variables, and this is temporary anyway)
-    carToDrive = currentPygamesimInput(pygamesimInputList, demandMouseFocus=False).car #get the active sim within the window
+    simToDrive = currentPygamesimInput(pygamesimInputList, demandMouseFocus=False) #get the active sim within the window
+    carToDrive = simToDrive.car
     pressedKeyList = pygame.key.get_pressed()
-    speedAccelVal = 0.015
-    steerAccelVal = 0.002
+    deltaTime = time.time() - simToDrive.carKeyboardControlTimer
+    simToDrive.carKeyboardControlTimer = time.time()
+    speedAccelVal = 10.0 * deltaTime
+    steerAccelVal = 1.5 * deltaTime
     #first for speed
     if(pressedKeyList[pygame.K_UP]): #accelerate button
         carToDrive.velocity += speedAccelVal #accelerate
     elif(pressedKeyList[pygame.K_DOWN]): #brake/reverse button
         if(carToDrive.velocity > (speedAccelVal*3)): #positive speed
-            carToDrive.velocity -= speedAccelVal * 3 #fast brake
+            carToDrive.velocity -= speedAccelVal * 2 #fast brake
         else:                               #near-zero or negative speed
             carToDrive.velocity -= speedAccelVal * 0.5 #reverse accelerate
     else:                           #neither buttons
@@ -980,12 +950,12 @@ def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D li
         carToDrive.steering -= steerAccelVal
     else:
         if(carToDrive.steering > steerAccelVal):
-            carToDrive.steering -= steerAccelVal*2.5
+            carToDrive.steering -= steerAccelVal*2.0
         elif(carToDrive.steering < -steerAccelVal):
-            carToDrive.steering += steerAccelVal*2.5
+            carToDrive.steering += steerAccelVal*2.0
         else:
             carToDrive.steering = 0
-    carToDrive.steering = max(-np.pi/5, min(np.pi/5, carToDrive.steering)) #limit speed
+    carToDrive.steering = max(np.deg2rad(-25), min(np.deg2rad(25), carToDrive.steering)) #limit speed
 
 
 
