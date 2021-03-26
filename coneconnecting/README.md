@@ -16,14 +16,15 @@ cones:
 - holding F while placing/clicking on a cone will make that cone a finish-line-cone (there can only be 1 left and 1 right finish cone)
 
 camera:
-- press C to switch between regular and car-centered camera
+- press V to switch between regular and car-centered camera
 - scrolling zooms in and out
 - CTRL+scrolling rotates the screen (only in car-centered camera)
 - middle mouse buttom moves the viewpoint (dragging like google maps) (not in car-centered camera)
 
 other:
-- pressing R makes it try to find a path (requires connected cones on both side of track
-- pressing L makes it rewrite the coneLog immidielty (also happens automatically, but this just forces it to happen)
+- pressing P makes it try to find a path (requires connected cones on both side of track)
+- pressing C clears the car position history line
+- pressing T toggles whether the cone-lines that determined the targets are drawn
 
 driving (temporary):
 - arrow keys
