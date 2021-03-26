@@ -756,15 +756,16 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                     else:
                         print("can't set (existing) cone as finish, there's aready a "+("right" if leftOrRight else "left")+"-sided finish cone")
                 else:
-                    if((pygamesimInput.finish_line_cones[0].LorR == leftOrRight) if (len(pygamesimInput.finish_line_cones) > 0) else True):
+                    if((pygamesimInput.finish_line_cones[0].LorR != leftOrRight) if (len(pygamesimInput.finish_line_cones) > 0) else True):
                         newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
                         aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, True)
                         coneListToAppend = (pygamesimInput.right_cone_list if leftOrRight else pygamesimInput.left_cone_list)
                         coneListToAppend.append(aNewCone)
+                        pygamesimInput.finish_line_cones.append(aNewCone)
                         if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
                             pygamesimInput.connectCone(aNewCone)
                     else:
-                        print("can't set (new) cone as finish, there's aready a left-sided finish cone")
+                        print("can't set (new) cone as finish, there's aready a "+("right" if leftOrRight else "left")+"-sided finish cone")
             pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
         else:
             posToPlace = pygamesimInput.pixelsToRealPos(pos)
