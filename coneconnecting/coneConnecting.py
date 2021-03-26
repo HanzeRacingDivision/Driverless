@@ -745,40 +745,29 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                         connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
                     listToRemoveFrom = (pygamesimInput.right_cone_list if overlappingCone.LorR else pygamesimInput.left_cone_list)
                     listToRemoveFrom.pop(GF.findIndexByClassAttr(listToRemoveFrom, 'ID', overlappingCone.ID))
-        elif(pygame.key.get_pressed()[pygame.K_f]): #if setting finish line cone
-            if(len(pygamesimInput.finish_line_cones) < 2):
+        else:
+            if((len(pygamesimInput.finish_line_cones) < 2) if pygame.key.get_pressed()[pygame.K_f] else True):
                 posToPlace = pygamesimInput.pixelsToRealPos(pos)
                 overlaps, overlappingCone = pygamesimInput.overlapConeCheck(posToPlace)
                 if(overlaps):
-                    if((pygamesimInput.finish_line_cones[0].LorR != overlappingCone.LorR) if (len(pygamesimInput.finish_line_cones) > 0) else True):
-                        overlappingCone.isFinish = True
-                        pygamesimInput.finish_line_cones.append(overlappingCone)
+                    if(pygame.key.get_pressed()[pygame.K_f]):
+                        if((pygamesimInput.finish_line_cones[0].LorR != overlappingCone.LorR) if (len(pygamesimInput.finish_line_cones) > 0) else True):
+                            overlappingCone.isFinish = True
+                            pygamesimInput.finish_line_cones.append(overlappingCone)
+                        else:
+                            print("can't set (existing) cone as finish, there's aready a "+("right" if leftOrRight else "left")+"-sided finish cone")
                     else:
-                        print("can't set (existing) cone as finish, there's aready a "+("right" if leftOrRight else "left")+"-sided finish cone")
+                        pygamesimInput.connectCone(overlappingCone)
                 else:
-                    if((pygamesimInput.finish_line_cones[0].LorR != leftOrRight) if (len(pygamesimInput.finish_line_cones) > 0) else True):
-                        newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
-                        aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, True)
+                    newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
+                    aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, pygame.key.get_pressed()[pygame.K_f])
+                    if(((pygamesimInput.finish_line_cones[0].LorR != leftOrRight) if (len(pygamesimInput.finish_line_cones) > 0) else True) if pygame.key.get_pressed()[pygame.K_f] else True):
                         coneListToAppend = (pygamesimInput.right_cone_list if leftOrRight else pygamesimInput.left_cone_list)
                         coneListToAppend.append(aNewCone)
-                        pygamesimInput.finish_line_cones.append(aNewCone)
+                        if(pygame.key.get_pressed()[pygame.K_f]):
+                            pygamesimInput.finish_line_cones.append(aNewCone)
                         if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
                             pygamesimInput.connectCone(aNewCone)
-                    else:
-                        print("can't set (new) cone as finish, there's aready a "+("right" if leftOrRight else "left")+"-sided finish cone")
-            pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3])
-        else:
-            posToPlace = pygamesimInput.pixelsToRealPos(pos)
-            overlaps, overlappingCone = pygamesimInput.overlapConeCheck(posToPlace)
-            if(overlaps):
-                pygamesimInput.connectCone(overlappingCone)
-            else:
-                newConeID = GF.findMaxAttrIndex((pygamesimInput.right_cone_list + pygamesimInput.left_cone_list), 'ID')[1]
-                aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, False)
-                coneListToAppend = (pygamesimInput.right_cone_list if leftOrRight else pygamesimInput.left_cone_list)
-                coneListToAppend.append(aNewCone)
-                if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
-                    pygamesimInput.connectCone(aNewCone)
     elif(button==2): #middle mouse button
         if(buttonDown): #mouse pressed down
             if(not pygamesimInput.carCam):
