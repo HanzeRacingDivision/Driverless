@@ -1,19 +1,19 @@
 import numpy as np
 import generalFunctions as GF
 
-#constants for distanceToConeSquared, can be replaced with strings, but this is faster
-global DONT_SORT, SORTBY_DIST, SORTBY_ANGL, SORTBY_ANGL_DELT, SORTBY_ANGL_DELT_ABS
-DONT_SORT = 0
-SORTBY_DIST = 1
-SORTBY_ANGL = 2
-SORTBY_ANGL_DELT = 3
-SORTBY_ANGL_DELT_ABS = 4
-global NO_CONN_EXCL, EXCL_UNCONN, EXCL_SING_CONN, EXCL_DUBL_CONN
-NO_CONN_EXCL = 0
-EXCL_UNCONN = 1
-EXCL_SING_CONN = 2
-EXCL_DUBL_CONN = 3
-EXCL_ANY_CONN = 4
+# #constants for distanceToConeSquared, can be replaced with strings, but this is faster
+# global DONT_SORT, SORTBY_DIST, SORTBY_ANGL, SORTBY_ANGL_DELT, SORTBY_ANGL_DELT_ABS
+# DONT_SORT = 0
+# SORTBY_DIST = 1
+# SORTBY_ANGL = 2
+# SORTBY_ANGL_DELT = 3
+# SORTBY_ANGL_DELT_ABS = 4
+# global NO_CONN_EXCL, EXCL_UNCONN, EXCL_SING_CONN, EXCL_DUBL_CONN
+# NO_CONN_EXCL = 0
+# EXCL_UNCONN = 1
+# EXCL_SING_CONN = 2
+# EXCL_DUBL_CONN = 3
+# EXCL_ANY_CONN = 4
 
 
 class Map:
@@ -72,8 +72,8 @@ class Map:
                 arcMov = angular_velocity * dt
                 
                 #one way to do it
-                # turning_center = GF.distAnglePosToPos(turning_radius, carAngle+(np.pi/2), rearAxlePos) #get point around which car turns
-                # rearAxlePos = GF.distAnglePosToPos(turning_radius, carAngle+arcMov-(np.pi/2), turning_center)      #the car has traveled a a certain distancec (velocity*dt) along the circumference of the turning circle, that arc is arcMov radians long
+                # turning_center = GF.distAnglePosToPos(turning_radius, self.angle+(np.pi/2), rearAxlePos) #get point around which car turns
+                # rearAxlePos = GF.distAnglePosToPos(turning_radius, self.angle+arcMov-(np.pi/2), turning_center)      #the car has traveled a a certain distancec (velocity*dt) along the circumference of the turning circle, that arc is arcMov radians long
                 
                 #another way of doing it
                 forwardMov = np.sin(arcMov)*turning_radius #sin(arc)*turning radius = movement paralel with (old) carAngle
@@ -135,9 +135,10 @@ class Map:
 
     class Target:
         """ 'Target' child class only used in PathPlanning """
-        def __init__(self, pos=[0,0]):
+        def __init__(self, pos=[0,0], isFinish=False):
             #the targets should probably be just be ordered in the list to match their order in the track (shouldnt take much/any shuffling to get done), but if not: use pandas indexing?
             self.position = np.array([pos[0], pos[1]])
+            self.isFinish = isFinish
             
             #self.passed = 0 #counts the number of times it's been passed (from path-planning)
             
@@ -173,7 +174,7 @@ class Map:
         
     
     
-    def distanceToConeSquared(self, pos, conelist=None, sortByDistance=False, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, coneConnectionExclusions=NO_CONN_EXCL, ignoreLinkedConeIDs=[]):
+    def distanceToConeSquared(self, pos, conelist=None, sortByDistance=False, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, coneConnectionExclusions='NO_CONN_EXCL', ignoreLinkedConeIDs=[]):
         if(conelist is None): #if no conelist was entered (probably should do this)
             conelist = self.left_cone_list + self.right_cone_list #then search both lists
         returnList = []  #[[conePointer, squaredDist], ]
@@ -183,10 +184,10 @@ class Map:
             if(cone.ID in ignoreConeIDs):
                 ignoreCone = True
             coneConnectionCount = len(cone.connections)
-            if(((coneConnectionExclusions == EXCL_UNCONN) and (coneConnectionCount == 0)) or \
-               ((coneConnectionExclusions == EXCL_SING_CONN) and (coneConnectionCount == 1)) or \
-               ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnectionCount == 2)) or \
-               ((coneConnectionExclusions == EXCL_ANY_CONN) and (coneConnectionCount > 0))):
+            if(((coneConnectionExclusions == 'EXCL_UNCONN') and (coneConnectionCount == 0)) or \
+               ((coneConnectionExclusions == 'EXCL_SING_CONN') and (coneConnectionCount == 1)) or \
+               ((coneConnectionExclusions == 'EXCL_DUBL_CONN') and (coneConnectionCount == 2)) or \
+               ((coneConnectionExclusions == 'EXCL_ANY_CONN') and (coneConnectionCount > 0))):
                 ignoreCone = True
             elif(coneConnectionCount > 0):
                 for coneIDtoIgnore in ignoreLinkedConeIDs: #check if the cone needs to be ignored because of its connections
@@ -209,7 +210,7 @@ class Map:
                         returnList.append([cone, squaredDistance])
         return(returnList)
     
-    def distanceToCone(self, pos, conelist=None, sortBySomething=DONT_SORT, ignoreConeIDs=[], simpleThreshold=-1.0, coneConnectionExclusions=NO_CONN_EXCL, ignoreLinkedConeIDs=[], angleDeltaTarget=0.0, angleThreshRange=[]): #note: angleThreshRange is [lowBound, upBound]
+    def distanceToCone(self, pos, conelist=None, sortBySomething='DONT_SORT', ignoreConeIDs=[], simpleThreshold=-1.0, coneConnectionExclusions='NO_CONN_EXCL', ignoreLinkedConeIDs=[], angleDeltaTarget=0.0, angleThreshRange=[]): #note: angleThreshRange is [lowBound, upBound]
         if(conelist is None): #if no conelist was entered (probably should do this)
             conelist = self.left_cone_list + self.right_cone_list #then search both lists
         returnList = []  #[[conePointer, [dist, angle]], ]
@@ -219,10 +220,10 @@ class Map:
             if(cone.ID in ignoreConeIDs):
                 ignoreCone = True
             coneConnectionCount = len(cone.connections)
-            if(((coneConnectionExclusions == EXCL_UNCONN) and (coneConnectionCount == 0)) or \
-               ((coneConnectionExclusions == EXCL_SING_CONN) and (coneConnectionCount == 1)) or \
-               ((coneConnectionExclusions == EXCL_DUBL_CONN) and (coneConnectionCount == 2)) or \
-               ((coneConnectionExclusions == EXCL_ANY_CONN) and (coneConnectionCount > 0))):
+            if(((coneConnectionExclusions == 'EXCL_UNCONN') and (coneConnectionCount == 0)) or \
+               ((coneConnectionExclusions == 'EXCL_SING_CONN') and (coneConnectionCount == 1)) or \
+               ((coneConnectionExclusions == 'EXCL_DUBL_CONN') and (coneConnectionCount == 2)) or \
+               ((coneConnectionExclusions == 'EXCL_ANY_CONN') and (coneConnectionCount > 0))):
                 ignoreCone = True
             elif(coneConnectionCount > 0):
                 for coneIDtoIgnore in ignoreLinkedConeIDs: #check if the cone needs to be ignored because of its connections
@@ -233,7 +234,7 @@ class Map:
                 distance, angle = GF.distAngleBetwPos(pos, cone.position) #math obove was moved to a handy function
                 if(((distance < simpleThreshold) if (simpleThreshold > 0) else True) and ((GF.radRange(angle, angleThreshRange[0], angleThreshRange[1])) if (hasAngleThreshRange) else True)): #note: (method if boolean else method) used to make sure angleThreshRange isnt used if it's empty
                     #if it gets here, the cone fits the requirements and needs to be placed in returnList
-                    if(sortBySomething == SORTBY_DIST):
+                    if(sortBySomething == 'SORTBY_DIST'):
                         insertionDone = False
                         for i in range(len(returnList)):
                             if((distance < returnList[i][1][0]) and (not insertionDone)): #if the new entry is larger
@@ -241,7 +242,7 @@ class Map:
                                 insertionDone = True
                         if(not insertionDone): #if the new entry is larger than the last entry, append it
                             returnList.append([cone, [distance, angle]])
-                    elif(sortBySomething == SORTBY_ANGL):
+                    elif(sortBySomething == 'SORTBY_ANGL'):
                         insertionDone = False
                         for i in range(len(returnList)):
                             if((angle < returnList[i][1][1]) and (not insertionDone)): #if the new entry is larger
@@ -249,7 +250,7 @@ class Map:
                                 insertionDone = True
                         if(not insertionDone): #if the new entry is larger than the last entry, append it
                             returnList.append([cone, [distance, angle]])
-                    elif(sortBySomething == SORTBY_ANGL_DELT):
+                    elif(sortBySomething == 'SORTBY_ANGL_DELT'):
                         insertionDone = False
                         for i in range(len(returnList)):
                             if((GF.radDiff(angle, angleDeltaTarget) < GF.radDiff(returnList[i][1][1], angleDeltaTarget)) and (not insertionDone)): #if the new entry is larger
@@ -257,7 +258,7 @@ class Map:
                                 insertionDone = True
                         if(not insertionDone): #if the new entry is larger than the last entry, append it
                             returnList.append([cone, [distance, angle]])
-                    elif(sortBySomething == SORTBY_ANGL_DELT_ABS):
+                    elif(sortBySomething == 'SORTBY_ANGL_DELT_ABS'):
                         insertionDone = False
                         for i in range(len(returnList)):
                             if((abs(GF.radDiff(angle, angleDeltaTarget)) < abs(GF.radDiff(returnList[i][1][1], angleDeltaTarget))) and (not insertionDone)): #if the new entry is larger
