@@ -9,8 +9,10 @@
 import serial
 import serial.tools.list_ports
 import time
-import mapClassTemp as mp
 import numpy as np
+
+from mapClassTemp import Map
+import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 class carMCU:
     def __init__(self, connectAtInit=True, comPort=None, autoFind=True):
@@ -255,9 +257,9 @@ class carMCU:
 
 
 #a TEMPORARY class, to be replaced by SLAM code (which uses real filtering and stuff)
-class realCar(carMCU, mp.Map.Car):
+class realCar(carMCU, Map.Car):
     def __init__(self, pos=[0,0], angle=0, connectAtInit=True, comPort=None, autoFind=True):
-        mp.Map.Car.__init__(self, pos[0], pos[1], angle)
+        Map.Car.__init__(self, pos[0], pos[1], angle)
         carMCU.__init__(self, connectAtInit, comPort, autoFind)
         self.timeSinceLastUpdate = time.time()
         self.skippedUpdateCheckVar = 0.0
@@ -278,14 +280,21 @@ class realCar(carMCU, mp.Map.Car):
                 stepSteering = (self.steering + self.angleFIFO[updates])/2
                 stepDist = self.distTotalFIFO[updates] - self.skippedUpdateCheckVar #little tricky, but should work
                 
-                angularVelocity = 0 #init var
-                if(abs(stepSteering) > 0.001): #avoid divide by 0
-                    turningRadius = self.length / np.sin(stepSteering)
-                    angularVelocity = stepVelocity / turningRadius #(rework math for rotation around actual point of rotation?)
-                self.angle += (dt * angularVelocity) / 2 #half now...
-                self.position[0] += stepDist * np.cos(self.angle) #x
-                self.position[1] += stepDist * np.sin(self.angle) #y
-                self.angle += (dt * angularVelocity) / 2 #second half of angle change is added after linear movement is calulated, to (hopefully) increase accuracy slightly
+                #turning math
+                if((abs(stepSteering) > 0.001) and (abs(stepVelocity) > 0.001)): #avoid divide by 0 (and avoid complicated math in a simple situation)
+                    rearAxlePos = GF.distAnglePosToPos(self.length/2, GF.radInv(self.angle), self.position)
+                    turning_radius = self.length/np.tan(stepSteering)
+                    angular_velocity = self.velocity/turning_radius
+                    arcMov = angular_velocity * dt
+                    #one way to do it
+                    turning_center = GF.distAnglePosToPos(turning_radius, self.angle+(np.pi/2), rearAxlePos) #get point around which car turns
+                    rearAxlePos = GF.distAnglePosToPos(turning_radius, self.angle+arcMov-(np.pi/2), turning_center)      #the car has traveled a a certain distancec (velocity*dt) along the circumference of the turning circle, that arc is arcMov radians long
+                    #update position
+                    self.angle += arcMov
+                    self.position = GF.distAnglePosToPos(self.length/2, self.angle, rearAxlePos)
+                else:
+                    self.position[0] += dt * stepVelocity * np.cos(self.angle)
+                    self.position[1] += dt * stepVelocity * np.sin(self.angle)
                 self.skippedUpdateCheckVar += stepDist
             #regular forloop to get through
             for i in range(updates):
@@ -294,23 +303,32 @@ class realCar(carMCU, mp.Map.Car):
                 stepSteering = (self.angleFIFO[updates-i]+self.angleFIFO[updates-i-1])/2 #idk, average steering angle between datapoints i guess
                 stepDist = self.distFIFO[updates-i-1] #distance traveled (wheel encoder difference)
                 
-                angularVelocity = 0 #init var
-                if(abs(stepSteering) > 0.001): #avoid divide by 0
-                    turningRadius = self.length / np.sin(stepSteering)
-                    angularVelocity = stepVelocity / turningRadius #(rework math for rotation around actual point of rotation?)
-                self.angle += (dt * angularVelocity) / 2 #half now...
-                self.position[0] += stepDist * np.cos(self.angle) #x
-                self.position[1] += stepDist * np.sin(self.angle) #y
-                self.angle += (dt * angularVelocity) / 2 #second half of angle change is added after linear movement is calulated, to (hopefully) increase accuracy slightly
+                #turning math
+                if((abs(stepSteering) > 0.001) and (abs(stepVelocity) > 0.001)): #avoid divide by 0 (and avoid complicated math in a simple situation)
+                    rearAxlePos = GF.distAnglePosToPos(self.length/2, GF.radInv(self.angle), self.position)
+                    turning_radius = self.length/np.tan(stepSteering)
+                    angular_velocity = stepVelocity/turning_radius
+                    arcMov = angular_velocity * dt
+                    #one way to do it
+                    turning_center = GF.distAnglePosToPos(turning_radius, self.angle+(np.pi/2), rearAxlePos) #get point around which car turns
+                    rearAxlePos = GF.distAnglePosToPos(turning_radius, self.angle+arcMov-(np.pi/2), turning_center)      #the car has traveled a a certain distancec (velocity*dt) along the circumference of the turning circle, that arc is arcMov radians long
+                    #update position
+                    self.angle += arcMov
+                    self.position = GF.distAnglePosToPos(self.length/2, self.angle, rearAxlePos)
+                else:
+                    self.position[0] += dt * stepVelocity * np.cos(self.angle)
+                    self.position[1] += dt * stepVelocity * np.sin(self.angle)
                 self.skippedUpdateCheckVar += stepDist
                 if(abs(self.skippedUpdateCheckVar - self.distTotalFIFO[updates-i-1]) > 0.1): #both variables hold the total (summed up) distance traveled
                     print("you should run car.update() more often, because you are missing important data")
                     print("traveled dist (car.update()):", self.skippedUpdateCheckVar)
                     print("traveled dist (distTotalFIFO["+str(updates-i-1)+"]):", self.distTotalFIFO[updates-i-1])
                     self.skippedUpdateCheckVar = self.distTotalFIFO[updates-i-1]
-            self.velocity = self.speedFIFO[0] #just take the most recent velocity
+            #self.velocity = self.speedFIFO[0] #just take the most recent velocity
+            self.velocity = stepVelocity
+            self.steering = stepSteering
             self.timeSinceLastUpdate = self.feedbackTimestampFIFO[0]
-            #print([round(self.position[0], 2), round(self.position[1], 2)], round(self.angle,2), round(self.velocity,2), round(self.skippedUpdateCheckVar,2))
+            print([round(self.position[0], 2), round(self.position[1], 2)], round(self.angle,2), round(self.velocity,2), round(self.skippedUpdateCheckVar,2))
     
     def runOnThread(self, autoreconnect=False): #overwrites runOnThread() in carMCU class
         carMCUconThreadkeepRunning = True
