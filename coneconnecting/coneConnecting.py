@@ -15,7 +15,7 @@ import generalFunctions as GF #(homemade) some useful functions for everyday eas
 class coneConnection: #a class to go in Map.Cone.coneConData. This carries some extra data which is only used by the coneConnecter functions
     def __init__(self, angle=0, dist=0, strength=0):
         #self.cone = conePointer #(pointer to) connected cone (ALREADY IN Cone CLASS UNDER Cone.connections)
-        self.angle = angle #angle between cones
+        self.angle = angle #angle between cones (always from the perspective of the cone that holds this data)
         self.dist = dist #distance between cones
         self.strength = strength #connection strength (highest strength option was used)
 
@@ -26,6 +26,8 @@ class coneConnecter(Map):
         #Map.__init__(self) #init map class
         self.coneConnectionThreshold = 5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
         self.coneConnectionThresholdSquared = self.coneConnectionThreshold**2
+        ## self.coneConnectionLowChainLen = 3 #if the connection length of coneToConnect is higher than this, devalue the length of the pospect cone's connections #NOT IMPLEMENTED (YET?)
+        self.coneConnectionHighChainLen = 5 #the longer the sequence, the better, but any longer than this is just as good as this (strength saturation). (not hard threshold)
         self.coneConnectionHighAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         self.coneConnectionMaxAngleDelta = np.deg2rad(120) #if the angle difference is larger than this, it just doesnt make sense to connect them. (this IS a hard threshold)
         self.coneConnectionRestrictiveAngleChangeThreshold = np.deg2rad(20) # the most-restrictive-angle code only switches if angle is this much more restrictive
@@ -62,6 +64,7 @@ class coneConnecter(Map):
                 connectionCount = len(cone.connections)
                 coneCandidateStrength = 1 #init var
                 coneCandidateStrength *= 1.5-(nearbyConeList[i][1][0]/self.coneConnectionThreshold)  #high distance, low strength. Linear. worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
+                coneCandidateStrength *= 0.5+min(self.getConeChainLen(cone)/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
                 angleToCone = nearbyConeList[i][1][1]
                 #hard no's: if the angle difference is above the max (like 135 degrees), the prospect cone is just too damn weird, just dont connect to this one
                 #note: this can be partially achieved by using angleThreshRange in distanceToCone() to preventatively discard cones like  angleThreshRange=([currentExistingAngle - self.coneConnectionMaxAngleDelta, currentExistingAngle + self.coneConnectionMaxAngleDelta] if (currentConnectionsFilled[0] or currentConnectionsFilled[1]) else [])
@@ -125,6 +128,7 @@ class coneConnecter(Map):
             for i in range(len(nearbyConeList)):
                 coneCandidateStrength = 1 #init var
                 coneCandidateStrength *= 1.5-(nearbyConeList[i][1]/self.coneConnectionThresholdSquared)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
+                coneCandidateStrength *= 0.5+min(self.getConeChainLen(nearbyConeList[i][0])/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
                 ## no angle math can be done, as Pythagoras's ABC is used, not sohcahtoa :)
                 if(coneCandidateStrength > highestStrength):
                     highestStrength = coneCandidateStrength
@@ -303,7 +307,7 @@ class pathFinder(Map):
                             strengths[i] *= 1.5-min(angleDeltas[i]/max(angleDeltas), 1) #lower delta = better
                             strengths[i] *= 0.5+min(connectionSeqLengths[i]/max(connectionSeqLengths), 1) #longer chain = better
                         prospectConnectionIndex = (1 if (strengths[1] > strengths[0]) else 0)
-                        print("deciding direction of path", prospectConnectionIndex, strengths, angleDeltas, connectionSeqLengths)
+                        #print("deciding direction of path", prospectConnectionIndex, strengths, angleDeltas, connectionSeqLengths)
                     elif(connectedConesProspectable[0]):
                         prospectConnectionIndex = 0
                     elif(connectedConesProspectable[1]):
@@ -431,6 +435,9 @@ class pygameDrawer(Map):
         self.carKeyboardControlTimer = time.time()
         self.carHistTimer = time.time()
         self.carHistPoints = []
+        self.carHistTimeStep = 0.15
+        self.carHistMinSquaredDistThresh = 0.1**2 #only save new positions if the car is moving
+        self.carHistMaxLen = 200
         
         # try: #if there's no car object, this will not crash the entire program
         #     self.viewOffset = [(-self.car.pos[0]) + ((self.drawSize[0]/self.sizeScale)/2), (-self.car.pos[1]) + ((self.drawSize[1]/self.sizeScale)/2)]
@@ -539,9 +546,13 @@ class pygameDrawer(Map):
         oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
         pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
         
-        if((time.time() - self.carHistTimer) > 0.1):
+        if((time.time() - self.carHistTimer) > self.carHistTimeStep):
             self.carHistTimer = time.time()
-            self.carHistPoints.append([[self.car.position[0] + offsets[0][0], self.car.position[1] + offsets[0][1]], [self.car.position[0] - offsets[1][0], self.car.position[1] - offsets[1][1]], GF.distAnglePosToPos(self.car.length/2, GF.radInv(self.car.angle), self.car.position)])
+            rearAxlePos = GF.distAnglePosToPos(self.car.length/2, GF.radInv(self.car.angle), self.car.position)
+            if((GF.distSqrdBetwPos(self.carHistPoints[-1][2], rearAxlePos) > self.carHistMinSquaredDistThresh) if (len(self.carHistPoints) > 1) else True):
+                self.carHistPoints.append([[self.car.position[0] + offsets[0][0], self.car.position[1] + offsets[0][1]], [self.car.position[0] - offsets[1][0], self.car.position[1] - offsets[1][1]], rearAxlePos])
+                if(len(self.carHistPoints) > self.carHistMaxLen):
+                    self.carHistPoints.pop(0)
         
         if(len(self.carHistPoints) > 1):
             for i in range(1, len(self.carHistPoints)):
@@ -814,6 +825,9 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
         if(keyDown):
             pygamesimInput.drawTargetConeLines = not pygamesimInput.drawTargetConeLines
     elif(key==pygame.K_c): # c
+        if(keyDown):
+            pygamesimInput.carHistPoints = []
+    elif(key==pygame.K_v): # v
         if(keyDown):
             pygamesimInput.carCam = not pygamesimInput.carCam
             if(pygamesimInput.carCam and pygamesimInput.movingViewOffset): #if you switched to carCam while you were moving viewOffset, just stop moving viewOffset (same as letting go of MMB)
