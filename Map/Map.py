@@ -30,8 +30,8 @@ class Map:
         #self.newConeID = 0 #add 1 after adding a cone #TO BE REPLACED BY PANDAS INDEXING
 
     class Car:
-        def __init__(self, pos=[0,0], angle=0):
-            self.position = np.array([pos[0], pos[1]])
+        def __init__(self, pos=[0.0,0.0], angle=0.0):
+            self.position = np.array([float(pos[0]), float(pos[1])])
             self.angle = angle #car orientation in radians
             self.velocity = 0.0 #measured and filtered car 'forward' (wheel) speed in meters/second (used to update position)
             self.steering = 0.0 #measured and filtered steering angle in radians (used to update position)
@@ -56,7 +56,7 @@ class Map:
             self.coneConData = None #extra data specifically for cone-connection
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
-
+            
         def update(self, dt):
             # if(dt < 0.0001):
             #     timeRightNow = time.time() #python is not the fastest language, using time.time() at different points in this function will give different values, this won't
@@ -87,10 +87,12 @@ class Map:
                 
                 #update position
                 self.angle += arcMov
-                self.position = GF.distAnglePosToPos(self.length/2, self.angle, rearAxlePos)
+                newPosition = GF.distAnglePosToPos(self.length/2, self.angle, rearAxlePos)
+                self.position[0] = newPosition[0] #keep the numpy array object the same (instead of replacing it with a whole new array every time)
+                self.position[1] = newPosition[1]
             else:
-                self.position[0] += dt * self.velocity * np.cos(self.angle)
-                self.position[1] += dt * self.velocity * np.sin(self.angle)
+                self.position[0] = self.position[0] + (dt * self.velocity * np.cos(self.angle)) #for some reason += doesnt work at the start
+                self.position[1] = self.position[1] + (dt * self.velocity * np.sin(self.angle))
         
         def distanceToCar(self, pos): #a more comprehensive/accurate function for getting the SHORTEST distance to the NEAREST surface of the car
             translatedDistance = GF.vectorProjectDist(self.position, pos, self.angle)
