@@ -15,6 +15,8 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, DD.pygameDrawer):
         self.pathFinderPresent = True
         self.pathPlanningPresent = False
         self.SLAMPresent = False
+        
+        self.carPolygonMode = False #use the fancy car sprite (default)
 
 
 
@@ -24,13 +26,13 @@ sim1 = pygamesimLocal(DD.window) #just a basic class object with all default att
 timeSinceLastUpdate = time.time()
 
 while DD.windowKeepRunning:
-    DD.handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
-    
     rightNow = time.time()
+    DD.handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
     sim1.car.update(rightNow - timeSinceLastUpdate)
     timeSinceLastUpdate = rightNow
-    
     sim1.redraw()
     DD.frameRefresh() #not done in redraw() to accomodate multi-sim options
+    if((time.time()-rightNow) < 0.015):
+        time.sleep(0.016-(time.time()-rightNow))
 
 DD.pygameEnd()
