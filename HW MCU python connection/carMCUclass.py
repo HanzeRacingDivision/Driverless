@@ -11,7 +11,7 @@ import serial.tools.list_ports
 import time
 import numpy as np
 
-from mapClassTemp import Map
+from Map import Map
 import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 class carMCU:
@@ -295,6 +295,8 @@ class realCar(carMCU, Map.Car):
                 else:
                     self.position[0] += dt * stepVelocity * np.cos(self.angle)
                     self.position[1] += dt * stepVelocity * np.sin(self.angle)
+                    # self.position[0] += stepDist * np.cos(self.angle)
+                    # self.position[1] += stepDist * np.sin(self.angle)
                 self.skippedUpdateCheckVar += stepDist
             #regular forloop to get through
             for i in range(updates):
@@ -318,6 +320,8 @@ class realCar(carMCU, Map.Car):
                 else:
                     self.position[0] += dt * stepVelocity * np.cos(self.angle)
                     self.position[1] += dt * stepVelocity * np.sin(self.angle)
+                    # self.position[0] += stepDist * np.cos(self.angle)
+                    # self.position[1] += stepDist * np.sin(self.angle)
                 self.skippedUpdateCheckVar += stepDist
                 if(abs(self.skippedUpdateCheckVar - self.distTotalFIFO[updates-i-1]) > 0.1): #both variables hold the total (summed up) distance traveled
                     print("you should run car.update() more often, because you are missing important data")
