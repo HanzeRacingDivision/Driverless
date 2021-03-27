@@ -2,7 +2,10 @@ import pygame       #python game library, used for the visualization
 import numpy as np  #general math library
 import time         #used for (temporary) driving math in raceCar() class
 
-from mapClassTemp import Map
+import os #only used for loading the car sprite (os is used to get the filepath)
+from PIL import Image, ImageDraw #python image library, only used for drawing car headlights
+
+from Map import Map
 import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
@@ -51,7 +54,15 @@ class pygameDrawer():
         self.debugLineWidth = 3
         
         ## load car sprite here (TBD)
-        self.carPolygonMode = True #if no sprite is present, this can be used
+        self.carPolygonMode = False #if no sprite is present, this can be used to draw a simple car
+        try: #if the sprite doesnt load (usually because it's missing), thats fine
+            current_dir = os.path.dirname(os.path.abspath(__file__)) #get directory name of current sketch
+            self.car_image = pygame.image.load(os.path.join(current_dir, "carSprite.png"))
+        except Exception as excep:
+            print("couldn't load car sprite ", excep)
+            print("using simple polygon car instead")
+            self.carPolygonMode = True
+        self.headlights = False
         
         self.coneConnecterPresent = False
         self.pathFinderPresent = False
@@ -59,7 +70,6 @@ class pygameDrawer():
         self.SLAMPresent = False
         
         #DELETE ME
-        self.timeSinceLastUpdate = time.time()
         self.drawTargetConeLines = True #just for UI purposes, to toggle between showing and not showing how the targets are made
         self.carKeyboardControlTimer = time.time()
         self.carHistTimer = time.time()
@@ -176,13 +186,31 @@ class pygameDrawer():
             oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
             pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
         else:
-            print("car sprite TBD")
+            if(self.headlights):# draw headlights (first, to not overlap car sprite)
+                headlightsImageSize = int(10.0*2*self.sizeScale)
+                headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
+                headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
+                #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
+                headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), -np.rad2deg(self.mapToDraw.car.angle)-60, -np.rad2deg(self.mapToDraw.car.angle)+60, fill= (55, 55, 35))
+                headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
+                headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(self.mapToDraw.car.position))
+                self.window.blit(headlightsImage, headlightsImage_rect)
+            scaledCarSprite = pygame.transform.scale(self.car_image, (self.mapToDraw.car.length*self.sizeScale, self.mapToDraw.car.width*self.sizeScale)) #note: height (length) and width are switched because an angle of 0 is at 3 o'clock, (and the car sprite is loaded like that)
+            rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg(self.mapToDraw.car.angle))
+            rotatedCarRect = rotatedCarSprite.get_rect()
+            carPos = self.realToPixelPos(self.mapToDraw.car.position)
+            carPos = (carPos[0] - (rotatedCarRect.width / 2), carPos[1] - (rotatedCarRect.height / 2))
+            #pygame.draw.rect(self.window, (200,200,200), (carPos, (rotatedCarRect.width, rotatedCarRect.height))) #draws a little box around the car sprite (just for debug)
+            self.window.blit(rotatedCarSprite, carPos) #draw car
         
         if((time.time() - self.carHistTimer) > self.carHistTimeStep):
             self.carHistTimer = time.time()
             rearAxlePos = GF.distAnglePosToPos(self.mapToDraw.car.length/2, GF.radInv(self.mapToDraw.car.angle), self.mapToDraw.car.position)
-            if((GF.distSqrdBetwPos(self.carHistPoints[-1][2], rearAxlePos) > self.carHistMinSquaredDistThresh) if (len(self.carHistPoints) > 1) else True):
-                self.carHistPoints.append([[self.mapToDraw.car.position[0] + offsets[0][0], self.mapToDraw.car.position[1] + offsets[0][1]], [self.mapToDraw.car.position[0] - offsets[1][0], self.mapToDraw.car.position[1] - offsets[1][1]], rearAxlePos])
+            if((GF.distSqrdBetwPos(self.carHistPoints[-1][0], rearAxlePos) > self.carHistMinSquaredDistThresh) if (len(self.carHistPoints) > 1) else True):
+                if(self.carPolygonMode):
+                    self.carHistPoints.append([[self.mapToDraw.car.position[0] + offsets[0][0], self.mapToDraw.car.position[1] + offsets[0][1]], [self.mapToDraw.car.position[0] - offsets[1][0], self.mapToDraw.car.position[1] - offsets[1][1]], rearAxlePos])
+                else:
+                    self.carHistPoints.append([rearAxlePos])
                 if(len(self.carHistPoints) > self.carHistMaxLen):
                     self.carHistPoints.pop(0)
         
@@ -191,6 +219,7 @@ class pygameDrawer():
                 for j in range(len(self.carHistPoints[i])):
                     pygame.draw.line(self.window, [200, 200, 200], self.realToPixelPos(self.carHistPoints[i-1][j]), self.realToPixelPos(self.carHistPoints[i][j]), 1)
     
+    ## UI and debug
     def drawMouseCone(self, drawPossibleConnections=True, drawConnectionThresholdCircle=False):
         if(self.mouseCone is not None): #if there is a floating cone to be drawn
             conePixelDiam = Map.Cone.coneDiam * self.sizeScale
@@ -442,6 +471,9 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
     elif(key==pygame.K_t): # t
         if(keyDown):
             pygamesimInput.drawTargetConeLines = not pygamesimInput.drawTargetConeLines #only has an effect if pyagmesimInput.pathFinderPresent == True
+    elif(key==pygame.K_h): # h
+        if(keyDown):
+            pygamesimInput.headlights = not pygamesimInput.headlights #only has an effect if car sprite is used (.carPolygonMode)
     elif(key==pygame.K_c): # c
         if(keyDown):
             pygamesimInput.carHistPoints = []
