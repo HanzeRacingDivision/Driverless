@@ -7,7 +7,7 @@
 
 import numpy as np  #general math library
 
-from mapClassTemp import Map
+from Map import Map
 import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
