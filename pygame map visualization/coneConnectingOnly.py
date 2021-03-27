@@ -1,10 +1,10 @@
-from mapClassTemp import Map
+from Map import Map
 import coneConnecting as CC
-import pathFinding as    PF
+import pathFinding    as PF
 import drawDriverless as DD
 import time
 
-class pygamesimLocal(CC.coneConnecter, CC.pathFinder, DD.pygameDrawer):
+class pygamesimLocal(CC.coneConnecter, PF.pathFinder, DD.pygameDrawer):
     def __init__(self, window, drawSize=(1200,600), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=30, startWithCarCam=False, invertYaxis=True, importConeLogFilename='', logging=True, logname="coneLog"):
         Map.__init__(self) #init map class
         CC.coneConnecter.__init__(self, importConeLogFilename, logging, logname)
