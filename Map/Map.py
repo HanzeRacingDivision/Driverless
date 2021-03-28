@@ -168,7 +168,7 @@ class Map:
                     return(-1, currentCone)
         else: #technically, this does allow more that 2 connections per cone, but what maniac would do that
             if(lengthMem >= len((self.right_cone_list if currentCone.LorR else self.left_cone_list))): #a crude way of checking if the chain loops
-                print(("right" if currentCone.LorR else "left"), "cone chain is full circle")
+                #print(("right" if currentCone.LorR else "left"), "cone chain is full circle")
                 ## alternatively, you could just set a (Map class) boolean to indicate that a full cone circle chain has been reached (and skip all this itteration)
                 ## or, you could store (pass on as argument) the start of the chain, and just check if currentCone==startingCone
                 return(lengthMem, currentCone)
