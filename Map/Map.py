@@ -36,7 +36,7 @@ class Map:
             self.velocity = 0.0 #measured and filtered car 'forward' (wheel) speed in meters/second (used to update position)
             self.steering = 0.0 #measured and filtered steering angle in radians (used to update position)
             self.length = 2 #meters
-            self.width = 1 #meters (mostly used for drawing)
+            self.width = 1 #meters
             
             self.desired_velocity = 0.0 #desired velocity in m/s (sent to car MCU)
             self.desired_steering = 0.0 #desired steering angle in radians (sent to car MCU)
@@ -279,11 +279,11 @@ class Map:
         combinedConeList = (self.right_cone_list + self.left_cone_list)
         for cone in combinedConeList:
             if((posToCheck[0] > (cone.position[0]-coneDistToler)) and (posToCheck[0] < (cone.position[0]+coneDistToler)) and (posToCheck[1] > (cone.position[1]-coneDistToler)) and (posToCheck[1] < (cone.position[1]+coneDistToler))):
-                if(boolAnswer): #if an overlapping cone was already found
-                    print("multiple cones overlap!?")
-                else:
-                    boolAnswer = True
-                    coneListPointer = cone
+                # if(boolAnswer): #if an overlapping cone was already found
+                #     print("multiple cones overlap!?") #OR two cones are very close (but not overlapping), and the posToCheck overlaps with both
+                # else:
+                boolAnswer = True
+                coneListPointer = cone
         return(boolAnswer, coneListPointer) #coneListPointer is None if it doesnt overlap
     
     # def addCone(self, pos, leftOrRight=False, isFinish=False):
