@@ -62,7 +62,9 @@ class pygameDrawer():
             print("couldn't load car sprite ", excep)
             print("using simple polygon car instead")
             self.carPolygonMode = True
-        self.headlights = False
+        self.headlights = False #only has an effect if carPolygonMode=False
+        
+        self.drawQubicSplines = True #only has an effect if pathPlanningPresent=True
         
         self.coneConnecterPresent = False
         self.pathFinderPresent = False
@@ -126,41 +128,66 @@ class pygameDrawer():
     def drawCones(self, drawLines=True):
         conePixelDiam = Map.Cone.coneDiam * self.sizeScale
         drawnLineList = [] #[ [ID, ID], ] just a list of drawn lines by ID
-        combinedConeList = (self.mapToDraw.right_cone_list + self.mapToDraw.left_cone_list)
-        for cone in combinedConeList:
-            #if(self.isInsideWindowReal(cone.position)): #if it is within bounds, draw it
-            conePos = self.realToPixelPos(cone.position) #convert to pixel positions
-            coneColor = self.rightConeColor if cone.LorR else self.leftConeColor
-            if(drawLines):
-                alreadyDrawn = [False, False]
-                for drawnLine in drawnLineList:
+        for LorR in range(2):
+            coneColor = self.rightConeColor if LorR else self.leftConeColor
+            for cone in (self.mapToDraw.right_cone_list if LorR else self.mapToDraw.left_cone_list):
+                conePos = self.realToPixelPos(cone.position) #convert to pixel position
+                ## draw the lines between cones
+                if(drawLines and (not self.drawQubicSplines)):
+                    alreadyDrawn = [False, False]
+                    for drawnLine in drawnLineList:
+                        for i in range(len(cone.connections)):
+                            if((cone.ID in drawnLine) and (cone.connections[i].ID in drawnLine)):
+                                alreadyDrawn[i] = True
                     for i in range(len(cone.connections)):
-                        if((cone.ID in drawnLine) and (cone.connections[i].ID in drawnLine)):
-                            alreadyDrawn[i] = True
-                for i in range(len(cone.connections)):
-                    if(not alreadyDrawn[i]):
-                        pygame.draw.line(self.window, coneColor, conePos, self.realToPixelPos(cone.connections[i].position), self.coneLineWidth)
-                        drawnLineList.append([cone.ID, cone.connections[i].ID]) #put established 'back' connection in list of drawn 
-            #pygame.draw.circle(self.window, coneColor, [int(conePos[0]), int(conePos[1])], int(conePixelDiam/2)) #draw cone (as filled circle, not ellipse)
-            conePos = GF.ASA(-(conePixelDiam/2), conePos) #bounding box of ellipse is positioned in topleft corner, so shift cone half a conesize to the topleft.
-            pygame.draw.ellipse(self.window, coneColor, [conePos, [conePixelDiam, conePixelDiam]]) #draw cone
+                        if(not alreadyDrawn[i]):
+                            pygame.draw.line(self.window, coneColor, conePos, self.realToPixelPos(cone.connections[i].position), self.coneLineWidth)
+                            drawnLineList.append([cone.ID, cone.connections[i].ID]) #put established 'back' connection in list of drawn 
+                ## now draw the cone itself
+                #pygame.draw.circle(self.window, coneColor, [int(conePos[0]), int(conePos[1])], int(conePixelDiam/2)) #draw cone (as filled circle, not ellipse)
+                conePos = GF.ASA(-(conePixelDiam/2), conePos) #bounding box of ellipse is positioned in topleft corner, so shift cone half a conesize to the topleft.
+                pygame.draw.ellipse(self.window, coneColor, [conePos, [conePixelDiam, conePixelDiam]]) #draw cone
+            if(self.pathPlanningPresent and self.drawQubicSplines):
+                splinePointPixelDiam = self.splinePointDiam * self.sizeScale
+                splineList = (self.right_spline if LorR else self.left_spline)
+                for i in range(len(splineList[0])):
+                    splinePointPos = self.realToPixelPos([splineList[0][i], splineList[1][i]])
+                    pygame.draw.ellipse(self.window, coneColor, [GF.ASA(-(splinePointPixelDiam/2), splinePointPos), [splinePointPixelDiam, splinePointPixelDiam]]) #draw cone
+                    if(i > 0):#if more than one spline point exists (and the forloop is past the first one)
+                        lastSplinePointPos = self.realToPixelPos([splineList[0][i-1], splineList[1][i-1]])
+                        pygame.draw.line(self.window, coneColor, lastSplinePointPos, splinePointPos, self.coneLineWidth) #line from center pos to center pos
+                ## drawing the last little line to complete the full-circle is rather difficult in the current system, so i won't bother
     
-    def drawPathLines(self, drawConeLines=True, drawCenterPoints=False):
+    def drawPathLines(self, drawPoints=False, drawConeLines=True):
         # target_list content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
         pathCenterPixelDiam = Map.Cone.coneDiam * self.sizeScale
-        for i in range(len(self.mapToDraw.target_list)):
-            #if(self.isInsideWindowReal(self.mapToDraw.target_list[i].position)):
-            if(drawCenterPoints):
-                #centerPixelPos = self.realToPixelPos(self.mapToDraw.target_list[i][0])
-                #pygame.draw.circle(self.window, self.pathColor, [int(centerPixelPos[0]), int(centerPixelPos[1])], int(pathCenterPixelDiam/2)) #draw center point (as filled circle, not ellipse)
-                pygame.draw.ellipse(self.window, self.pathColor, [GF.ASA(-(pathCenterPixelDiam/2), self.realToPixelPos(self.mapToDraw.target_list[i].position)), [pathCenterPixelDiam, pathCenterPixelDiam]]) #draw center point
-            if(drawConeLines and self.pathFinderPresent):
-                pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.mapToDraw.target_list[i].coneConData.cones[0].position), self.realToPixelPos(self.mapToDraw.target_list[i].coneConData.cones[1].position), self.pathLineWidth) #line from left cone to right cone
-            if(i > 0):#if more than one path point exists (and the forloop is past the first one)
-                #draw line between center points of current pathline and previous pathline (to make a line that the car should (sort of) follow)
-                pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.mapToDraw.target_list[i-1].position), self.realToPixelPos(self.mapToDraw.target_list[i].position), self.pathLineWidth) #line from center pos to center pos
-        if(self.mapToDraw.targets_full_circle):
-            pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.mapToDraw.target_list[-1].position), self.realToPixelPos(self.mapToDraw.target_list[0].position), self.pathLineWidth) #line that loops around to start
+        if(self.pathPlanningPresent and self.drawQubicSplines):
+            splinePointPixelDiam = self.splinePointDiam * self.sizeScale
+            for i in range(len(self.path_midpoints_spline[0])):
+                targetPos = self.realToPixelPos([self.path_midpoints_spline[0][i], self.path_midpoints_spline[1][i]])
+                if(drawPoints):
+                    pygame.draw.ellipse(self.window, self.pathColor, [GF.ASA(-(splinePointPixelDiam/2), targetPos), [splinePointPixelDiam, splinePointPixelDiam]]) #draw spline point
+                if(i > 0):#if more than one path point exists (and the forloop is past the first one)
+                    lastTargetPos = self.realToPixelPos([self.path_midpoints_spline[0][i-1], self.path_midpoints_spline[1][i-1]])
+                    pygame.draw.line(self.window, self.pathColor, lastTargetPos, targetPos, self.pathLineWidth) #line from center pos to center pos
+            # if(self.mapToDraw.targets_full_circle and (len(self.path_midpoints_spline[0]) > 1)): #note: this depends on mapToDraw, which path_midpoints_spline might not, be careful
+            #     startingPos = self.realToPixelPos([self.path_midpoints_spline[0][0], self.path_midpoints_spline[1][0]])
+            #     endingPos = self.realToPixelPos([self.path_midpoints_spline[0][-1], self.path_midpoints_spline[1][-1]])
+            #     pygame.draw.line(self.window, self.pathColor, endingPos, startingPos, self.pathLineWidth) #line that loops around to start
+        else:
+            for i in range(len(self.mapToDraw.target_list)):
+                #if(self.isInsideWindowReal(self.mapToDraw.target_list[i].position)):
+                if(drawPoints):
+                    #centerPixelPos = self.realToPixelPos(self.mapToDraw.target_list[i][0])
+                    #pygame.draw.circle(self.window, self.pathColor, [int(centerPixelPos[0]), int(centerPixelPos[1])], int(pathCenterPixelDiam/2)) #draw center point (as filled circle, not ellipse)
+                    pygame.draw.ellipse(self.window, self.pathColor, [GF.ASA(-(pathCenterPixelDiam/2), self.realToPixelPos(self.mapToDraw.target_list[i].position)), [pathCenterPixelDiam, pathCenterPixelDiam]]) #draw center point
+                if(drawConeLines and self.pathFinderPresent):
+                    pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.mapToDraw.target_list[i].coneConData.cones[0].position), self.realToPixelPos(self.mapToDraw.target_list[i].coneConData.cones[1].position), self.pathLineWidth) #line from left cone to right cone
+                if(i > 0):#if more than one path point exists (and the forloop is past the first one)
+                    #draw line between center points of current pathline and previous pathline (to make a line that the car should (sort of) follow)
+                    pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.mapToDraw.target_list[i-1].position), self.realToPixelPos(self.mapToDraw.target_list[i].position), self.pathLineWidth) #line from center pos to center pos
+            if(self.mapToDraw.targets_full_circle):
+                pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.mapToDraw.target_list[-1].position), self.realToPixelPos(self.mapToDraw.target_list[0].position), self.pathLineWidth) #line that loops around to start
     
     def drawFinishLine(self):
         if(len(self.mapToDraw.finish_line_cones) >= 2):
@@ -169,39 +196,39 @@ class pygameDrawer():
     def drawCar(self):
         ## drawing is currently done by calculating the position of the corners and drawing a polygon with those points. Not efficient, not pretty, but fun
         #if(self.isInsideWindowReal(self.mapToDraw.car.position)):
-        if(self.carPolygonMode):
-            if(self.carPointRadius is None):
-                self.carPointRadius = (((self.mapToDraw.car.width**2)+(self.mapToDraw.car.length**2))**0.5)/2 #Pythagoras
-                self.carPointAngle = np.arctan2(self.mapToDraw.car.width, self.mapToDraw.car.length) #this is used to make corner point for polygon
-            polygonPoints = []
-            offsets = [[np.cos(self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius, np.sin(self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius],
-                        [np.cos(np.pi-self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius, np.sin(np.pi-self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius]]
-            polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] + offsets[0][0], self.mapToDraw.car.position[1] + offsets[0][1]])) #front left
-            polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] + offsets[1][0], self.mapToDraw.car.position[1] + offsets[1][1]])) #back left
-            polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] - offsets[0][0], self.mapToDraw.car.position[1] - offsets[0][1]])) #back right
-            polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] - offsets[1][0], self.mapToDraw.car.position[1] - offsets[1][1]])) #front right
-            pygame.draw.polygon(self.window, self.carColor, polygonPoints) #draw car
-            #arrow drawing (not needed, just handy to indicate direction of car)
-            arrowPoints = [self.realToPixelPos(self.mapToDraw.car.position), polygonPoints[1], polygonPoints[2]] #not as efficient as using the line below, but self.pos can vary
-            oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
-            pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
-        else:
-            if(self.headlights):# draw headlights (first, to not overlap car sprite)
-                headlightsImageSize = int(10.0*2*self.sizeScale)
-                headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
-                headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
-                #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
-                headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), -np.rad2deg(self.mapToDraw.car.angle)-60, -np.rad2deg(self.mapToDraw.car.angle)+60, fill= (55, 55, 35))
-                headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
-                headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(self.mapToDraw.car.position))
-                self.window.blit(headlightsImage, headlightsImage_rect)
-            scaledCarSprite = pygame.transform.scale(self.car_image, (self.mapToDraw.car.length*self.sizeScale, self.mapToDraw.car.width*self.sizeScale)) #note: height (length) and width are switched because an angle of 0 is at 3 o'clock, (and the car sprite is loaded like that)
-            rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg(self.mapToDraw.car.angle))
-            rotatedCarRect = rotatedCarSprite.get_rect()
-            carPos = self.realToPixelPos(self.mapToDraw.car.position)
-            carPos = (carPos[0] - (rotatedCarRect.width / 2), carPos[1] - (rotatedCarRect.height / 2))
-            #pygame.draw.rect(self.window, (200,200,200), (carPos, (rotatedCarRect.width, rotatedCarRect.height))) #draws a little box around the car sprite (just for debug)
-            self.window.blit(rotatedCarSprite, carPos) #draw car
+        #if(self.carPolygonMode):
+        if(self.carPointRadius is None):
+            self.carPointRadius = (((self.mapToDraw.car.width**2)+(self.mapToDraw.car.length**2))**0.5)/2 #Pythagoras
+            self.carPointAngle = np.arctan2(self.mapToDraw.car.width, self.mapToDraw.car.length) #this is used to make corner point for polygon
+        polygonPoints = []
+        offsets = [[np.cos(self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius, np.sin(self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius],
+                    [np.cos(np.pi-self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius, np.sin(np.pi-self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius]]
+        polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] + offsets[0][0], self.mapToDraw.car.position[1] + offsets[0][1]])) #front left
+        polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] + offsets[1][0], self.mapToDraw.car.position[1] + offsets[1][1]])) #back left
+        polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] - offsets[0][0], self.mapToDraw.car.position[1] - offsets[0][1]])) #back right
+        polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] - offsets[1][0], self.mapToDraw.car.position[1] - offsets[1][1]])) #front right
+        pygame.draw.polygon(self.window, self.carColor, polygonPoints) #draw car
+        #arrow drawing (not needed, just handy to indicate direction of car)
+        arrowPoints = [self.realToPixelPos(self.mapToDraw.car.position), polygonPoints[1], polygonPoints[2]] #not as efficient as using the line below, but self.pos can vary
+        oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
+        pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
+        #else:
+        if(self.headlights):# draw headlights (first, to not overlap car sprite)
+            headlightsImageSize = int(10.0*2*self.sizeScale)
+            headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
+            headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
+            #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
+            headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), -np.rad2deg(self.mapToDraw.car.angle)-60, -np.rad2deg(self.mapToDraw.car.angle)+60, fill= (55, 55, 35))
+            headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
+            headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(self.mapToDraw.car.position))
+            self.window.blit(headlightsImage, headlightsImage_rect)
+        scaledCarSprite = pygame.transform.scale(self.car_image, (self.mapToDraw.car.length*self.sizeScale, self.mapToDraw.car.width*self.sizeScale)) #note: height (length) and width are switched because an angle of 0 is at 3 o'clock, (and the car sprite is loaded like that)
+        rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg(self.mapToDraw.car.angle))
+        rotatedCarRect = rotatedCarSprite.get_rect()
+        carPos = self.realToPixelPos(self.mapToDraw.car.position)
+        carPos = (carPos[0] - (rotatedCarRect.width / 2), carPos[1] - (rotatedCarRect.height / 2))
+        #pygame.draw.rect(self.window, (200,200,200), (carPos, (rotatedCarRect.width, rotatedCarRect.height))) #draws a little box around the car sprite (just for debug)
+        self.window.blit(rotatedCarSprite, carPos) #draw car
         
         if((time.time() - self.carHistTimer) > self.carHistTimeStep):
             self.carHistTimer = time.time()
@@ -278,7 +305,7 @@ class pygameDrawer():
         self.updateViewOffset()
         self.background()
         self.drawCones(True) #boolean parameter is whether to draw lines between connected cones (track bounds) or not
-        self.drawPathLines(self.drawTargetConeLines, True) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
+        self.drawPathLines(True, self.drawTargetConeLines) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
         self.drawFinishLine()
         self.drawCar()
         #debug and UI
@@ -402,6 +429,8 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                         connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
                     listToRemoveFrom = (pygamesimInput.mapToDraw.right_cone_list if overlappingCone.LorR else pygamesimInput.mapToDraw.left_cone_list)
                     listToRemoveFrom.pop(GF.findIndexByClassAttr(listToRemoveFrom, 'ID', overlappingCone.ID))
+            if(pygamesimInput.pathPlanningPresent):
+                pygamesimInput.makeBoundrySplines()
         else:
             if((len(pygamesimInput.mapToDraw.finish_line_cones) < 2) if pygame.key.get_pressed()[pygame.K_f] else True):
                 posToPlace = pygamesimInput.pixelsToRealPos(pos)
@@ -425,6 +454,8 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                             pygamesimInput.mapToDraw.finish_line_cones.append(aNewCone)
                         if(pygame.key.get_pressed()[pygame.K_LSHIFT] and pygamesimInput.coneConnecterPresent):
                             pygamesimInput.mapToDraw.connectCone(aNewCone)
+                if(pygamesimInput.pathPlanningPresent):
+                    pygamesimInput.makeBoundrySplines()
     elif(button==2): #middle mouse button
         if(buttonDown): #mouse pressed down
             if(not pygamesimInput.carCam):
@@ -463,11 +494,17 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             deleteCursorSet = False
     elif(key==pygame.K_p): # p
-        if(keyDown and pygamesimInput.pathFinderPresent):
-            pygamesimInput.mapToDraw.makePath()
-            # doesNothing = 0
-            # while(pygamesimInput.mapToDraw.makePath()): #stops when path can no longer be advanced
-            #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
+        if(keyDown):
+            if(pygamesimInput.pathFinderPresent):
+                pygamesimInput.mapToDraw.makePath()
+                # doesNothing = 0
+                # while(pygamesimInput.mapToDraw.makePath()): #stops when path can no longer be advanced
+                #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
+            if(pygamesimInput.pathPlanningPresent):
+                pygamesimInput.makePathSpline()
+    elif(key==pygame.K_q):
+        if(keyDown):
+            pygamesimInput.drawQubicSplines = not pygamesimInput.drawQubicSplines #only has (the desired) effect if pyagmesimInput.pathPlanningPresent == True
     elif(key==pygame.K_t): # t
         if(keyDown):
             pygamesimInput.drawTargetConeLines = not pygamesimInput.drawTargetConeLines #only has an effect if pyagmesimInput.pathFinderPresent == True
@@ -477,6 +514,11 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
     elif(key==pygame.K_c): # c
         if(keyDown):
             pygamesimInput.carHistPoints = []
+            if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
+                aNewCleanMap = Map() #make new instance of the Map class
+                for attrName in dir(aNewCleanMap): #dir(class) returs a list of all class attributes
+                        if((not attrName.startswith('_')) and (not callable(getattr(aNewCleanMap, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
+                            setattr(pygamesimInput, attrName, getattr(aNewCleanMap, attrName)) #copy attribute
     elif(key==pygame.K_v): # v
         if(keyDown):
             pygamesimInput.carCam = not pygamesimInput.carCam
