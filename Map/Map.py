@@ -30,13 +30,15 @@ class Map:
         #self.newConeID = 0 #add 1 after adding a cone #TO BE REPLACED BY PANDAS INDEXING
 
     class Car:
-        def __init__(self, pos=[0.0,0.0], angle=0.0):
+        def __init__(self, pos=[0,0], angle=0.0):
             self.position = np.array([float(pos[0]), float(pos[1])])
             self.angle = angle #car orientation in radians
             self.velocity = 0.0 #measured and filtered car 'forward' (wheel) speed in meters/second (used to update position)
             self.steering = 0.0 #measured and filtered steering angle in radians (used to update position)
-            self.length = 2 #meters
-            self.width = 1 #meters
+            self.wheelbase = 0.25 #meters
+            self.chassis_length = 0.37 #meters
+            self.chassis_width = 0.20 #meters
+            self.chassis_length_offset = 0.03 #(meters) car center + this = chassis center
             
             self.desired_velocity = 0.0 #desired velocity in m/s (sent to car MCU)
             self.desired_steering = 0.0 #desired steering angle in radians (sent to car MCU)
@@ -45,7 +47,7 @@ class Map:
             self.max_acceleration = 4.0 #in m/s^2
             self.max_steering = np.radians(30) #max angle (in either direction) in radians
             
-            #self.rearAxlePos = GF.distAnglePosToPos(self.length/2, GF.radInv(self.angle), self.position) #updates in Car.update()
+            #self.rearAxlePos = GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position) #updates in Car.update()
             ## there is no need for rearAxlePos to be stored, but it would make Car.update() slightly faster IF (and only if) Car.update() is the ONLY function in which the position is altered
             
             #self.acceleration = 0.0 #acceleration in meters/second^2
@@ -56,7 +58,7 @@ class Map:
             self.coneConData = None #extra data specifically for cone-connection
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
-            
+        
         def update(self, dt):
             # if(dt < 0.0001):
             #     timeRightNow = time.time() #python is not the fastest language, using time.time() at different points in this function will give different values, this won't
@@ -67,8 +69,8 @@ class Map:
             
             #turning math
             if((abs(self.steering) > 0.001) and (abs(self.velocity) > 0.001)): #avoid divide by 0 (and avoid complicated math in a simple situation)
-                rearAxlePos = GF.distAnglePosToPos(self.length/2, GF.radInv(self.angle), self.position)
-                turning_radius = self.length/np.tan(self.steering)
+                rearAxlePos = GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position)
+                turning_radius = self.wheelbase/np.tan(self.steering)
                 angular_velocity = self.velocity/turning_radius
                 arcMov = angular_velocity * dt
                 
@@ -87,7 +89,7 @@ class Map:
                 
                 #update position
                 self.angle += arcMov
-                newPosition = GF.distAnglePosToPos(self.length/2, self.angle, rearAxlePos)
+                newPosition = GF.distAnglePosToPos(self.wheelbase/2, self.angle, rearAxlePos)
                 self.position[0] = newPosition[0] #keep the numpy array object the same (instead of replacing it with a whole new array every time)
                 self.position[1] = newPosition[1]
             else:
@@ -96,34 +98,38 @@ class Map:
         
         def distanceToCar(self, pos): #a more comprehensive/accurate function for getting the SHORTEST distance to the NEAREST surface of the car
             translatedDistance = GF.vectorProjectDist(self.position, pos, self.angle)
-            #simSelf.debugLines.append([0, simSelf.realToPixelPos(self.pos), simSelf.realToPixelPos(pos), 0])
-            if((abs(translatedDistance[0]) < (self.length/2)) and (abs(translatedDistance[1]) < (self.width/2))): #if pos lies within the car
+            #self.debugLines.append([0, self.realToPixelPos(self.position), self.realToPixelPos(pos), 0])
+            chassisBackLength = (-self.chassis_length/2)+self.chassis_length_offset #(negative number) length from middle of car to back-end of chassis (bumper)
+            chassisFrontLength = (self.chassis_length/2)+self.chassis_length_offset #(positive number) length from middle of car to front-end of chassis (bumper)
+            if(((translatedDistance[0] > chassisBackLength) and (translatedDistance[0] < chassisFrontLength)) and (abs(translatedDistance[1]) < (self.chassis_width/2))): #if pos lies within the car
                 return(True, 0) #return(yes pos overlaps car, 0 distance to car)
             else:
                 returnDistance = 0
-                if(abs(translatedDistance[0]) < (self.length/2)): #if it's beside the car
-                    returnDistance = abs(translatedDistance[1]) - (self.width/2) #shortest dist is a line perp. from the side of the car
-                    # debugAngle = (radInv(self.orient) if (translatedDistance[0] < 0) else self.orient)
-                    # simSelf.debugLines.append([1, simSelf.realToPixelPos(pos), [returnDistance, distAngleBetwPos(pos, [self.pos[0] + abs(translatedDistance[0])*np.cos(debugAngle), self.pos[1] + abs(translatedDistance[0])*np.sin(debugAngle)])[1]], 1])
-                elif(abs(translatedDistance[1]) < (self.width/2)): #if it's in front of or behind the car
-                    returnDistance = abs(translatedDistance[0]) - (self.length/2) #shortest dist is a line perp. from the front/back of the car
-                    # debugAngle = self.orient + ((-np.pi/2) if (translatedDistance[1] < 0) else (np.pi/2))
-                    # simSelf.debugLines.append([1, simSelf.realToPixelPos(pos), [returnDistance, distAngleBetwPos(pos, [self.pos[0] + abs(translatedDistance[1])*np.cos(debugAngle), self.pos[1] + abs(translatedDistance[1])*np.sin(debugAngle)])[1]], 1])
+                if((translatedDistance[0] > chassisBackLength) and (translatedDistance[0] < chassisFrontLength)): #if it's beside the car
+                    returnDistance = abs(translatedDistance[1]) - (self.chassis_width/2) #shortest dist is a line perp. from the side of the car
+                    # debugAngle = (GF.radInv(self.angle) if (translatedDistance[0] < 0) else self.angle)
+                    # self.debugLines.append([1, self.realToPixelPos(pos), [returnDistance, GF.distAngleBetwPos(pos, [self.position[0] + abs(translatedDistance[0])*np.cos(debugAngle), self.position[1] + abs(translatedDistance[0])*np.sin(debugAngle)])[1]], 1])
+                elif(abs(translatedDistance[1]) < (self.chassis_width/2)): #if it's in front of or behind the car
+                    if(translatedDistance[0] > 0): #in front of the car
+                        returnDistance = translatedDistance[0] - chassisFrontLength #shortest dist is a line perp. from the front of the car
+                    else: #behind the car
+                        returnDistance = abs(translatedDistance[0] - chassisBackLength) #shortest dist is a line perp. from the front of the car
+                    # debugAngle = self.angle + ((-np.pi/2) if (translatedDistance[1] < 0) else (np.pi/2))
+                    # self.debugLines.append([1, self.realToPixelPos(pos), [returnDistance, GF.distAngleBetwPos(pos, [self.position[0] + abs(translatedDistance[1])*np.cos(debugAngle), self.position[1] + abs(translatedDistance[1])*np.sin(debugAngle)])[1]], 1])
                 else:
-                    #returnDistance = ((abs(translatedDistance[0]) - (self.length/2))**2 + (abs(translatedDistance[1]) - (self.width/2))**2)**0.5  #pythagoras
-                    tempAngle = np.arctan2(abs(translatedDistance[1]) - (self.width/2), abs(translatedDistance[0]) - (self.length/2))
+                    tempAngle = np.arctan2(abs(translatedDistance[1]) - (self.chassis_width/2), abs((translatedDistance[0] - chassisBackLength) if (translatedDistance[0]<0) else (translatedDistance[0] - chassisFrontLength)))
                     returnDistance = abs(translatedDistance[1]/np.sin(tempAngle))  #soh  #note: this should never divide by 0, but if it does, change the '<' from previous two if-statements to a '<='
                     #returnDistance = translatedDistance[0]/np.cos(tempAngle)  #cah
                     ## debug:
-                    # debugOffsets = [[np.cos(self.pointAngle+self.orient) * self.pointRadius, np.sin(self.pointAngle+self.orient) * self.pointRadius],
-                    #         [np.cos(np.pi-self.pointAngle+self.orient) * self.pointRadius, np.sin(np.pi-self.pointAngle+self.orient) * self.pointRadius]]
-                    # debugPos = [(self.pos[i] + (-1 if (translatedDistance[1]<0) else 1)*debugOffsets[(0 if (((translatedDistance[0]<0) and (translatedDistance[1]<0)) or ((translatedDistance[0]>0) and (translatedDistance[1]>0))) else 1)][i])  for i in range(2)]
-                    # simSelf.debugLines.append([0, simSelf.realToPixelPos(pos), simSelf.realToPixelPos(debugPos), 2])
+                    # debugOffsets = [[np.cos(self.pointAngle+self.angle) * self.pointRadius, np.sin(self.pointAngle+self.angle) * self.pointRadius],
+                    #         [np.cos(np.pi-self.pointAngle+self.angle) * self.pointRadius, np.sin(np.pi-self.pointAngle+self.angle) * self.pointRadius]]
+                    # debugPos = [(self.position[i] + (-1 if (translatedDistance[1]<0) else 1)*debugOffsets[(0 if (((translatedDistance[0]<0) and (translatedDistance[1]<0)) or ((translatedDistance[0]>0) and (translatedDistance[1]>0))) else 1)][i])  for i in range(2)]
+                    # self.debugLines.append([0, self.realToPixelPos(pos), self.realToPixelPos(debugPos), 2])
                 return(False, returnDistance) #pos doesnt overlap car
 
     class Cone:
         """ Class for storing the coordinates and visibility of each cone """
-        coneDiam = 0.2 #cone diameter in meters (constant)
+        coneDiam = 0.14 #cone diameter in meters (constant)
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
             self.position = np.array([pos[0], pos[1]])
@@ -275,7 +281,7 @@ class Map:
     
     def overlapConeCheck(self, posToCheck):
         boolAnswer = False;   coneListPointer=None #boolAnswer MUST default to False, the other variables dont matter as much
-        coneDistToler = self.Cone.coneDiam*2 #overlap tolerance  NOTE: area is square, not round
+        coneDistToler = self.Cone.coneDiam*1 #overlap tolerance  NOTE: area is square, not round
         combinedConeList = (self.right_cone_list + self.left_cone_list)
         for cone in combinedConeList:
             if((posToCheck[0] > (cone.position[0]-coneDistToler)) and (posToCheck[0] < (cone.position[0]+coneDistToler)) and (posToCheck[1] > (cone.position[1]-coneDistToler)) and (posToCheck[1] < (cone.position[1]+coneDistToler))):
