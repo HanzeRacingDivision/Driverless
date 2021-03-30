@@ -386,11 +386,11 @@ pygamesimInputLast = None #to be filled
 oldWindowSize = []
 
 
-def pygameInit():
+def pygameInit(resolution): #you must specify a resolution
     pygame.init()
     pygame.font.init()
     global window, oldWindowSize
-    window = pygame.display.set_mode([1200, 600], pygame.RESIZABLE)
+    window = pygame.display.set_mode(resolution, pygame.RESIZABLE)
     oldWindowSize = window.get_size()
     pygame.display.set_caption("(pygame) selfdriving sim")
     global windowKeepRunning, windowStarted
