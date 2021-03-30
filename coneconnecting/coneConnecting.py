@@ -6,7 +6,6 @@
 
 
 import numpy as np  #general math library
-import time         #used for (temporary) driving math in raceCar() class
 
 from Map import Map
 import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
@@ -24,7 +23,7 @@ class coneConnection: #a class to go in Map.Cone.coneConData. This carries some 
 class coneConnecter(Map):
     def __init__(self, importConeLogFilename='', logging=True, logname="coneLog"):
         #Map.__init__(self) #init map class
-        self.coneConnectionThreshold = 5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
+        self.coneConnectionThreshold = 1.5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
         self.coneConnectionThresholdSquared = self.coneConnectionThreshold**2
         ## self.coneConnectionLowChainLen = 3 #if the connection length of coneToConnect is higher than this, devalue the length of the pospect cone's connections #NOT IMPLEMENTED (YET?)
         self.coneConnectionHighChainLen = 5 #the longer the sequence, the better, but any longer than this is just as good as this (strength saturation). (not hard threshold)
@@ -64,7 +63,7 @@ class coneConnecter(Map):
                 connectionCount = len(cone.connections)
                 coneCandidateStrength = 1 #init var
                 coneCandidateStrength *= 1.5-(nearbyConeList[i][1][0]/self.coneConnectionThreshold)  #high distance, low strength. Linear. worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
-                coneCandidateStrength *= 0.5+min(self.getConeChainLen(cone)/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
+                coneCandidateStrength *= 0.5+min(self.getConeChainLen(cone)[0]/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
                 angleToCone = nearbyConeList[i][1][1]
                 #hard no's: if the angle difference is above the max (like 135 degrees), the prospect cone is just too damn weird, just dont connect to this one
                 #note: this can be partially achieved by using angleThreshRange in distanceToCone() to preventatively discard cones like  angleThreshRange=([currentExistingAngle - self.coneConnectionMaxAngleDelta, currentExistingAngle + self.coneConnectionMaxAngleDelta] if (currentConnectionsFilled[0] or currentConnectionsFilled[1]) else [])
@@ -128,7 +127,7 @@ class coneConnecter(Map):
             for i in range(len(nearbyConeList)):
                 coneCandidateStrength = 1 #init var
                 coneCandidateStrength *= 1.5-(nearbyConeList[i][1]/self.coneConnectionThresholdSquared)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
-                coneCandidateStrength *= 0.5+min(self.getConeChainLen(nearbyConeList[i][0])/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
+                coneCandidateStrength *= 0.5+min(self.getConeChainLen(nearbyConeList[i][0])[0]/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
                 ## no angle math can be done, as Pythagoras's ABC is used, not sohcahtoa :)
                 if(coneCandidateStrength > highestStrength):
                     highestStrength = coneCandidateStrength
