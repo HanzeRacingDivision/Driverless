@@ -7,16 +7,17 @@ import simulatedCar   as SC
 import carMCUclass    as RC
 
 import time
-import numpy as np
+#import numpy as np
 
-from copy import deepcopy
 
-def copyExtractMap(classWithMapParent): #copy ONLY the map class attributes from any (child) class into a new map object
-    returnObject = Map() #make new instance of same class as source
-    for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
-            if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-                setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #copy attribute
-    return(returnObject)
+# from copy import deepcopy
+
+# def copyExtractMap(classWithMapParent): #copy ONLY the map class attributes from any (child) class into a new map object
+#     returnObject = Map() #make new instance of same class as source
+#     for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
+#             if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
+#                 setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #copy attribute
+#     return(returnObject)
 
 class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
     def __init__(self, window, drawSize=(600,300), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True, importConeLogFilename='', logging=True, logname="coneLog"):
@@ -33,7 +34,7 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameD
         self.pathPlanningPresent = True
         self.SLAMPresent = False
         
-        #self.carPolygonMode = False #use the fancy car sprite (default)
+        #self.carPolygonMode = True #if you dont want to use the car sprite, set this to true (but if the sprite wasnt loaded this will be used automatically)
         
         if(self.pathPlanningPresent):
             self.car.pathFolData = PP.pathPlannerData()

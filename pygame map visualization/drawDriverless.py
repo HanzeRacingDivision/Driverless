@@ -216,16 +216,17 @@ class pygameDrawer():
             pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
         else:
             if(self.headlights):# draw headlights (first, to not overlap car sprite)
-                headlightsImageSize = int(10.0*2*self.sizeScale)
+                headlightsImageSize = int(2.0*2*self.sizeScale) #2.0 is arbitrary for now, to be replaced with apprixate camera/sensor range
                 headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
                 headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
                 #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
-                headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), -np.rad2deg(carToDraw.angle)-60, -np.rad2deg(carToDraw.angle)+60, fill= (55, 55, 35))
+                headlightsCenterAngle = -1 * np.rad2deg((self.carCamOrient) if self.carCam else (carToDraw.angle))
+                headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), headlightsCenterAngle-60, headlightsCenterAngle+60, fill= (55, 55, 35))
                 headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
                 headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(chassisCenter))
                 self.window.blit(headlightsImage, headlightsImage_rect)
             scaledCarSprite = pygame.transform.scale(self.car_image, (int(carToDraw.chassis_length*self.sizeScale), int(carToDraw.chassis_width*self.sizeScale))) #note: height (length) and width are switched because an angle of 0 is at 3 o'clock, (and the car sprite is loaded like that)
-            rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg(carToDraw.angle))
+            rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg((self.carCamOrient) if self.carCam else (carToDraw.angle)))
             rotatedCarRect = rotatedCarSprite.get_rect()
             carPos = self.realToPixelPos(chassisCenter)
             carPos = (carPos[0] - (rotatedCarRect.width / 2), carPos[1] - (rotatedCarRect.height / 2))
