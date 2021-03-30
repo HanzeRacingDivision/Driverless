@@ -1,5 +1,5 @@
 how to use: <br/>
-- see 'coneConnectingOnly.py' for an example
+- see 'generalSim.py' for an example
 
 cones:
 - left mouse button places left cones (yellow)
@@ -17,10 +17,13 @@ camera:
 other:
 - pressing P makes it try to find a path (requires connected cones on both side of track) (ONLY IF pathFinding.py is present)
 - pressing C clears the car position history line
+- pressing A toggles auto-driving (only has effect if pathPlanning(Temp).py is present)
+- pressing +/- increases/decreases auto-driving target speed
+- pressing Q toggles drawing qubic splines (only has effect if pathPlanning(Temp).py is present)
 - pressing T toggles whether the cone-lines that determined the targets are drawn (only has effect if pathFinding.py is present)
 
 driving (temporary):
-- arrow keys
+- arrow keys (only if autodriving is off, and has no effect on real car (if realCar is connected))
 
 
 meaning of the colors and other visual aspects: <br/>
