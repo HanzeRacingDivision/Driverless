@@ -19,7 +19,7 @@ def copyExtractMap(classWithMapParent): #copy ONLY the map class attributes from
     return(returnObject)
 
 class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
-    def __init__(self, window, drawSize=(1200,600), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True, importConeLogFilename='', logging=True, logname="coneLog"):
+    def __init__(self, window, drawSize=(600,300), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True, importConeLogFilename='', logging=True, logname="coneLog"):
         Map.__init__(self) #init map class
         self.car = SC.simCar() #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         #self.car = RC.realCar(comPort='COM8')
@@ -41,9 +41,10 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameD
         #self.mapList = [copyExtractMap(self)]
 
 
+resolution = [1200, 600]
 
-DD.pygameInit()
-sim1 = pygamesimLocal(DD.window) #just a basic class object with all default attributes
+DD.pygameInit(resolution)
+sim1 = pygamesimLocal(DD.window, resolution)
 
 timeSinceLastUpdate = time.time()
 #mapSaveTimer = time.time()
