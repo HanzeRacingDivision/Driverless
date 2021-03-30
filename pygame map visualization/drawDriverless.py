@@ -12,7 +12,7 @@ import generalFunctions as GF #(homemade) some useful functions for everyday eas
 
 
 class pygameDrawer():
-    def __init__(self, mapToDraw, window, drawSize=(1200,600), drawOffset=(0,0), viewOffset=(0,0), carCamOrient=0, sizeScale=30, startWithCarCam=False, invertYaxis=True):
+    def __init__(self, mapToDraw, window, drawSize=(1200,600), drawOffset=(0,0), viewOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         self.window = window #pass on the window object (pygame)
         self.drawSize = (int(drawSize[0]),int(drawSize[1])) #width and height of the display area (does not have to be 100% of the window)
         self.drawOffset = (int(drawOffset[0]), int(drawOffset[1])) #draw position offset, (0,0) is topleft
@@ -36,6 +36,7 @@ class pygameDrawer():
         self.pathColor = [0,220,255] #light blue
         self.pathLineWidth = 2 #pixels wide
         #self.pathCenterPixelDiam = 
+        self.pathPointDiam = Map.Cone.coneDiam / 2
         
         self.mouseCone = None #either None, True or False, to indicate the color of the (mouse) cone that is about to be placed (replaces floatingCone)
         
@@ -71,8 +72,8 @@ class pygameDrawer():
         self.pathPlanningPresent = False
         self.SLAMPresent = False
         
-        #DELETE ME
-        self.drawTargetConeLines = True #just for UI purposes, to toggle between showing and not showing how the targets are made
+        #DELETE ME?
+        self.drawTargetConeLines = False #just for UI purposes, to toggle between showing and not showing how the targets are made
         self.carKeyboardControlTimer = time.time()
         self.carHistTimer = time.time()
         self.carHistPoints = []
@@ -80,10 +81,10 @@ class pygameDrawer():
         self.carHistMinSquaredDistThresh = 0.1**2 #only save new positions if the car is moving
         self.carHistMaxLen = 200
         
-        # try: #if there's no car object, this will not crash the entire program
-        #     self.viewOffset = [(-self.car.pos[0]) + ((self.drawSize[0]/self.sizeScale)/2), (-self.car.pos[1]) + ((self.drawSize[1]/self.sizeScale)/2)]
-        # except Exception as theExcept:
-        #     print("couldn't set viewOffset to car pos:", theExcept)
+        try: #if there's no car object, this will not crash the entire program
+            self.viewOffset = [(-self.car.position[0]) + ((self.drawSize[0]/self.sizeScale)/2), (-self.car.position[1]) + ((self.drawSize[1]/self.sizeScale)/2)]
+        except Exception as theExcept:
+            print("couldn't set viewOffset to car pos:", theExcept)
     
     #pixel conversion functions (the most important functions in here)
     def pixelsToRealPos(self, pixelPos):
@@ -160,7 +161,7 @@ class pygameDrawer():
     
     def drawPathLines(self, drawPoints=False, drawConeLines=True):
         # target_list content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
-        pathCenterPixelDiam = Map.Cone.coneDiam * self.sizeScale
+        pathCenterPixelDiam = self.pathPointDiam * self.sizeScale
         if(self.pathPlanningPresent and self.drawQubicSplines):
             splinePointPixelDiam = self.splinePointDiam * self.sizeScale
             for i in range(len(self.path_midpoints_spline[0])):
@@ -195,49 +196,53 @@ class pygameDrawer():
     
     def drawCar(self):
         ## drawing is currently done by calculating the position of the corners and drawing a polygon with those points. Not efficient, not pretty, but fun
-        #if(self.isInsideWindowReal(self.mapToDraw.car.position)):
-        #if(self.carPolygonMode):
-        if(self.carPointRadius is None):
-            self.carPointRadius = (((self.mapToDraw.car.width**2)+(self.mapToDraw.car.length**2))**0.5)/2 #Pythagoras
-            self.carPointAngle = np.arctan2(self.mapToDraw.car.width, self.mapToDraw.car.length) #this is used to make corner point for polygon
-        polygonPoints = []
-        offsets = [[np.cos(self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius, np.sin(self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius],
-                    [np.cos(np.pi-self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius, np.sin(np.pi-self.carPointAngle+self.mapToDraw.car.angle) * self.carPointRadius]]
-        polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] + offsets[0][0], self.mapToDraw.car.position[1] + offsets[0][1]])) #front left
-        polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] + offsets[1][0], self.mapToDraw.car.position[1] + offsets[1][1]])) #back left
-        polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] - offsets[0][0], self.mapToDraw.car.position[1] - offsets[0][1]])) #back right
-        polygonPoints.append(self.realToPixelPos([self.mapToDraw.car.position[0] - offsets[1][0], self.mapToDraw.car.position[1] - offsets[1][1]])) #front right
-        pygame.draw.polygon(self.window, self.carColor, polygonPoints) #draw car
-        #arrow drawing (not needed, just handy to indicate direction of car)
-        arrowPoints = [self.realToPixelPos(self.mapToDraw.car.position), polygonPoints[1], polygonPoints[2]] #not as efficient as using the line below, but self.pos can vary
-        oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
-        pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
-        #else:
-        if(self.headlights):# draw headlights (first, to not overlap car sprite)
-            headlightsImageSize = int(10.0*2*self.sizeScale)
-            headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
-            headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
-            #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
-            headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), -np.rad2deg(self.mapToDraw.car.angle)-60, -np.rad2deg(self.mapToDraw.car.angle)+60, fill= (55, 55, 35))
-            headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
-            headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(self.mapToDraw.car.position))
-            self.window.blit(headlightsImage, headlightsImage_rect)
-        scaledCarSprite = pygame.transform.scale(self.car_image, (self.mapToDraw.car.length*self.sizeScale, self.mapToDraw.car.width*self.sizeScale)) #note: height (length) and width are switched because an angle of 0 is at 3 o'clock, (and the car sprite is loaded like that)
-        rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg(self.mapToDraw.car.angle))
-        rotatedCarRect = rotatedCarSprite.get_rect()
-        carPos = self.realToPixelPos(self.mapToDraw.car.position)
-        carPos = (carPos[0] - (rotatedCarRect.width / 2), carPos[1] - (rotatedCarRect.height / 2))
-        #pygame.draw.rect(self.window, (200,200,200), (carPos, (rotatedCarRect.width, rotatedCarRect.height))) #draws a little box around the car sprite (just for debug)
-        self.window.blit(rotatedCarSprite, carPos) #draw car
+        carToDraw = self.mapToDraw.car
+        chassisCenter = GF.distAnglePosToPos(carToDraw.chassis_length_offset, carToDraw.angle, carToDraw.position)
+        if(self.carPolygonMode):
+            if(self.carPointRadius is None):
+                self.carPointRadius = (((carToDraw.chassis_width**2)+(carToDraw.chassis_length**2))**0.5)/2 #Pythagoras
+                self.carPointAngle = np.arctan2(carToDraw.chassis_width, carToDraw.chassis_length) #this is used to make corner point for polygon
+            polygonPoints = []
+            offsets = [[np.cos(self.carPointAngle+carToDraw.angle) * self.carPointRadius, np.sin(self.carPointAngle+carToDraw.angle) * self.carPointRadius],
+                        [np.cos(np.pi-self.carPointAngle+carToDraw.angle) * self.carPointRadius, np.sin(np.pi-self.carPointAngle+carToDraw.angle) * self.carPointRadius]]
+            polygonPoints.append(self.realToPixelPos([chassisCenter[0] + offsets[0][0], chassisCenter[1] + offsets[0][1]])) #front left
+            polygonPoints.append(self.realToPixelPos([chassisCenter[0] + offsets[1][0], chassisCenter[1] + offsets[1][1]])) #back left
+            polygonPoints.append(self.realToPixelPos([chassisCenter[0] - offsets[0][0], chassisCenter[1] - offsets[0][1]])) #back right
+            polygonPoints.append(self.realToPixelPos([chassisCenter[0] - offsets[1][0], chassisCenter[1] - offsets[1][1]])) #front right
+            pygame.draw.polygon(self.window, self.carColor, polygonPoints) #draw car
+            #arrow drawing (not needed, just handy to indicate direction of car)
+            arrowPoints = [self.realToPixelPos(chassisCenter), polygonPoints[1], polygonPoints[2]] #not as efficient as using the line below, but self.pos can vary
+            oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
+            pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
+        else:
+            if(self.headlights):# draw headlights (first, to not overlap car sprite)
+                headlightsImageSize = int(10.0*2*self.sizeScale)
+                headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
+                headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
+                #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
+                headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), -np.rad2deg(carToDraw.angle)-60, -np.rad2deg(carToDraw.angle)+60, fill= (55, 55, 35))
+                headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
+                headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(chassisCenter))
+                self.window.blit(headlightsImage, headlightsImage_rect)
+            scaledCarSprite = pygame.transform.scale(self.car_image, (int(carToDraw.chassis_length*self.sizeScale), int(carToDraw.chassis_width*self.sizeScale))) #note: height (length) and width are switched because an angle of 0 is at 3 o'clock, (and the car sprite is loaded like that)
+            rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg(carToDraw.angle))
+            rotatedCarRect = rotatedCarSprite.get_rect()
+            carPos = self.realToPixelPos(chassisCenter)
+            carPos = (carPos[0] - (rotatedCarRect.width / 2), carPos[1] - (rotatedCarRect.height / 2))
+            #pygame.draw.rect(self.window, (200,200,200), (carPos, (rotatedCarRect.chassis_width, rotatedCarRect.height))) #draws a little box around the car sprite (just for debug)
+            self.window.blit(rotatedCarSprite, carPos) #draw car
+        
+        if((carToDraw.pathFolData is not None) and self.pathPlanningPresent):
+            if(carToDraw.pathFolData.nextTarget is not None):
+                targetPos = self.realToPixelPos(carToDraw.pathFolData.nextTarget.position)
+                carPos = self.realToPixelPos(carToDraw.position)
+                pygame.draw.line(self.window, [255, 255, 255], carPos, targetPos, 1)
         
         if((time.time() - self.carHistTimer) > self.carHistTimeStep):
             self.carHistTimer = time.time()
-            rearAxlePos = GF.distAnglePosToPos(self.mapToDraw.car.length/2, GF.radInv(self.mapToDraw.car.angle), self.mapToDraw.car.position)
+            rearAxlePos = GF.distAnglePosToPos(carToDraw.wheelbase/2, GF.radInv(carToDraw.angle), carToDraw.position)
             if((GF.distSqrdBetwPos(self.carHistPoints[-1][0], rearAxlePos) > self.carHistMinSquaredDistThresh) if (len(self.carHistPoints) > 1) else True):
-                if(self.carPolygonMode):
-                    self.carHistPoints.append([[self.mapToDraw.car.position[0] + offsets[0][0], self.mapToDraw.car.position[1] + offsets[0][1]], [self.mapToDraw.car.position[0] - offsets[1][0], self.mapToDraw.car.position[1] - offsets[1][1]], rearAxlePos])
-                else:
-                    self.carHistPoints.append([rearAxlePos])
+                self.carHistPoints.append([rearAxlePos]) #you can add any number of points to store, as long as the first one is rearAxlePos
                 if(len(self.carHistPoints) > self.carHistMaxLen):
                     self.carHistPoints.pop(0)
         
@@ -502,7 +507,21 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
                 #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
             if(pygamesimInput.pathPlanningPresent):
                 pygamesimInput.makePathSpline()
-    elif(key==pygame.K_q):
+    elif(key==pygame.K_a): # a
+        if(keyDown):
+            if((pygamesimInput.mapToDraw.car.pathFolData is not None) and pygamesimInput.pathPlanningPresent):
+                pygamesimInput.mapToDraw.car.pathFolData.auto = not pygamesimInput.mapToDraw.car.pathFolData.auto
+    elif((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)): # +
+        if(keyDown):
+            if((pygamesimInput.mapToDraw.car.pathFolData is not None) and pygamesimInput.pathPlanningPresent):
+                pygamesimInput.mapToDraw.car.pathFolData.targetVelocity += 0.25
+    elif(key==pygame.K_MINUS): # -
+        if(keyDown):
+            if((pygamesimInput.mapToDraw.car.pathFolData is not None) and pygamesimInput.pathPlanningPresent):
+                pygamesimInput.mapToDraw.car.pathFolData.targetVelocity -= 0.25
+                if(pygamesimInput.mapToDraw.car.pathFolData.targetVelocity < 0):
+                    pygamesimInput.mapToDraw.car.pathFolData.targetVelocity = 0
+    elif(key==pygame.K_q): # q (cubic splines sounds like 'q'-bic, also i suck at spelling
         if(keyDown):
             pygamesimInput.drawQubicSplines = not pygamesimInput.drawQubicSplines #only has (the desired) effect if pyagmesimInput.pathPlanningPresent == True
     elif(key==pygame.K_t): # t
@@ -595,7 +614,8 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
             simToScale.carCamOrient += (eventToHandle.y * np.pi/16)
         else:
             dif = [simToScale.drawSize[0]/simToScale.sizeScale, simToScale.drawSize[1]/simToScale.sizeScale]
-            simToScale.sizeScale += eventToHandle.y #zooming
+            #simToScale.sizeScale += eventToHandle.y #zooming (note: can reach 0, at which point the porgram crashes)
+            simToScale.sizeScale *= 1.0+(eventToHandle.y/10.0) #10.0 is an arbetrary zoomspeed
             #if(not simToScale.carCam): #viewOffset is not used in carCam mode, but it won't hurt to change it anyway
             dif[0] -= (simToScale.drawSize[0]/simToScale.sizeScale)
             dif[1] -= (simToScale.drawSize[1]/simToScale.sizeScale)
@@ -626,41 +646,42 @@ def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D li
     
     #the manual keyboard driving (tacked on here, because doing it with the event system would require more variables, and this is temporary anyway)
     simToDrive = currentPygamesimInput(pygamesimInputList, demandMouseFocus=False) #get the active sim within the window
-    carToDrive = simToDrive.mapToDraw.car
-    pressedKeyList = pygame.key.get_pressed()
-    deltaTime = time.time() - simToDrive.carKeyboardControlTimer
-    simToDrive.carKeyboardControlTimer = time.time()
-    speedAccelVal = 10.0 * deltaTime
-    steerAccelVal = 1.5 * deltaTime
-    #first for speed
-    if(pressedKeyList[pygame.K_UP]): #accelerate button
-        carToDrive.velocity += speedAccelVal #accelerate
-    elif(pressedKeyList[pygame.K_DOWN]): #brake/reverse button
-        if(carToDrive.velocity > (speedAccelVal*3)): #positive speed
-            carToDrive.velocity -= speedAccelVal * 2 #fast brake
-        else:                               #near-zero or negative speed
-            carToDrive.velocity -= speedAccelVal * 0.5 #reverse accelerate
-    else:                           #neither buttons
-        if(carToDrive.velocity > speedAccelVal): #positive speed
-            carToDrive.velocity -= speedAccelVal/2 #slow brake
-        elif(carToDrive.velocity < -speedAccelVal): #negative speed
-            carToDrive.velocity += speedAccelVal #brake
-        else:                           #near-zero speed
-            carToDrive.velocity = 0
-    carToDrive.velocity = max(-4, min(8, carToDrive.velocity)) #limit speed
-    #now for steering
-    if(pressedKeyList[pygame.K_LEFT] and (not pressedKeyList[pygame.K_RIGHT])):
-        carToDrive.steering += steerAccelVal
-    elif(pressedKeyList[pygame.K_RIGHT] and (not pressedKeyList[pygame.K_LEFT])):
-        carToDrive.steering -= steerAccelVal
-    else:
-        if(carToDrive.steering > steerAccelVal):
-            carToDrive.steering -= steerAccelVal*2.0
-        elif(carToDrive.steering < -steerAccelVal):
-            carToDrive.steering += steerAccelVal*2.0
+    carToDrive = simToDrive.car
+    if((not carToDrive.pathFolData.auto) if simToDrive.pathPlanningPresent else True):
+        pressedKeyList = pygame.key.get_pressed()
+        deltaTime = time.time() - simToDrive.carKeyboardControlTimer
+        simToDrive.carKeyboardControlTimer = time.time()
+        speedAccelVal = 3.0 * deltaTime
+        steerAccelVal = 1.5 * deltaTime
+        #first for speed
+        if(pressedKeyList[pygame.K_UP]): #accelerate button
+            carToDrive.velocity += speedAccelVal #accelerate
+        elif(pressedKeyList[pygame.K_DOWN]): #brake/reverse button
+            if(carToDrive.velocity > (speedAccelVal*3)): #positive speed
+                carToDrive.velocity -= speedAccelVal * 2 #fast brake
+            else:                               #near-zero or negative speed
+                carToDrive.velocity -= speedAccelVal * 0.5 #reverse accelerate
+        else:                           #neither buttons
+            if(carToDrive.velocity > speedAccelVal): #positive speed
+                carToDrive.velocity -= speedAccelVal/2 #slow brake
+            elif(carToDrive.velocity < -speedAccelVal): #negative speed
+                carToDrive.velocity += speedAccelVal #brake
+            else:                           #near-zero speed
+                carToDrive.velocity = 0
+        carToDrive.velocity = max(-1, min(2, carToDrive.velocity)) #limit speed
+        #now for steering
+        if(pressedKeyList[pygame.K_LEFT] and (not pressedKeyList[pygame.K_RIGHT])):
+            carToDrive.steering += steerAccelVal
+        elif(pressedKeyList[pygame.K_RIGHT] and (not pressedKeyList[pygame.K_LEFT])):
+            carToDrive.steering -= steerAccelVal
         else:
-            carToDrive.steering = 0
-    carToDrive.steering = max(np.deg2rad(-25), min(np.deg2rad(25), carToDrive.steering)) #limit speed
+            if(carToDrive.steering > steerAccelVal):
+                carToDrive.steering -= steerAccelVal*2.0
+            elif(carToDrive.steering < -steerAccelVal):
+                carToDrive.steering += steerAccelVal*2.0
+            else:
+                carToDrive.steering = 0
+        carToDrive.steering = max(np.deg2rad(-25), min(np.deg2rad(25), carToDrive.steering)) #limit speed
 
 
 
