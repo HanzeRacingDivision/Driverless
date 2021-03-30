@@ -1,8 +1,4 @@
-#TBD: add spoof coneConnecter class that gets data from network, to run visualization for non-local coneConnecter
-#TBD: consider the length of a track-boundry in connectCone() (longer = better)
-
 #note: for numpy sin/cos/tan angles, 0 is at 3 o'clock, positive values are CCW and the range returned by arctan2 is (-180,180) or (-pi, pi)
-
 
 
 import numpy as np  #general math library
@@ -24,13 +20,13 @@ class pathFinderData: #a class to go in Map.Cone.coneConData or Map.Cone.pathFol
 
 class pathFinder(Map):
     def __init__(self):
-        self.pathConnectionThreshold = 10 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
+        self.pathConnectionThreshold = 3 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         self.pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         
         self.pathFirstLineCarAngleDeltaMax = np.deg2rad(45) #if the radDiff() between car (.angle) and the first line's connections is bigger than this, switch conneections or stop
         self.pathFirstLineCarSideAngleDelta = np.deg2rad(80) #left cones should be within +- pathFirstLineCarSideAngleDelta radians of the side of the car (asin, car.angle + or - pi/2, depending on left/right side)
-        self.pathFirstLinePosDist = 4 # simple center to center distance, hard threshold, used to filter out very far cones
-        self.pathFirstLineCarDist = 3 # real distance, not hard threshold, just distance at which lowest strength-score is given
+        self.pathFirstLinePosDist = 2 # simple center to center distance, hard threshold, used to filter out very far cones
+        self.pathFirstLineCarDist = 1 # real distance, not hard threshold, just distance at which lowest strength-score is given
         
     
     def makePath(self):
@@ -160,7 +156,7 @@ class pathFinder(Map):
                         connectionSeqLengths = []
                         for i in range(lastConnectionCount):
                             angleDeltas.append(abs(GF.radDiff(lastCones[LorR].coneConData[i].angle, self.car.angle)))
-                            connectionSeqLengths.append(self.getConeChainLen(lastCones[LorR].connections[i], lastCones[LorR]))
+                            connectionSeqLengths.append(self.getConeChainLen(lastCones[LorR].connections[i], lastCones[LorR])[0])
                         for i in range(lastConnectionCount):
                             strengths.append(1.0)
                             strengths[i] *= 1.5-min(angleDeltas[i]/max(angleDeltas), 1) #lower delta = better
