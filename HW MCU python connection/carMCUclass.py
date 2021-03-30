@@ -24,6 +24,9 @@ class carMCU:
         if(connectAtInit):
             self.connect(comPort, autoFind) #attempt to connect upon class creation
         
+        self.lastSendTime = time.time() #timestamp of last sendSpeedAngle() (attempt)
+        self.sendMinInterval = 0.09 #minimum time between sending things (to avoid spamming the poor carMCU)
+        
         # constants
         self.minimumSerialLength = 14 #the minimum length of a feedback message is "x.xx x.xx x.x\r"
         self.unfinTimeout = 0.015 #if the unfinished message is older than this, just dump it (this value should be larger than the time between getFeedback() calls
@@ -129,16 +132,23 @@ class carMCU:
             print("carMCU serial already closed")
         return(True)
     
-    def sendSpeedAngle(self, speed, angle): #TBD: angle unit (radian/degree) conversion, depending on which ones we choose to use
-        if(self.carMCUserial.is_open):
-            dataString = str(round(float(speed), 2)) + ' ' + str(round(float(angle), 1)) + '\n' #convert floats to string ('\r' is not really needed)
-            #print("sending:",dataString.encode())
-            try:
-                self.carMCUserial.write(dataString.encode())
-            except:
-                print("carMCU serial write exception (or encode() exception)")
+    def sendSpeedAngle(self, speed, angle): #NOTE: 'angle' input for this function should be in radians
+        rightNow = time.time()
+        if((rightNow - self.lastSendTime) > self.sendMinInterval):
+            self.lastSendTime = rightNow
+            if(self.carMCUserial.is_open):
+                #convert floats to string ('\r' is not really needed)
+                dataString = str(round(float(speed), 2)) + ' ' + str(round(np.rad2deg(float(angle)), 1)) + '\n'
+                #NOTE: the (current) serial formatting uses angles in degrees (for more precision per char (unless you start multiplying&dividing by powers of 10))
+                #print("sending:",dataString.encode())
+                try:
+                    self.carMCUserial.write(dataString.encode())
+                except:
+                    print("carMCU serial write exception (or encode() exception)")
+            else:
+                print("can't sendSpeedAngle(), carMCU is not connected")
         else:
-            print("can't sendSpeedAngle(), carMCU is not connected")
+            print("you're spamming sendSpeedAngle(), stop it")
     
     def _FIFOwrite(self, value, fifoList, fifoMaxLength):
         fifoList.insert(0, value) #insert the new value at the start of the list
@@ -154,7 +164,7 @@ class carMCU:
         self._FIFOwrite(time.time(), self.feedbackTimestampFIFO, self.maxFIFOlength)
         self._FIFOwrite(float(splitString[0]), self.speedFIFO, self.maxFIFOlength)
         self._FIFOwrite(float(splitString[1]), self.distFIFO, self.maxFIFOlength)
-        self._FIFOwrite(float(splitString[2]), self.angleFIFO, self.maxFIFOlength)
+        self._FIFOwrite(np.deg2rad(float(splitString[2])), self.angleFIFO, self.maxFIFOlength)
         self._FIFOwrite(self.distTotalFIFO[0]+self.distFIFO[0], self.distTotalFIFO, self.maxFIFOlength)
         #print(self.speedFIFO[0], self.distFIFO[0], self.angleFIFO[0])
         return(True)
@@ -259,12 +269,12 @@ class carMCU:
 #a TEMPORARY class, to be replaced by SLAM code (which uses real filtering and stuff)
 class realCar(carMCU, Map.Car):
     def __init__(self, pos=[0,0], angle=0, connectAtInit=True, comPort=None, autoFind=True):
-        Map.Car.__init__(self, pos[0], pos[1], angle)
+        Map.Car.__init__(self, pos, angle)
         carMCU.__init__(self, connectAtInit, comPort, autoFind)
         self.timeSinceLastUpdate = time.time()
         self.skippedUpdateCheckVar = 0.0
     
-    def update(self): #this update() overwrites the update() in Map.Car, but this has no dt argument (because why would you do that)
+    def update(self, inputDt=0): #this update() overwrites the update() in Map.Car, but this doesnt use the dt argument (because timestamps from the FIFO are used)
         if((len(self.speedFIFO) > 0) and (self.feedbackTimestampFIFO[0] > self.timeSinceLastUpdate)): #if the newest entry ([0]) is newer than the last processed entry
             updates = 0 #ideally, you'd only be dealing with a single new datapoint
             for i in range(len(self.speedFIFO)):
@@ -275,7 +285,7 @@ class realCar(carMCU, Map.Car):
                 if(len(self.speedFIFO) > 1): #dont report error if the program only just started, or if maxFIFOlength is only 1
                     print("!!! updateOverflow !!!:", updates)
                 updates -= 1 #updates is equal to the length of the array, which is not a valid index (and doing -1 is the whole point of the overflow exception)
-                dt = self.timeSinceLastUpdate-self.feedbackTimestampFIFO[updates] #old timestamp - new timestamp
+                dt = self.feedbackTimestampFIFO[updates]-self.timeSinceLastUpdate #old timestamp - new timestamp
                 stepVelocity = (self.velocity + self.speedFIFO[updates])/2
                 stepSteering = (self.steering + self.angleFIFO[updates])/2
                 stepDist = self.distTotalFIFO[updates] - self.skippedUpdateCheckVar #little tricky, but should work
@@ -300,9 +310,9 @@ class realCar(carMCU, Map.Car):
                 self.skippedUpdateCheckVar += stepDist
             #regular forloop to get through
             for i in range(updates):
-                dt = self.feedbackTimestampFIFO[updates-i]-self.feedbackTimestampFIFO[updates-i-1] #old timestamp - new timestamp
-                stepVelocity = (self.speedFIFO[updates-i]+self.speedFIFO[updates-i-1])/2 #idk, average speed between datapoints i guess
-                stepSteering = (self.angleFIFO[updates-i]+self.angleFIFO[updates-i-1])/2 #idk, average steering angle between datapoints i guess
+                dt = self.feedbackTimestampFIFO[updates-i-1]-self.feedbackTimestampFIFO[updates-i] #old timestamp - new timestamp
+                stepVelocity = (self.speedFIFO[updates-i-1]+self.speedFIFO[updates-i])/2 #idk, average speed between datapoints i guess
+                stepSteering = (self.angleFIFO[updates-i-1]+self.angleFIFO[updates-i])/2 #idk, average steering angle between datapoints i guess
                 stepDist = self.distFIFO[updates-i-1] #distance traveled (wheel encoder difference)
                 
                 #turning math
@@ -332,7 +342,7 @@ class realCar(carMCU, Map.Car):
             self.velocity = stepVelocity
             self.steering = stepSteering
             self.timeSinceLastUpdate = self.feedbackTimestampFIFO[0]
-            print([round(self.position[0], 2), round(self.position[1], 2)], round(self.angle,2), round(self.velocity,2), round(self.skippedUpdateCheckVar,2))
+            #print([round(self.position[0], 2), round(self.position[1], 2)], round(GF.radRoll(self.angle),2), round(self.velocity,2), round(self.skippedUpdateCheckVar,2))
     
     def runOnThread(self, autoreconnect=False): #overwrites runOnThread() in carMCU class
         carMCUconThreadkeepRunning = True
@@ -344,8 +354,8 @@ class realCar(carMCU, Map.Car):
                     if(not self.carMCUserial.is_open):
                         time.sleep(0.5) #wait a bit between connection attempts
                 while(self.carMCUserial.is_open):
-                    self.getFeedback() #run this to get the data
-                    self.update()
+                    self.getFeedback() #get serial data and parse into values for the fifos
+                    self.update()      #parse fifos to get position
                     time.sleep(self.defaultGetFeedbackInterval) #wait just a little bit, as to not needlessly overload the CPU
                 if(not autoreconnect):
                     print("carMCU connection on thread stopped becuase is_open:", self.carMCUserial.is_open)
@@ -366,6 +376,7 @@ class realCar(carMCU, Map.Car):
                 return()
 
 
-## testing code, turn on a print() inside a function of interest (like car.update()) to see it working
-# someCar = realCar(comPort='COM5')
-# someCar.runOnThread()
+# testing code, turn on a print() inside a function of interest (like car.update()) to see it working
+if __name__ == '__main__':
+    someCar = realCar(comPort='COM8')
+    someCar.runOnThread()
