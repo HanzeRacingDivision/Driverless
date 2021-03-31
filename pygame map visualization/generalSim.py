@@ -1,30 +1,30 @@
 from Map import Map
 import coneConnecting as CC
 import pathFinding    as PF
-import drawDriverless as DD
 import pathPlanningTemp as PP
 import simulatedCar   as SC
 import carMCUclass    as RC
+import drawDriverless as DD
 
 import time
 #import numpy as np
 
+import sys
+from copy import deepcopy
 
-# from copy import deepcopy
-
-# def copyExtractMap(classWithMapParent): #copy ONLY the map class attributes from any (child) class into a new map object
-#     returnObject = Map() #make new instance of same class as source
-#     for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
-#             if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-#                 setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #copy attribute
-#     return(returnObject)
+def copyExtractMap(classWithMapParent): #copy ONLY the map class attributes from any (child) class into a new map object
+    returnObject = Map() #make new instance of same class as source
+    for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
+            if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
+                setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #copy attribute
+    return(returnObject)
 
 class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
-    def __init__(self, window, drawSize=(600,300), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True, importConeLogFilename='', logging=True, logname="coneLog"):
+    def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
         self.car = SC.simCar() #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         #self.car = RC.realCar(comPort='COM8')
-        CC.coneConnecter.__init__(self, importConeLogFilename, logging, logname)
+        CC.coneConnecter.__init__(self)
         PF.pathFinder.__init__(self)
         PP.pathPlanner.__init__(self)
         DD.pygameDrawer.__init__(self, self, window, drawSize, drawOffset, viewOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
@@ -39,7 +39,7 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameD
         if(self.pathPlanningPresent):
             self.car.pathFolData = PP.pathPlannerData()
         
-        #self.mapList = [copyExtractMap(self)]
+        self.mapList = [copyExtractMap(self)]
 
 
 resolution = [1200, 600]
@@ -48,7 +48,7 @@ DD.pygameInit(resolution)
 sim1 = pygamesimLocal(DD.window, resolution)
 
 timeSinceLastUpdate = time.time()
-#mapSaveTimer = time.time()
+mapSaveTimer = time.time()
 print("printing serial ports:")
 [print(entry.name) for entry in RC.serial.tools.list_ports.comports()]
 print("done printing ports.")
@@ -64,18 +64,18 @@ while DD.windowKeepRunning:
         sim1.calcAutoDriving()
         sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
         sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
-        #print(sim1.car.velocity)
     sim1.car.update(dt)
     
     sim1.redraw()
     DD.frameRefresh() #not done in redraw() to accomodate multi-sim options
     
-    # if((time.time()-mapSaveTimer)>0.25):
-    #     mapSaveTimer = time.time()
-    #     sim1.mapList.append(copyExtractMap(sim1))
-    #     if(len(sim1.mapList) > 40):
-    #         sim1.mapList.pop(0)
-    #     print((time.time()-mapSaveTimer)*1000)
+    if((rightNow-mapSaveTimer)>0.25):
+        sim1.mapList.append(copyExtractMap(sim1))
+        if(len(sim1.mapList) > 40):
+            sim1.mapList.pop(0)
+        print(sys.getsizeof(deepcopy(sim1.mapList[0])))
+        #print((time.time()-mapSaveTimer)*1000)
+        mapSaveTimer = rightNow
     
     timeSinceLastUpdate = rightNow #save time (from start of loop) to be used next time
     

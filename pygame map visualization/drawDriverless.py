@@ -12,6 +12,7 @@ import generalFunctions as GF #(homemade) some useful functions for everyday eas
 
 
 class pygameDrawer():
+    """a class to draw Map objects (also includes drawing of UI some elements for manually making tracks)"""
     def __init__(self, mapToDraw, window, drawSize=(1200,600), drawOffset=(0,0), viewOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         self.window = window #pass on the window object (pygame)
         self.drawSize = (int(drawSize[0]),int(drawSize[1])) #width and height of the display area (does not have to be 100% of the window)
@@ -88,6 +89,8 @@ class pygameDrawer():
     
     #pixel conversion functions (the most important functions in here)
     def pixelsToRealPos(self, pixelPos):
+        """return a (real) position for a given pixel position (usually mouse position)
+            (mostly used for UI)"""
         if(self.carCam):
             dist = 0; angle = 0; #init var
             if(self.invertYaxis):
@@ -102,6 +105,7 @@ class pygameDrawer():
                 return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((pixelPos[1]-self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
     
     def realToPixelPos(self, realPos):
+        """return the pixel-position (for pygame) for a given (real) position"""
         if(self.carCam):
             dist, angle = GF.distAngleBetwPos(self.mapToDraw.car.position, realPos) #get distance to, and angle with respect to, car
             shiftedPixelPos = GF.distAnglePosToPos(dist*self.sizeScale, angle-self.mapToDraw.car.angle+self.carCamOrient, (self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2)) #calculate new (pixel) pos from the car pos, at the same distance, and the angle, plus the angle that the entire scene is shifted
@@ -117,16 +121,21 @@ class pygameDrawer():
     
     #check if things need to be drawn at all
     def isInsideWindowPixels(self, pixelPos):
+        """whether or not a pixel-position is inside the window"""
         return((pixelPos[0] < (self.drawSize[0] + self.drawOffset[0])) and (pixelPos[0] > self.drawOffset[0]) and (pixelPos[1] < (self.drawSize[1] + self.drawOffset[1])) and (pixelPos[1] > self.drawOffset[1]))
     
     def isInsideWindowReal(self, realPos):
+        """whether or not a (real) position is inside the window (note: not computationally efficient)"""
         return(self.isInsideWindowPixels(self.realToPixelPos(realPos))) #not very efficient, but simple
     
     #drawing functions
     def background(self):
+        """draw the background"""
         self.window.fill(self.bgColor, (self.drawOffset[0], self.drawOffset[1], self.drawSize[0], self.drawSize[1])) #dont fill entire screen, just this pygamesim's area (allowing for multiple sims in one window)
     
     def drawCones(self, drawLines=True):
+        """draw the cones and their connections
+            (if enabled, draw qubic splines instead of direct connections)"""
         conePixelDiam = Map.Cone.coneDiam * self.sizeScale
         drawnLineList = [] #[ [ID, ID], ] just a list of drawn lines by ID
         for LorR in range(2):
@@ -160,6 +169,8 @@ class pygameDrawer():
                 ## drawing the last little line to complete the full-circle is rather difficult in the current system, so i won't bother
     
     def drawPathLines(self, drawPoints=False, drawConeLines=True):
+        """draw the path (target_list)
+            (if enabled, draw qubic splines instead of direct connections)"""
         # target_list content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
         pathCenterPixelDiam = self.pathPointDiam * self.sizeScale
         if(self.pathPlanningPresent and self.drawQubicSplines):
@@ -191,10 +202,13 @@ class pygameDrawer():
                 pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.mapToDraw.target_list[-1].position), self.realToPixelPos(self.mapToDraw.target_list[0].position), self.pathLineWidth) #line that loops around to start
     
     def drawFinishLine(self):
+        """draw finish line (between finish_line_cones)"""
         if(len(self.mapToDraw.finish_line_cones) >= 2):
             pygame.draw.line(self.window, self.finishLineColor, self.realToPixelPos(self.mapToDraw.finish_line_cones[0].position), self.realToPixelPos(self.mapToDraw.finish_line_cones[1].position), self.finishLineWidth)
     
     def drawCar(self):
+        """draw car sprite
+            (or a simple polygon instead, if sprite failed/disabled)"""
         ## drawing is currently done by calculating the position of the corners and drawing a polygon with those points. Not efficient, not pretty, but fun
         carToDraw = self.mapToDraw.car
         chassisCenter = GF.distAnglePosToPos(carToDraw.chassis_length_offset, carToDraw.angle, carToDraw.position)
@@ -254,6 +268,7 @@ class pygameDrawer():
     
     ## UI and debug
     def drawMouseCone(self, drawPossibleConnections=True, drawConnectionThresholdCircle=False):
+        """(UI element) show where you're about to place a cone and/or show the avaiable connections to new/hovered-over cone"""
         if(self.mouseCone is not None): #if there is a floating cone to be drawn
             conePixelDiam = Map.Cone.coneDiam * self.sizeScale
             conePos = pygame.mouse.get_pos() #update position to match mouse position
@@ -278,7 +293,8 @@ class pygameDrawer():
                     pygame.draw.circle(self.window, coneColor, [int(conePos[0]), int(conePos[1])], self.mapToDraw.coneConnectionThreshold * self.sizeScale, self.coneLineWidth) #draw circle with coneConnectionThreshold radius 
     
     def drawDebugLines(self):
-         #debugLines structure: [pos,pos, color_index (0-2)]
+        """debugging utility, allows certain debugging elements to be visualized (not carCam friendly)"""
+        #debugLines structure: [pos,pos, color_index (0-2)]
         for debugLine in self.debugLines:
             if(abs(debugLine[0]) == 2):
                 if(debugLine[0] == 2):
@@ -296,6 +312,7 @@ class pygameDrawer():
                 pygame.draw.line(self.window, self.debugLineColors[(debugLine[3] if (len(debugLine)==4) else 0)], debugLine[1], debugLine[2], self.debugLineWidth)
     
     def updateViewOffset(self, mousePos=None): #screen dragging
+        """(UI element) if active (button press), 'drag' the screen around by using the mouse"""
         if(self.movingViewOffset):
             if(mousePos is None):
                 mousePos = pygame.mouse.get_pos()
@@ -308,7 +325,8 @@ class pygameDrawer():
             self.viewOffset[1] = self.prevViewOffset[1] + (mouseDelta[1]/self.sizeScale)
     
     def redraw(self):
-        self.updateViewOffset()
+        """draw all map elements"""
+        self.updateViewOffset() #handle mouse dragging
         self.background()
         self.drawCones(True) #boolean parameter is whether to draw lines between connected cones (track bounds) or not
         self.drawPathLines(True, self.drawTargetConeLines) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
@@ -319,6 +337,8 @@ class pygameDrawer():
         self.drawDebugLines()
     
     def updateWindowSize(self, drawSize=[1200, 600], drawOffset=[0,0], sizeScale=-1, autoMatchSizeScale=True):
+        """handle the size of the window changing
+            (optional) scale sizeScale (zooming) to match previous window size"""
         if(sizeScale > 0):
             self.sizeScale = sizeScale
         elif(autoMatchSizeScale):
@@ -388,6 +408,8 @@ oldWindowSize = []
 
 
 def pygameInit(resolution): #you must specify a resolution
+    """initialize pygame window
+        (one pygame window can host multiple pygameDrawer objects by using the drawOffset variable)"""
     pygame.init()
     pygame.font.init()
     global window, oldWindowSize
@@ -399,15 +421,18 @@ def pygameInit(resolution): #you must specify a resolution
     windowKeepRunning = True
 
 def pygameEnd():
+    """deinitialize the pygame window (required for ending without crashing)"""
     global windowStarted
     if(windowStarted): #if the window never started, quit might error out or something stupid
         print("quitting pygame window...")
         pygame.quit()
 
 def frameRefresh():
+    """push the drawn frame(buffer) to the display"""
     pygame.display.flip() #send (finished) frame to display
 
 def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
+    """(UI element) handle the mouse-press-events"""
     if(buttonDown and ((button == 1) or (button == 3))): #left/rigth mouse button pressed (down)
         pygame.event.set_grab(1)
         leftOrRight = (True if (button == 3) else False)
@@ -477,6 +502,7 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
             pygamesimInput.movingViewOffset = False
 
 def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
+    """(UI element) handle the key-press-events"""
     if(key==pygame.K_f): # f
         global flagCursorSet
         if(keyDown):
@@ -549,6 +575,7 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
                 pygamesimInput.movingViewOffset = False
 
 def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
+    """(UI element) return the pygameDrawer that the mouse is hovering over, or the one you interacted with last"""
     if(len(pygamesimInputList) > 1):
         if(mousePos is None):
             mousePos = pygame.mouse.get_pos()
@@ -567,6 +594,7 @@ def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=Tr
         return(pygamesimInputList[0])
 
 def handleWindowEvent(pygamesimInputList, eventToHandle):
+    """(UI element) handle general (pygame) window-event"""
     global window, oldWindowSize
     if(eventToHandle.type == pygame.QUIT):
         global windowKeepRunning
@@ -617,6 +645,9 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
             dif = [simToScale.drawSize[0]/simToScale.sizeScale, simToScale.drawSize[1]/simToScale.sizeScale]
             #simToScale.sizeScale += eventToHandle.y #zooming (note: can reach 0, at which point the porgram crashes)
             simToScale.sizeScale *= 1.0+(eventToHandle.y/10.0) #10.0 is an arbetrary zoomspeed
+            if(simToScale.sizeScale < 1.0):
+                print("can't zoom out any further")
+                simToScale.sizeScale = 1.0
             #if(not simToScale.carCam): #viewOffset is not used in carCam mode, but it won't hurt to change it anyway
             dif[0] -= (simToScale.drawSize[0]/simToScale.sizeScale)
             dif[1] -= (simToScale.drawSize[1]/simToScale.sizeScale)
@@ -624,6 +655,7 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
             simToScale.viewOffset[1] -= dif[1]/2
 
 def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D list of pygamesim objects or 2D list of pygamesim objects
+    """(UI element) loop through (pygame) window-events and handle all of them"""
     pygamesimInputList = []
     if(type(pygamesimInput) is list):
         if(len(pygamesimInput) > 0):
@@ -645,44 +677,44 @@ def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D li
     for eventToHandle in pygame.event.get(): #handle all events
         handleWindowEvent(pygamesimInputList, eventToHandle)
     
-    #the manual keyboard driving (tacked on here, because doing it with the event system would require more variables, and this is temporary anyway)
-    simToDrive = currentPygamesimInput(pygamesimInputList, demandMouseFocus=False) #get the active sim within the window
-    carToDrive = simToDrive.car
-    if((not carToDrive.pathFolData.auto) if simToDrive.pathPlanningPresent else True):
-        pressedKeyList = pygame.key.get_pressed()
-        deltaTime = time.time() - simToDrive.carKeyboardControlTimer
-        simToDrive.carKeyboardControlTimer = time.time()
-        speedAccelVal = 3.0 * deltaTime
-        steerAccelVal = 1.5 * deltaTime
-        #first for speed
-        if(pressedKeyList[pygame.K_UP]): #accelerate button
-            carToDrive.velocity += speedAccelVal #accelerate
-        elif(pressedKeyList[pygame.K_DOWN]): #brake/reverse button
-            if(carToDrive.velocity > (speedAccelVal*3)): #positive speed
-                carToDrive.velocity -= speedAccelVal * 2 #fast brake
-            else:                               #near-zero or negative speed
-                carToDrive.velocity -= speedAccelVal * 0.5 #reverse accelerate
-        else:                           #neither buttons
-            if(carToDrive.velocity > speedAccelVal): #positive speed
-                carToDrive.velocity -= speedAccelVal/2 #slow brake
-            elif(carToDrive.velocity < -speedAccelVal): #negative speed
-                carToDrive.velocity += speedAccelVal #brake
-            else:                           #near-zero speed
-                carToDrive.velocity = 0
-        carToDrive.velocity = max(-1, min(2, carToDrive.velocity)) #limit speed
-        #now for steering
-        if(pressedKeyList[pygame.K_LEFT] and (not pressedKeyList[pygame.K_RIGHT])):
-            carToDrive.steering += steerAccelVal
-        elif(pressedKeyList[pygame.K_RIGHT] and (not pressedKeyList[pygame.K_LEFT])):
-            carToDrive.steering -= steerAccelVal
-        else:
-            if(carToDrive.steering > steerAccelVal):
-                carToDrive.steering -= steerAccelVal*2.0
-            elif(carToDrive.steering < -steerAccelVal):
-                carToDrive.steering += steerAccelVal*2.0
-            else:
-                carToDrive.steering = 0
-        carToDrive.steering = max(np.deg2rad(-25), min(np.deg2rad(25), carToDrive.steering)) #limit speed
+    # #the manual keyboard driving (tacked on here, because doing it with the event system would require more variables, and this is temporary anyway)
+    # simToDrive = currentPygamesimInput(pygamesimInputList, demandMouseFocus=False) #get the active sim within the window
+    # carToDrive = simToDrive.car
+    # if((not carToDrive.pathFolData.auto) if simToDrive.pathPlanningPresent else True):
+    #     pressedKeyList = pygame.key.get_pressed()
+    #     deltaTime = time.time() - simToDrive.carKeyboardControlTimer
+    #     simToDrive.carKeyboardControlTimer = time.time()
+    #     speedAccelVal = 3.0 * deltaTime
+    #     steerAccelVal = 1.5 * deltaTime
+    #     #first for speed
+    #     if(pressedKeyList[pygame.K_UP]): #accelerate button
+    #         carToDrive.velocity += speedAccelVal #accelerate
+    #     elif(pressedKeyList[pygame.K_DOWN]): #brake/reverse button
+    #         if(carToDrive.velocity > (speedAccelVal*3)): #positive speed
+    #             carToDrive.velocity -= speedAccelVal * 2 #fast brake
+    #         else:                               #near-zero or negative speed
+    #             carToDrive.velocity -= speedAccelVal * 0.5 #reverse accelerate
+    #     else:                           #neither buttons
+    #         if(carToDrive.velocity > speedAccelVal): #positive speed
+    #             carToDrive.velocity -= speedAccelVal/2 #slow brake
+    #         elif(carToDrive.velocity < -speedAccelVal): #negative speed
+    #             carToDrive.velocity += speedAccelVal #brake
+    #         else:                           #near-zero speed
+    #             carToDrive.velocity = 0
+    #     carToDrive.velocity = max(-1, min(2, carToDrive.velocity)) #limit speed
+    #     #now for steering
+    #     if(pressedKeyList[pygame.K_LEFT] and (not pressedKeyList[pygame.K_RIGHT])):
+    #         carToDrive.steering += steerAccelVal
+    #     elif(pressedKeyList[pygame.K_RIGHT] and (not pressedKeyList[pygame.K_LEFT])):
+    #         carToDrive.steering -= steerAccelVal
+    #     else:
+    #         if(carToDrive.steering > steerAccelVal):
+    #             carToDrive.steering -= steerAccelVal*2.0
+    #         elif(carToDrive.steering < -steerAccelVal):
+    #             carToDrive.steering += steerAccelVal*2.0
+    #         else:
+    #             carToDrive.steering = 0
+    #     carToDrive.steering = max(np.deg2rad(-25), min(np.deg2rad(25), carToDrive.steering)) #limit speed
 
 
 
