@@ -9,6 +9,7 @@ import generalFunctions as GF #(homemade) some useful functions for everyday eas
 
 
 class pathPlannerData: #a class to go in Map.Cone.coneConData or Map.Cone.pathFolData, if Alex approves
+    """some data to go in .pathFolData of the car"""
     def __init__(self):
         self.auto = False
         self.nextTarget = None
@@ -17,6 +18,8 @@ class pathPlannerData: #a class to go in Map.Cone.coneConData or Map.Cone.pathFo
 
 
 class pathPlanner(Map):
+    """some functions (& constants) to follow (steer towards- and select next) Targets.
+        (could potentially be copied along with Map objects (but does not HAVE to be))"""
     def __init__(self):
         self.left_spline = [[], []]
         self.right_spline = [[], []]
@@ -32,14 +35,14 @@ class pathPlanner(Map):
         
         #self.turning_sharpness = 1.8
         
-        self.targetReachedThreshold = 0.1 #if distance to target (regardless of orientation) is less than this, target is reached
+        self.targetReachedThreshold = 0.3 #if distance to target (regardless of orientation) is less than this, target is reached (larger means less likely to spin off, smaller means more accurate)
         ##if the target can't be reached, due to turning radius limitations (TBD: slowing down), then passing is enough
         self.targetPassedDistThreshold = self.targetReachedThreshold*2.0 #if it passes a target (without hitting it perfectly), the distance to target should still be less than this
         self.targetPassedAngleThreshold = np.deg2rad(80) #if it passes a target (without hitting it perfectly), the angle to target will probably be more than this
         self.targetMissedAngleThreshold = np.deg2rad(150) #if the angle to target is larger than this, (panic, and) move on to the next target (or something)
-
-    
+        
     def nextTarget(self, currentTarget):
+        """returns the next target in the target_list"""
         for i in range(len(self.target_list)):
             if(currentTarget == self.target_list[i]):
                 if(i<(len(self.target_list)-1)):
@@ -52,6 +55,7 @@ class pathPlanner(Map):
                     return(currentTarget)
     
     def targetUpdate(self, currentTarget, distToTarget, angleToTarget):
+        """returns the next target if the current one is reached/passed/missed, returns the current target if the car is still on track to reach it"""
         if(currentTarget is None): #if the first target hasn't been selected yet
             print("selecting totally new target")
             print("TBD")
@@ -72,7 +76,9 @@ class pathPlanner(Map):
                 return(currentTarget)
         
     
-    def calcAutoDriving(self):
+    def calcAutoDriving(self, saveOutput=True):
+        """calculate the steering angle (and speed) required to reach the current target
+            (default) if input parameter True the output will be saved to the Car"""
         if(self.car.pathFolData.nextTarget is None):
             self.car.pathFolData.nextTarget = self.targetUpdate(None, 0, 0)
         dist, angle = GF.distAngleBetwPos(self.car.position, self.car.pathFolData.nextTarget.position)
@@ -83,12 +89,17 @@ class pathPlanner(Map):
             dist, angle = GF.distAngleBetwPos(self.car.position, self.car.pathFolData.nextTarget.position)
             angle = GF.radRoll(angle-self.car.angle)
         
-        #self.car.steering = min(max(np.arctan(angle/(dist**self.turning_sharpness)), -25), 25)
-        self.car.desired_steering = min(max(angle,-25),25)
-        self.car.desired_velocity = self.car.pathFolData.targetVelocity
+        #desired_steering = min(max(np.arctan(angle/(dist**self.turning_sharpness)), -25), 25)
+        desired_steering = min(max(angle,-self.maxSteeringAngle),self.maxSteeringAngle)
+        desired_velocity = self.car.pathFolData.targetVelocity
+        if(saveOutput):
+            self.car.desired_steering = desired_steering
+            self.car.desired_velocity = desired_velocity
+        return(desired_velocity, desired_steering)
     
     ## cubic spline 
     def makeBoundrySpline(self, inputConeList):
+        """calculate and return a qubic spline for a cone_list (left or right)"""
         returnList = [[], []]
         if(len(inputConeList) > 1):
             startingCone = inputConeList[0] #start at any random cone
@@ -139,10 +150,12 @@ class pathPlanner(Map):
         return(returnList)
     
     def makeBoundrySplines(self):
+        """make and store qubic splines for both left_ and right_cone_list"""
         self.left_spline = self.makeBoundrySpline(self.left_cone_list)
         self.right_spline = self.makeBoundrySpline(self.right_cone_list)
     
     def makePathSpline(self):
+        """calculate and return a qubic spline for the target_list"""
         self.path_midpoints_spline = [[], []]
         if(len(self.target_list) > 1):
             targetPositions = [[target.position[i] for target in self.target_list] for i in range(2)]

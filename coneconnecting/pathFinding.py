@@ -10,6 +10,7 @@ import generalFunctions as GF #(homemade) some useful functions for everyday eas
 
 
 class pathFinderData: #a class to go in Map.Cone.coneConData or Map.Cone.pathFolData, if Alex approves
+    """some data to go in .coneConData of Map.Target objects (TBD: put in .pathFolData?)"""
     def __init__(self, heading=0, track_width=0, cones=[None, None], strength=0):
         #self.position = np.array([pos[0], pos[1]])
         self.heading = heading #angle the car should (roughly) face when crossing this target
@@ -19,6 +20,8 @@ class pathFinderData: #a class to go in Map.Cone.coneConData or Map.Cone.pathFol
 
 
 class pathFinder(Map):
+    """some functions (& constants) to find Target points (target_list) using (track boundry) cones 
+        (should not be copied along with Map objects)"""
     def __init__(self):
         self.pathConnectionThreshold = 3 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         self.pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
@@ -30,6 +33,8 @@ class pathFinder(Map):
         
     
     def makePath(self):
+        """find Target points between connected cones (track boundry),
+            the first Target is placed on the finish lines (if available) or near the car"""
         # target_list content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
         # left/right-ConeList content: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]
         if(self.targets_full_circle):
