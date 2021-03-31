@@ -1,5 +1,4 @@
-#TBD: add spoof coneConnecter class that gets data from network, to run visualization for non-local coneConnecter
-#TBD: consider the length of a track-boundry in connectCone() (longer = better)
+#TBD: consider the length of a track-boundry in connectCone() (longer = better), with exceptions for full-circle chains
 
 #note: for numpy sin/cos/tan angles, 0 is at 3 o'clock, positive values are CCW and the range returned by arctan2 is (-180,180) or (-pi, pi)
 
@@ -12,6 +11,7 @@ import generalFunctions as GF #(homemade) some useful functions for everyday eas
 
 
 class coneConnection: #a class to go in Map.Cone.coneConData. This carries some extra data which is only used by the coneConnecter functions
+    """some data to go in .coneConData of Map.Cone objects"""
     def __init__(self, angle=0, dist=0, strength=0):
         #self.cone = conePointer #(pointer to) connected cone (ALREADY IN Cone CLASS UNDER Cone.connections)
         self.angle = angle #angle between cones (always from the perspective of the cone that holds this data)
@@ -21,7 +21,9 @@ class coneConnection: #a class to go in Map.Cone.coneConData. This carries some 
 
 
 class coneConnecter(Map):
-    def __init__(self, importConeLogFilename='', logging=True, logname="coneLog"):
+    """some functions (& constants) to connect cones to form a track boundry 
+        (should not be copied along with Map objects)"""
+    def __init__(self):
         #Map.__init__(self) #init map class
         self.coneConnectionThreshold = 1.5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
         self.coneConnectionThresholdSquared = self.coneConnectionThreshold**2
@@ -36,7 +38,8 @@ class coneConnecter(Map):
         #self.rightConesFullCircle = False
     
     
-    def connectCone(self, coneToConnect, applyResult=True): #
+    def connectCone(self, coneToConnect, applyResult=True): #attempt to connect a given cone
+        """attempt to connect a cone to a suitable cone. selection is based on distance, angle and several other parameters"""
         #the correct cone should be selected based on a number of parameters:
         #distance to last cone, angle difference from last and second-to-last cones's, angle that 'track' is (presumably) going based on cones on other side (left/right) (if right cones make corner, left cones must also), etc
         # ideas: distance between last (existing) cone connection may be similar to current cone distance (human may place cones in inner corners close together and outer corners far apart, but at least consistent)
@@ -114,6 +117,7 @@ class coneConnecter(Map):
             return(True, winningCone) #return the cone you connected with (or are capable of connecting with, if applyResult=False)
     
     def connectConeSuperSimple(self, coneToConnect, applyResult=True):
+        """attempt to (quickly) connect a cone to a suitable cone. selection is based on (squared) distance and a few other parameters"""
         currentConnectionCount = len(coneToConnect.connections)
         if(currentConnectionCount >= 2):#if cone is already doubly connected
             print("input cone already doubly connected?!:", coneToConnect.coneConData)
