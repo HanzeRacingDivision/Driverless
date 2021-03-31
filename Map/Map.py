@@ -17,7 +17,7 @@ import generalFunctions as GF
 
 
 class Map:
-    """ A Parent Map Class that SLAM, PathPlanning and other simulations inherit from """
+    """ A parent map class that holds all variables that make up a (basic) track """
     def __init__(self, carStartPos=[0,0]):  # variables here that define the scenario/map
         self.car = self.Car([carStartPos[0], carStartPos[1]])
         self.left_cone_list = []
@@ -28,8 +28,9 @@ class Map:
         self.targets_full_circle = False #if the target list loops around
         
         #self.newConeID = 0 #add 1 after adding a cone #TO BE REPLACED BY PANDAS INDEXING
-
+    
     class Car:
+        """ A (parent) car class that holds all the variables that make up a (basic) car """
         def __init__(self, pos=[0,0], angle=0.0):
             self.position = np.array([float(pos[0]), float(pos[1])])
             self.angle = angle #car orientation in radians
@@ -42,10 +43,12 @@ class Map:
             
             self.desired_velocity = 0.0 #desired velocity in m/s (sent to car MCU)
             self.desired_steering = 0.0 #desired steering angle in radians (sent to car MCU)
-            self.auto = False #(thijs) could do with a clearer name like 'driving' or 'self_driving_active' or something
-            self.max_velocity = 5 #in m/s
-            self.max_acceleration = 4.0 #in m/s^2
-            self.max_steering = np.radians(30) #max angle (in either direction) in radians
+            
+            ## moved to pathPlanningTemp (and some renamed), can be found in self.pathFolData
+            #self.auto = False #(thijs) could do with a clearer name like 'driving' or 'self_driving_active' or something
+            #self.max_velocity = 5 #in m/s
+            #self.max_acceleration = 4.0 #in m/s^2
+            #self.max_steering = np.radians(25) #max angle (in either direction) in radians
             
             #self.rearAxlePos = GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position) #updates in Car.update()
             ## there is no need for rearAxlePos to be stored, but it would make Car.update() slightly faster IF (and only if) Car.update() is the ONLY function in which the position is altered
@@ -60,6 +63,7 @@ class Map:
             self.slamData = None    #extra data specifically for SLAM
         
         def update(self, dt):
+            """ update the position of the car, based on velocity, steering and time-passage """
             # if(dt < 0.0001):
             #     timeRightNow = time.time() #python is not the fastest language, using time.time() at different points in this function will give different values, this won't
             #     dt = time.time() - lastUpdateTime
@@ -97,6 +101,7 @@ class Map:
                 self.position[1] = self.position[1] + (dt * self.velocity * np.sin(self.angle))
         
         def distanceToCar(self, pos): #a more comprehensive/accurate function for getting the SHORTEST distance to the NEAREST surface of the car
+            """ returns the shortest possible distance to the car chassis and whether or not the car overlaps the entered pos """
             translatedDistance = GF.vectorProjectDist(self.position, pos, self.angle)
             #self.debugLines.append([0, self.realToPixelPos(self.position), self.realToPixelPos(pos), 0])
             chassisBackLength = (-self.chassis_length/2)+self.chassis_length_offset #(negative number) length from middle of car to back-end of chassis (bumper)
@@ -128,7 +133,7 @@ class Map:
                 return(False, returnDistance) #pos doesnt overlap car
 
     class Cone:
-        """ Class for storing the coordinates and visibility of each cone """
+        """ a small class to hold all pertinent information about boundry cones (like position, left-or-right-ness, whether it's part of the finish line, etc) """
         coneDiam = 0.14 #cone diameter in meters (constant)
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
@@ -143,7 +148,7 @@ class Map:
             self.slamData = None    #extra data specifically for SLAM
 
     class Target:
-        """ 'Target' child class only used in PathPlanning """
+        """ a single point in the path of the car (a target to aim for) """
         def __init__(self, pos=[0,0], isFinish=False):
             #the targets should probably be just be ordered in the list to match their order in the track (shouldnt take much/any shuffling to get done), but if not: use pandas indexing?
             self.position = np.array([pos[0], pos[1]])
@@ -156,7 +161,8 @@ class Map:
             self.slamData = None    #extra data specifically for SLAM
     
     
-    def getConeChainLen(self, currentCone, prevCone=None, lengthMem=1): #(itteratively) determine the lenght of a sequence of connected cones (note: uses Cone.ID)
+    def getConeChainLen(self, currentCone: Cone, prevCone=None, lengthMem=1): #(itteratively) determine the lenght of a sequence of connected cones (note: uses Cone.ID)
+        """ get the length of the 'chain' of cones that the input cone is connected to """
         connectionCount = len(currentCone.connections)
         if((connectionCount > 1) and (prevCone is None)):
             print("incorrect usage of getConeChainLen()")
@@ -184,6 +190,9 @@ class Map:
     
     
     def distanceToConeSquared(self, pos, conelist=None, sortByDistance=False, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, coneConnectionExclusions='NO_CONN_EXCL', ignoreLinkedConeIDs=[]):
+        """ returns a list with squared distances to cones from a given position, 
+            allows (optional) filtering based on cone.ID, max-distance, cone-connected-ness 
+            and (optional) sorting by distance """   
         if(conelist is None): #if no conelist was entered (probably should do this)
             conelist = self.left_cone_list + self.right_cone_list #then search both lists
         returnList = []  #[[conePointer, squaredDist], ]
@@ -220,6 +229,9 @@ class Map:
         return(returnList)
     
     def distanceToCone(self, pos, conelist=None, sortBySomething='DONT_SORT', ignoreConeIDs=[], simpleThreshold=-1.0, coneConnectionExclusions='NO_CONN_EXCL', ignoreLinkedConeIDs=[], angleDeltaTarget=0.0, angleThreshRange=[]): #note: angleThreshRange is [lowBound, upBound]
+        """ returns a list with distances and angles to cones from a given position, 
+            allows (optional) filtering based on cone.ID, max-distance, cone-connected-ness and angle thresholds
+            and (optional) sorting by distance, angle or angle-delta """
         if(conelist is None): #if no conelist was entered (probably should do this)
             conelist = self.left_cone_list + self.right_cone_list #then search both lists
         returnList = []  #[[conePointer, [dist, angle]], ]
@@ -280,6 +292,7 @@ class Map:
         return(returnList)
     
     def overlapConeCheck(self, posToCheck):
+        """ return whether or not a given position overlaps an existing cone and the cone which it overlaps (if any) """
         boolAnswer = False;   coneListPointer=None #boolAnswer MUST default to False, the other variables dont matter as much
         coneDistToler = self.Cone.coneDiam*1 #overlap tolerance  NOTE: area is square, not round
         combinedConeList = (self.right_cone_list + self.left_cone_list)
