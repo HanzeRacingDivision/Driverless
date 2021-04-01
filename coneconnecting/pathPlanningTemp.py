@@ -90,7 +90,7 @@ class pathPlanner(Map):
             angle = GF.radRoll(angle-self.car.angle)
         
         #desired_steering = min(max(np.arctan(angle/(dist**self.turning_sharpness)), -25), 25)
-        desired_steering = min(max(angle,-self.maxSteeringAngle),self.maxSteeringAngle)
+        desired_steering = min(max(angle,-self.car.maxSteeringAngle),self.car.maxSteeringAngle)
         desired_velocity = self.car.pathFolData.targetVelocity
         if(saveOutput):
             self.car.desired_steering = desired_steering
