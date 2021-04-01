@@ -44,6 +44,8 @@ class Map:
             self.desired_velocity = 0.0 #desired velocity in m/s (sent to car MCU)
             self.desired_steering = 0.0 #desired steering angle in radians (sent to car MCU)
             
+            self.maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept serial commands outside this range)
+            
             ## moved to pathPlanningTemp (and some renamed), can be found in self.pathFolData
             #self.auto = False #(thijs) could do with a clearer name like 'driving' or 'self_driving_active' or something
             #self.max_velocity = 5 #in m/s
