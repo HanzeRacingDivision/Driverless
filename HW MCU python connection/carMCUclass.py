@@ -27,8 +27,6 @@ class carMCU:
         if(connectAtInit):
             self.connect(comPort, autoFind) #attempt to connect upon class creation
         
-        self.maxSteeringAngle = np.deg2rad(25) #maybe this should be Map.Car?
-        
         # constants
         self.minimumSerialLength = 14 #the minimum length of a feedback message is "x.xx x.xx x.x\r"
         self.unfinTimeout = 0.015 #if the unfinished message is older than this, just dump it (this value should be larger than the time between getFeedback() calls
