@@ -19,7 +19,6 @@ class simCar(Map.Car):
         
         self.min_velocity = -1
         self.max_velocity = 3
-        self.maxSteeringAngle = np.deg2rad(25) #maybe this should be Map.Car?
         
         self.lastSimUpdateTime = time.time()
     
