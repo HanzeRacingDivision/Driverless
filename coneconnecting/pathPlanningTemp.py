@@ -44,7 +44,7 @@ class pathPlanner(Map):
     def nextTarget(self, currentTarget):
         """returns the next target in the target_list"""
         for i in range(len(self.target_list)):
-            if(currentTarget == self.target_list[i]):
+            if(currentTarget == self.target_list[i]): #slightly risky pointer comparison
                 if(i<(len(self.target_list)-1)):
                     return(self.target_list[i+1])
                 elif(self.targets_full_circle):
@@ -59,7 +59,11 @@ class pathPlanner(Map):
         if(currentTarget is None): #if the first target hasn't been selected yet
             print("selecting totally new target")
             print("TBD")
-            return(self.target_list[0])
+            if(len(self.target_list) > 0):
+                return(self.target_list[0])
+            else:
+                print("there are no targets, how am i supposed to update it >:(")
+                return(currentTarget)
         else:
             if(distToTarget < self.targetReachedThreshold):
                 #print("target reached normally", distToTarget, np.rad2deg(angleToTarget))
@@ -79,6 +83,10 @@ class pathPlanner(Map):
     def calcAutoDriving(self, saveOutput=True):
         """calculate the steering angle (and speed) required to reach the current target
             (default) if input parameter True the output will be saved to the Car"""
+        if(len(self.target_list) == 0):
+            print("can't autodrive, there are no targets")
+            self.car.pathFolData.auto = False
+            return(0.0, 0.0)
         if(self.car.pathFolData.nextTarget is None):
             self.car.pathFolData.nextTarget = self.targetUpdate(None, 0, 0)
         dist, angle = GF.distAngleBetwPos(self.car.position, self.car.pathFolData.nextTarget.position)
@@ -112,7 +120,7 @@ class pathPlanner(Map):
                 startingCone = inputConeList[itt] #try the next entry
                 itt += 1
             if(len(startingCone.connections) < 1): #check if it found a cone with connections (if not, itt == len(inputConeList))
-               print("couldn't make boundry spline, no connected cones in list")
+               #print("couldn't make boundry spline, no connected cones in list")
                return([[], []])
             chainLen, startingCone = self.getConeChainLen(startingCone, ((startingCone.connections[0]) if (len(startingCone.connections)>1) else None)) #go to the end of the cone connection chain
             fullCircleLoop = False
