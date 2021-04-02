@@ -145,11 +145,15 @@ class mapTransmitterSocket:
                     self.objectWithMap.connectCone(aNewCone)
                 else:
                     print("couldn't connect newly instructed cone, because self.objectWithMap.coneConnecterPresent == False")
+            if(self.objectWithMap.pathPlanningPresent):
+                    self.objectWithMap.makeBoundrySplines()
         elif(instruction[0] == 'CONNEC'):
             if(self.objectWithMap.coneConnecterPresent):
                 overlaps, coneToConnect = self.objectWithMap.overlapConeCheck(instruction[1].position) #this is needed to retrieve the LOCAL cone object, not the transmitted one
                 if(overlaps and (coneToConnect.ID == instruction[1].ID)):
                     self.objectWithMap.connectCone(coneToConnect)
+                    if(self.objectWithMap.pathPlanningPresent):
+                        self.objectWithMap.makeBoundrySplines()
                 else:
                     print("'CONNEC' instruction couldnt find cone at location:", instruction[1].position, "with ID:", instruction[1].ID)
                     return(False)
@@ -175,6 +179,8 @@ class mapTransmitterSocket:
                     connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == coneToDelete.ID) else 1))
                 listToRemoveFrom = (self.objectWithMap.mapToDraw.right_cone_list if coneToDelete.LorR else self.objectWithMap.mapToDraw.left_cone_list)
                 listToRemoveFrom.pop(GF.findIndexByClassAttr(listToRemoveFrom, 'ID', coneToDelete.ID))
+                if(self.objectWithMap.pathPlanningPresent):
+                    self.objectWithMap.makeBoundrySplines()
             else:
                 print("'DELET' instruction couldn't find cone at location:", instruction[1].position, "with ID:", instruction[1].ID)
                 return(False)
@@ -187,6 +193,7 @@ class mapTransmitterSocket:
                 else: #if instructed to (attempt to) find a certian number of path points
                     for i in range(instruction[1]): #try to make this many path points
                         self.objectWithMap.makePath()
+                self.objectWithMap.makePathSpline()
             else:
                 print("ignored 'PATH' instruction, because self.objectWithMap.pathFinderPresent == False")
         elif(instruction[0] == 'AUTO'):
