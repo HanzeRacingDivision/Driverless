@@ -204,6 +204,11 @@ class mapTransmitterSocket:
                 if(self.objectWithMap.car.pathFolData is not None):
                     self.objectWithMap.car.pathFolData.auto = instruction[1]
                     self.objectWithMap.car.pathFolData.targetVelocity = instruction[2]
+                    if(not self.objectWithMap.car.pathFolData.auto):
+                        try:
+                            self.objectWithMap.car.sendSpeedAngle(0.0, 0.0)
+                        except:
+                            print("couldn't send stop command to car (sendSpeedAngle) after disabling auto")
                 else:
                     print("failed to perform 'AUTO' instruction, as car.pathFolData is None")
             else:
