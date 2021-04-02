@@ -26,6 +26,8 @@ class pygameDrawer():
         self.mapToDraw = mapToDraw
         
         self.bgColor = [50,50,50] #grey
+        self.fontSize = 30
+        self.pygameFont = pygame.font.Font(None, self.fontSize)
         
         self.finishLineColor = [255,40,0]
         self.finishLineWidth = 2 #pixels wide
@@ -68,19 +70,31 @@ class pygameDrawer():
         
         self.drawQubicSplines = True #only has an effect if pathPlanningPresent=True
         
+        #these should really be initialized in a class that makes use of pygameDrawer, but this avoids errors and is harmless (as long as pygameDrawer.__init__() is run BEFORE initializing thsese in the child class)
         self.coneConnecterPresent = False
         self.pathFinderPresent = False
         self.pathPlanningPresent = False
         self.SLAMPresent = False
         
-        #DELETE ME?
+        self.isRemote = False
+        self.remoteUIsender = None
+        
+        
         self.drawTargetConeLines = False #just for UI purposes, to toggle between showing and not showing how the targets are made
-        self.carKeyboardControlTimer = time.time()
+        
         self.carHistTimer = time.time()
         self.carHistPoints = []
         self.carHistTimeStep = 0.15
         self.carHistMinSquaredDistThresh = 0.1**2 #only save new positions if the car is moving
         self.carHistMaxLen = 200
+        
+        self.FPStimer = time.time()
+        self.FPSdata = []
+        self.FPSdisplayInterval = 0.25
+        self.FPSdisplayTimer = time.time()
+        self.FPSrenderedFonts = []
+        
+        #self.carKeyboardControlTimer = time.time()
         
         try: #if there's no car object, this will not crash the entire program
             self.viewOffset = [(-self.car.position[0]) + ((self.drawSize[0]/self.sizeScale)/2), (-self.car.position[1]) + ((self.drawSize[1]/self.sizeScale)/2)]
@@ -132,6 +146,32 @@ class pygameDrawer():
     def background(self):
         """draw the background"""
         self.window.fill(self.bgColor, (self.drawOffset[0], self.drawOffset[1], self.drawSize[0], self.drawSize[1])) #dont fill entire screen, just this pygamesim's area (allowing for multiple sims in one window)
+    
+    def drawFPScounter(self):
+        """draw a little Frames Per Second counter in the corner to show program performance"""
+        newTime = time.time()
+        if((newTime - self.FPStimer)>0): #avoid divide by 0
+            self.FPSdata.append(round(1/(newTime-self.FPStimer), 1))
+        self.FPStimer = newTime #save for next time
+        if((newTime - self.FPSdisplayTimer)>self.FPSdisplayInterval):
+            self.FPSdisplayTimer = newTime
+            FPSstrings = []
+            if(len(self.FPSdata)>0):
+                FPSstrings.append(str(round(GF.average(self.FPSdata), 1))) #average FPS
+                FPSstrings.append(str(min(self.FPSdata)))                  #minimum FPS
+                FPSstrings.append(str(max(self.FPSdata)))                  #maximum FPS
+                #GF.sortValues(self.FPSdata, True)
+                #FPSstrings.append(str(self.FPSdata[int((len(self.FPSdata)-1)/2)])) #median FPS
+                #print("FPS:", round(GF.average(self.FPSdata), 1), min(self.FPSdata), max(self.FPSdata), self.FPSdata[int((len(self.FPSdata)-1)/2)])
+            else:
+                FPSstrings = ["inf"]
+                #print("FPS: inf")
+            self.FPSdata = []
+            self.FPSrenderedFonts = []
+            for FPSstr in FPSstrings:
+                self.FPSrenderedFonts.append(self.pygameFont.render(FPSstr, False, [255-self.bgColor[0], 255-self.bgColor[1], 255-self.bgColor[2]], self.bgColor)) #render string (only 1 line per render allowed), no antialiasing, text color opposite of bgColor, background = bgColor
+        for i in range(len(self.FPSrenderedFonts)):
+            self.window.blit(self.FPSrenderedFonts[i], [self.drawOffset[0]+self.drawSize[0]-self.fontSize*1.5,self.drawOffset[1] + 5 + (i*self.fontSize)])
     
     def drawCones(self, drawLines=True):
         """draw the cones and their connections
@@ -193,7 +233,7 @@ class pygameDrawer():
                     #centerPixelPos = self.realToPixelPos(self.mapToDraw.target_list[i][0])
                     #pygame.draw.circle(self.window, self.pathColor, [int(centerPixelPos[0]), int(centerPixelPos[1])], int(pathCenterPixelDiam/2)) #draw center point (as filled circle, not ellipse)
                     pygame.draw.ellipse(self.window, self.pathColor, [GF.ASA(-(pathCenterPixelDiam/2), self.realToPixelPos(self.mapToDraw.target_list[i].position)), [pathCenterPixelDiam, pathCenterPixelDiam]]) #draw center point
-                if(drawConeLines and self.pathFinderPresent):
+                if(drawConeLines and (self.mapToDraw.target_list[i].coneConData is not None)): #instead of checking if pathFinderPresent, we can just check if the data is there (also more isRemote friendly)
                     pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.mapToDraw.target_list[i].coneConData.cones[0].position), self.realToPixelPos(self.mapToDraw.target_list[i].coneConData.cones[1].position), self.pathLineWidth) #line from left cone to right cone
                 if(i > 0):#if more than one path point exists (and the forloop is past the first one)
                     #draw line between center points of current pathline and previous pathline (to make a line that the car should (sort of) follow)
@@ -328,6 +368,7 @@ class pygameDrawer():
         """draw all map elements"""
         self.updateViewOffset() #handle mouse dragging
         self.background()
+        self.drawFPScounter()
         self.drawCones(True) #boolean parameter is whether to draw lines between connected cones (track bounds) or not
         self.drawPathLines(True, self.drawTargetConeLines) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
         self.drawFinishLine()
@@ -347,8 +388,51 @@ class pygameDrawer():
         self.drawOffset = (int(drawOffset[0]), int(drawOffset[1]))
 
 
+##remote connection UI:
+def remoteInstructionSend(socketToSendFrom, instruction):
+    """send instruction to remove instance (car/host)"""
+    if(socketToSendFrom.runningOnThread is not None):
+        #print("threaded send")
+        socketToSendFrom.manualSendBuffer.append(instruction)
+    else:
+        #print("manual send")
+        try:
+            socketToSendFrom.manualSend([instruction])
+        except Exception as excep:
+            print("remoteInstructionSend manualSend exception:", excep)
 
+##these functions could probably be removed later (just put their contents in place of the function call)
+def remoteConePlace(socketToSendFrom, coneToPlace, immediateConnect=False):
+    """instruct remote instance to place a cone"""
+    #print("remoteConePlace")
+    remoteInstructionSend(socketToSendFrom, ['PLACE', coneToPlace, immediateConnect])
 
+def remoteConeConnect(socketToSendFrom, coneToConnect):
+    """instruct remote instance to attempt to connect existing cone"""
+    #print("remoteConeConnect")
+    remoteInstructionSend(socketToSendFrom, ['CONNEC', coneToConnect])
+
+def remoteConeSetFinish(socketToSendFrom, coneToUpdate): #could be changed to general 'coneUpdate' or 'coneEdit', if needed
+    """instruct remote instance to set an existing cone as finish-line-cone"""
+    #print("remoteConeSetFinish")
+    remoteInstructionSend(socketToSendFrom, ['SETFIN', coneToUpdate])
+
+def remoteConeDelete(socketToSendFrom, coneToDelete):
+    """instruct remote instance to delete an existing cone"""
+    #print("remoteConeDelete")
+    remoteInstructionSend(socketToSendFrom, ['DELET', coneToDelete])
+
+def remotePathFind(socketToSendFrom, numberOfPathPointsToFind):
+    """instruct remote instance to try to generate a path (manual instruction)"""
+    #print("remotePathFind")
+    remoteInstructionSend(socketToSendFrom, ['PATH', numberOfPathPointsToFind])
+
+def remoteAutoDrivingUpdate(socketToSendFrom, autoMode, targetSpeed):
+    """instruct remote instance to update autodriving variables (.auto, .target_velocity)"""
+    #print("remoteAutoDrivingUpdate")
+    remoteInstructionSend(socketToSendFrom, ['AUTO', autoMode, targetSpeed])
+
+#def remoteWholeMapLoad(socketToSendFrom, mapToLoad): #for debugging/testing, when you need to load an entire map object over the network
 
 #cursor in the shape of a flag
 flagCurs = ("ooo         ooooooooo   ",
@@ -454,12 +538,15 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                         deleting = False
                 if(deleting):
                     print("deleting cone:", overlappingCone.ID)
-                    for connectedCone in overlappingCone.connections:
-                        if(len(connectedCone.coneConData) > 0): #it's always a list, but an empty one if coneConnecter is not used
-                            connectedCone.coneConData.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
-                        connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
-                    listToRemoveFrom = (pygamesimInput.mapToDraw.right_cone_list if overlappingCone.LorR else pygamesimInput.mapToDraw.left_cone_list)
-                    listToRemoveFrom.pop(GF.findIndexByClassAttr(listToRemoveFrom, 'ID', overlappingCone.ID))
+                    if(pygamesimInput.isRemote):
+                        remoteConeDelete(pygamesimInput.remoteUIsender, overlappingCone)
+                    else:
+                        for connectedCone in overlappingCone.connections:
+                            if(len(connectedCone.coneConData) > 0): #it's always a list, but an empty one if coneConnecter is not used
+                                connectedCone.coneConData.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
+                            connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
+                        listToRemoveFrom = (pygamesimInput.mapToDraw.right_cone_list if overlappingCone.LorR else pygamesimInput.mapToDraw.left_cone_list)
+                        listToRemoveFrom.pop(GF.findIndexByClassAttr(listToRemoveFrom, 'ID', overlappingCone.ID))
             if(pygamesimInput.pathPlanningPresent):
                 pygamesimInput.makeBoundrySplines()
         else:
@@ -469,24 +556,35 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                 if(overlaps):
                     if(pygame.key.get_pressed()[pygame.K_f]):
                         if((pygamesimInput.mapToDraw.finish_line_cones[0].LorR != overlappingCone.LorR) if (len(pygamesimInput.mapToDraw.finish_line_cones) > 0) else True):
-                            overlappingCone.isFinish = True
-                            pygamesimInput.mapToDraw.finish_line_cones.append(overlappingCone)
+                            if(pygamesimInput.isRemote):
+                                remoteConeSetFinish(pygamesimInput.remoteUIsender, overlappingCone)
+                            else:
+                                overlappingCone.isFinish = True
+                                pygamesimInput.mapToDraw.finish_line_cones.append(overlappingCone)
                         else:
                             print("can't set (existing) cone as finish, there's aready a "+("right" if leftOrRight else "left")+"-sided finish cone")
-                    elif(pygamesimInput.coneConnecterPresent):
-                        pygamesimInput.mapToDraw.connectCone(overlappingCone)
+                    elif(pygamesimInput.coneConnecterPresent or pygamesimInput.isRemote):
+                        if(pygamesimInput.isRemote):
+                            remoteConeConnect(pygamesimInput.remoteUIsender, overlappingCone)
+                        else:
+                            pygamesimInput.mapToDraw.connectCone(overlappingCone)
                 else:
                     newConeID = GF.findMaxAttrIndex((pygamesimInput.mapToDraw.right_cone_list + pygamesimInput.mapToDraw.left_cone_list), 'ID')[1]
                     aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, pygame.key.get_pressed()[pygame.K_f])
                     if(((pygamesimInput.mapToDraw.finish_line_cones[0].LorR != leftOrRight) if (len(pygamesimInput.mapToDraw.finish_line_cones) > 0) else True) if pygame.key.get_pressed()[pygame.K_f] else True):
-                        coneListToAppend = (pygamesimInput.mapToDraw.right_cone_list if leftOrRight else pygamesimInput.mapToDraw.left_cone_list)
-                        coneListToAppend.append(aNewCone)
-                        if(pygame.key.get_pressed()[pygame.K_f]):
-                            pygamesimInput.mapToDraw.finish_line_cones.append(aNewCone)
-                        if(pygame.key.get_pressed()[pygame.K_LSHIFT] and pygamesimInput.coneConnecterPresent):
-                            pygamesimInput.mapToDraw.connectCone(aNewCone)
+                        if(pygamesimInput.isRemote):
+                            remoteConePlace(pygamesimInput.remoteUIsender, aNewCone, pygame.key.get_pressed()[pygame.K_LSHIFT])
+                        else:
+                            coneListToAppend = (pygamesimInput.mapToDraw.right_cone_list if leftOrRight else pygamesimInput.mapToDraw.left_cone_list)
+                            coneListToAppend.append(aNewCone)
+                            if(pygame.key.get_pressed()[pygame.K_f]):
+                                pygamesimInput.mapToDraw.finish_line_cones.append(aNewCone)
+                            if(pygame.key.get_pressed()[pygame.K_LSHIFT] and pygamesimInput.coneConnecterPresent):
+                                pygamesimInput.mapToDraw.connectCone(aNewCone)
                 if(pygamesimInput.pathPlanningPresent):
                     pygamesimInput.makeBoundrySplines()
+        if(pygame.key.get_pressed()[pygame.K_f]): #flag cursor stuff
+            pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3]) #smaller flag cursor
     elif(button==2): #middle mouse button
         if(buttonDown): #mouse pressed down
             if(not pygamesimInput.carCam):
@@ -514,7 +612,7 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
             pygame.event.set_grab(0)
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             flagCursorSet = False
-    if(key==pygame.K_r): # r
+    elif(key==pygame.K_r): # r
         global deleteCursorSet
         if(keyDown):
             if(not deleteCursorSet): #in pygame SDL2, holding a button makes it act like a keyboard button, and event gets spammed.
@@ -525,48 +623,54 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
             pygame.event.set_grab(0)
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             deleteCursorSet = False
-    elif(key==pygame.K_p): # p
-        if(keyDown):
-            if(pygamesimInput.pathFinderPresent):
-                pygamesimInput.mapToDraw.makePath()
-                # doesNothing = 0
-                # while(pygamesimInput.mapToDraw.makePath()): #stops when path can no longer be advanced
-                #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
+    elif(keyDown): #most things only happen on keyDown, this just saves a few lines
+        if(key==pygame.K_p): # p
+            if(pygamesimInput.pathFinderPresent or pygamesimInput.isRemote):
+                if(pygamesimInput.isRemote):
+                    remotePathFind(pygamesimInput.remoteUIsender, 1)
+                    #remotePathFind(pygamesimInput.remoteUIsender, -1) #less than 1 means as many as possible
+                else:
+                    pygamesimInput.mapToDraw.makePath()
+                    # doesNothing = 0
+                    # while(pygamesimInput.mapToDraw.makePath()): #stops when path can no longer be advanced
+                    #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
             if(pygamesimInput.pathPlanningPresent):
                 pygamesimInput.makePathSpline()
-    elif(key==pygame.K_a): # a
-        if(keyDown):
-            if((pygamesimInput.mapToDraw.car.pathFolData is not None) and pygamesimInput.pathPlanningPresent):
-                pygamesimInput.mapToDraw.car.pathFolData.auto = not pygamesimInput.mapToDraw.car.pathFolData.auto
-    elif((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)): # +
-        if(keyDown):
-            if((pygamesimInput.mapToDraw.car.pathFolData is not None) and pygamesimInput.pathPlanningPresent):
-                pygamesimInput.mapToDraw.car.pathFolData.targetVelocity += 0.25
-    elif(key==pygame.K_MINUS): # -
-        if(keyDown):
-            if((pygamesimInput.mapToDraw.car.pathFolData is not None) and pygamesimInput.pathPlanningPresent):
-                pygamesimInput.mapToDraw.car.pathFolData.targetVelocity -= 0.25
-                if(pygamesimInput.mapToDraw.car.pathFolData.targetVelocity < 0):
-                    pygamesimInput.mapToDraw.car.pathFolData.targetVelocity = 0
-    elif(key==pygame.K_q): # q (cubic splines sounds like 'q'-bic, also i suck at spelling
-        if(keyDown):
+        elif((key==pygame.K_a) or ((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)) or (key==pygame.K_MINUS)):
+            if(key==pygame.K_a): # a
+                if((pygamesimInput.mapToDraw.car.pathFolData is not None) and pygamesimInput.pathPlanningPresent):
+                    pygamesimInput.mapToDraw.car.pathFolData.auto = not pygamesimInput.mapToDraw.car.pathFolData.auto
+                    if(not pygamesimInput.isRemote):
+                        pygamesimInput.mapToDraw.car.desired_velocity = 0.0
+                        pygamesimInput.mapToDraw.car.desired_steering = 0.0
+                        try:
+                            pygamesimInput.mapToDraw.car.sendSpeedAngle(pygamesimInput.mapToDraw.car.desired_velocity, pygamesimInput.mapToDraw.car.desired_steering)
+                        except:
+                            print("couldn't send stopping insctruction")
+            elif((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)): # +
+                if((pygamesimInput.mapToDraw.car.pathFolData is not None) and pygamesimInput.pathPlanningPresent):
+                    pygamesimInput.mapToDraw.car.pathFolData.targetVelocity += 0.25
+            elif(key==pygame.K_MINUS): # -
+                if((pygamesimInput.mapToDraw.car.pathFolData is not None) and pygamesimInput.pathPlanningPresent):
+                    pygamesimInput.mapToDraw.car.pathFolData.targetVelocity -= 0.25
+                    if(pygamesimInput.mapToDraw.car.pathFolData.targetVelocity < 0):
+                        pygamesimInput.mapToDraw.car.pathFolData.targetVelocity = 0
+            if(pygamesimInput.isRemote):
+                remoteAutoDrivingUpdate(pygamesimInput.remoteUIsender, pygamesimInput.mapToDraw.car.pathFolData.auto, pygamesimInput.mapToDraw.car.pathFolData.targetVelocity)
+        elif(key==pygame.K_q): # q (cubic splines sounds like 'q'-bic, also i suck at spelling
             pygamesimInput.drawQubicSplines = not pygamesimInput.drawQubicSplines #only has (the desired) effect if pyagmesimInput.pathPlanningPresent == True
-    elif(key==pygame.K_t): # t
-        if(keyDown):
+        elif(key==pygame.K_t): # t
             pygamesimInput.drawTargetConeLines = not pygamesimInput.drawTargetConeLines #only has an effect if pyagmesimInput.pathFinderPresent == True
-    elif(key==pygame.K_h): # h
-        if(keyDown):
+        elif(key==pygame.K_h): # h
             pygamesimInput.headlights = not pygamesimInput.headlights #only has an effect if car sprite is used (.carPolygonMode)
-    elif(key==pygame.K_c): # c
-        if(keyDown):
+        elif(key==pygame.K_c): # c
             pygamesimInput.carHistPoints = []
             if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
                 aNewCleanMap = Map() #make new instance of the Map class
                 for attrName in dir(aNewCleanMap): #dir(class) returs a list of all class attributes
                         if((not attrName.startswith('_')) and (not callable(getattr(aNewCleanMap, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
                             setattr(pygamesimInput, attrName, getattr(aNewCleanMap, attrName)) #copy attribute
-    elif(key==pygame.K_v): # v
-        if(keyDown):
+        elif(key==pygame.K_v): # v
             pygamesimInput.carCam = not pygamesimInput.carCam
             if(pygamesimInput.carCam and pygamesimInput.movingViewOffset): #if you switched to carCam while you were moving viewOffset, just stop moving viewOffset (same as letting go of MMB)
                 pygame.event.set_grab(0)
@@ -675,7 +779,8 @@ def handleAllWindowEvents(pygamesimInput): #input can be pygamesim object, 1D li
         pygame.event.pump()
         return()
     for eventToHandle in pygame.event.get(): #handle all events
-        handleWindowEvent(pygamesimInputList, eventToHandle)
+        if(eventToHandle.type != pygame.MOUSEMOTION): #skip mousemotion events early (fast)
+            handleWindowEvent(pygamesimInputList, eventToHandle)
     
     # #the manual keyboard driving (tacked on here, because doing it with the event system would require more variables, and this is temporary anyway)
     # simToDrive = currentPygamesimInput(pygamesimInputList, demandMouseFocus=False) #get the active sim within the window

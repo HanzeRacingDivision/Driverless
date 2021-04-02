@@ -4,7 +4,6 @@ import pathFinding    as PF
 import pathPlanningTemp as PP
 import simulatedCar   as SC
 import carMCUclass    as RC
-import drawDriverless as DD
 import mapTransSock   as MS
 
 import time
@@ -14,24 +13,20 @@ import threading as thr
 
 ## copyExtractMap() is moved to mapTransSock, you can still call it with MS.copyExtractMap()
 
-class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
-    def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
+class pygamesimHeadless(CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
+    def __init__(self):
         Map.__init__(self) #init map class
         self.car = SC.simCar() #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         #self.car = RC.realCar(comPort='COM8')
         CC.coneConnecter.__init__(self)
         PF.pathFinder.__init__(self)
         PP.pathPlanner.__init__(self)
-        DD.pygameDrawer.__init__(self, self, window, drawSize, drawOffset, viewOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
-        #tell the drawing class which parts are present
+        #initialize constants (about which parts are present)
         self.coneConnecterPresent = True
         self.pathFinderPresent = True
         self.pathPlanningPresent = True
         self.SLAMPresent = False
         
-        self.isRemote = False
-        
-        #self.carPolygonMode = True #if you dont want to use the car sprite, set this to true (but if the sprite wasnt loaded this will be used automatically)
         
         if(self.pathPlanningPresent):
             self.car.pathFolData = PP.pathPlannerData()
@@ -39,10 +34,8 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameD
         #self.mapList = [copyExtractMap(self)]
 
 
-resolution = [1200, 600]
 
-DD.pygameInit(resolution)
-sim1 = pygamesimLocal(DD.window, resolution)
+sim1 = pygamesimHeadless()
 
 timeSinceLastUpdate = time.time()
 mapSaveTimer = time.time()
@@ -61,19 +54,15 @@ try:
     mapSockThread.start()
     ##note: mapSender.manualSendBuffer is a list to which you can append things (any object) to be sent to the connected client (if any)
     
-    while DD.windowKeepRunning:
+    while threadKeepRunning[0]: #stop evrything if mapSockThread stops
         rightNow = time.time()
         dt = rightNow - timeSinceLastUpdate
-        DD.handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
         
         if((sim1.car.pathFolData.auto) if sim1.pathPlanningPresent else False):
             sim1.calcAutoDriving()
             sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
         sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
         sim1.car.update(dt)
-        
-        sim1.redraw()
-        DD.frameRefresh() #not done in redraw() to accomodate multi-sim options
         
         # if((rightNow-mapSaveTimer)>0.25):
         #     sim1.mapList.append(copyExtractMap(sim1))
@@ -103,7 +92,6 @@ finally:
         print("mapSockThread still alive?:", mapSockThread.is_alive())
     except Exception as excep:
         print("couldn't stop thread?:", excep)
-    DD.pygameEnd() #correctly shut down pygame window
     try:  #alternatively:  if(type(sim1.car) is RC.realCar):
         sim1.car.disconnect()
     except Exception as excep:
