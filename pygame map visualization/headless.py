@@ -46,7 +46,7 @@ print()
 
 try:
     mapSender = MS.mapTransmitterSocket(host='', port=65432, objectWithMap=sim1)
-    mapSender.mapSendInterval = 0.1
+    mapSender.mapSendInterval = 0.25
     threadKeepRunning = [True] #an argument (functional pointer) shared between the main and mapSockThread and main thread
     autoMapSend = [True] #an argument (functional pointer) shared between the main and mapSockThread and main thread
     UIreceive = [True] #an argument (functional pointer) shared between the main and mapSockThread and main thread
