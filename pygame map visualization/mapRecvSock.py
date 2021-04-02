@@ -372,9 +372,11 @@ class mapReceiverSocket:
                         
             except socket.error as excep: #handleable exceptions, this will only end things on major exceptions (unexpected ones)
                 errorResolved = False
-                # if(excep.args[0] == ): #client connection aborted (from clients side)
-                #     print("mapReceiverSocket.runOnThread(): client disconnected, ignoring exception...")
-                #     time.sleep(0.25)
+                if(excep.args[0] == 10038): #'an operation was performed by something that is not a socket'
+                    print("mapReceiverSocket.runOnThread(): mapSock is not socket?, attempting reInit...")
+                    if(self.reInit()):
+                        print("mapSock not socket -> reInit success, continuing...")
+                        errorResolved = True
                 if(not errorResolved):
                     print("mapReceiverSocket.runOnThread(): major socket exception:", excep)
                     try:
@@ -397,7 +399,6 @@ class mapReceiverSocket:
                 return()
             except Exception as excep:
                 errorResolved = False
-                print(type(excep.args[0]))
                 if((excep.args[0] == "faillureCounter") if (type(excep.args[0]) is str) else False):
                     print("simple failureCount overflow, ignoring exception (reconnecting)...")
                     errorResolved = True
