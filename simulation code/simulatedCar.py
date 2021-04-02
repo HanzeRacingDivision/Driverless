@@ -42,6 +42,8 @@ class simCar(Map.Car):
                 self.velocity = self.velocity + (self.acceleration * dt)
             else:
                 self.velocity = self.velocity - (self.acceleration * dt)
+        elif(abs(self.desired_velocity) < 0.1): #full stop
+            self.velocity = 0.0
         #self.velocity = min(max(self.velocity, self.min_velocity), self.max_velocity)
         
         if(abs(self.desired_steering - self.steering) > abs((self.steer_accel * dt)/2)):
