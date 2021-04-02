@@ -14,11 +14,18 @@ import generalFunctions as GF #only used for cone deletion (UI parser)
 ## this is used to shrink the sent object to only include (important) map objects, no drawing data
 from Map import Map #only used in copyExtractMap
 from copy import deepcopy #only used in copyExtractMap
-def copyExtractMap(classWithMapParent): #copy ONLY the map class attributes from any (child) class into a new map object
+def deepCopyExtractMap(classWithMapParent): #copy ONLY the map class attributes from any (child) class into a new map object
     returnObject = Map() #make new instance of same class as source
     for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
             if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-                setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #copy attribute
+                setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #deepcopy attribute
+    return(returnObject)
+
+def shallowCopyExtractMap(classWithMapParent): #copy ONLY the map class attributes from any (child) class into a 'new' map object (consisting of pointers)
+    returnObject = Map() #make new instance of same class as source
+    for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
+            if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
+                setattr(returnObject, attrName, getattr(classWithMapParent, attrName)) #copy attribute (pointer)
     return(returnObject)
 
 
@@ -177,7 +184,7 @@ class mapTransmitterSocket:
                     if(len(connectedCone.coneConData) > 0): #it's always a list, but an empty one if coneConnecter is not used
                         connectedCone.coneConData.pop((0 if (connectedCone.connections[0].ID == coneToDelete.ID) else 1))
                     connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == coneToDelete.ID) else 1))
-                listToRemoveFrom = (self.objectWithMap.mapToDraw.right_cone_list if coneToDelete.LorR else self.objectWithMap.mapToDraw.left_cone_list)
+                listToRemoveFrom = (self.objectWithMap.right_cone_list if coneToDelete.LorR else self.objectWithMap.left_cone_list)
                 listToRemoveFrom.pop(GF.findIndexByClassAttr(listToRemoveFrom, 'ID', coneToDelete.ID))
                 if(self.objectWithMap.pathPlanningPresent):
                     self.objectWithMap.makeBoundrySplines()
@@ -264,7 +271,7 @@ class mapTransmitterSocket:
                                         remainingBytes = clientSocket.recv(packetSize-len(receivedBytes)) #this should wait/provide delay
                                         receivedBytes += remainingBytes
                                         if((len(receivedBytes) < packetSize) and (attemptsRemaining>0)): #only if the goal hasnt been accomplised
-                                            time.sleep(0.005) #wait a tiny bit
+                                            time.sleep(0.010) #wait a tiny bit to let the bytes flow into the (underwater) buffer
                                     # if(len(receivedBytes) == packetSize):
                                     #     print("packet fixed in", self.maxPacketFixAttempts-attemptsRemaining, "attempts", packetSize)
                                     if(len(receivedBytes) != packetSize):
@@ -294,7 +301,10 @@ class mapTransmitterSocket:
                     #print("receivedObj:", type(receivedObj), len(pickle.dumps(receivedObj)))
                     if(type(receivedObj) is list):
                         if((type(receivedObj[0]) is str) if (len(receivedObj) >= 2) else False):
-                            self.UIparser(receivedObj)
+                            try:
+                                self.UIparser(receivedObj)
+                            except Exception as excep:
+                                print("UIparser exception:", excep)
                         else:
                             print("UIreceiver: receivedObj is not an INSTRUCTIONAL list!?", receivedObj)
                     else:
@@ -339,7 +349,7 @@ class mapTransmitterSocket:
             print("bad usage of mapTransmitterSocket.runOnThread(), for autoMapSend, please enter a 1-sized list with a boolean (python pointer hack)")
             threadKeepRunning[0] = False
             return()
-        if(((type(autoMapSend[0]) is not bool) if (len(autoMapSend)==1) else True) if (type(autoMapSend) is list) else True): #bad usage checking
+        if(((type(UIreceive[0]) is not bool) if (len(UIreceive)==1) else True) if (type(UIreceive) is list) else True): #bad usage checking
             print("bad usage of mapTransmitterSocket.runOnThread(), for UIreceive, please enter a 1-sized list with a boolean (python pointer hack)")
             threadKeepRunning[0] = False
             return()
@@ -356,6 +366,7 @@ class mapTransmitterSocket:
         # print("main thread:", thr.main_thread())
         # print(self.runningOnThread is thr.main_thread())
         ##if you made it here, all is well and you can start accepting clients on the socket
+        tempUIreceive = [UIreceive[0]] #copy UIreceive
         while(threadKeepRunning[0]):
             try:
                 print("mapTransmitterSocket.runOnThread(): waiting for client...")
@@ -364,16 +375,30 @@ class mapTransmitterSocket:
                 time.sleep(1.0) #wait a little while to avoid overloading client (and potentially getting drastically out of sync, especially when sending large packets
                 print("starting transmission!")
                 with clientSocket: #python's favorite way of handling a socket, this should (i think) close it up afterwards
-                    if(UIreceive[0]):
-                        UIreceiverThread = thr.Thread(target=self.UIreceiver, name="UIrecvThread", args=(threadKeepRunning, UIreceive, clientSocket), daemon=True)
+                    if(UIreceive[0]): #if the external (main thread) overlord wants remote UI to be enabled
+                        tempUIreceive[0] = True
+                        UIreceiverThread = thr.Thread(target=self.UIreceiver, name="UIrecvThread", args=(threadKeepRunning, tempUIreceive, clientSocket), daemon=True)
                         UIreceiverThread.start()
                     lastSendTime = time.time()
                     while(threadKeepRunning[0]):
                         if(autoMapSend[0] and (self.objectWithMap is not None)):
                             rightNow = time.time()
                             if((rightNow - lastSendTime) > self.mapSendInterval): #dont spam
+                                #print("PPS:", round(1/(rightNow-lastSendTime), 1))
                                 lastSendTime = rightNow
-                                bytesToSend = pickle.dumps(copyExtractMap(self.objectWithMap))
+                                bytesToSend = pickle.dumps(shallowCopyExtractMap(self.objectWithMap))
+                                
+                                ##debug speed measurement
+                                # extractStart = time.time()
+                                # extractedMap = shallowCopyExtractMap(self.objectWithMap)
+                                # pickleStart = time.time()
+                                # bytesToSend = pickle.dumps(extractedMap)
+                                # pickleEnd = time.time()
+                                # # if((pickleStart-extractStart)>0):
+                                # #     print("extract:", round(1/(pickleStart-extractStart), 1))
+                                # if((pickleEnd-pickleStart)>0):
+                                #     print("pickle:", round(1/(pickleEnd-pickleStart), 1))
+                                
                                 #print("sending map of size:", len(bytesToSend))
                                 if(self.usePacketSizeHeader):
                                     if(len(bytesToSend) > 999999):
@@ -398,6 +423,19 @@ class mapTransmitterSocket:
                             else:
                                 clientSocket.sendall(bytesToSend)
                             self.manualSendBuffer.pop(0)
+                        
+                        if(not UIreceive[0]): #if something outside of this thread, want the UIthread to be shut down (For whatever reason)
+                            tempUIreceive[0] = False
+                        elif((not tempUIreceive[0]) and UIreceive[0] and threadKeepRunning[0]): #if the thread died, but this thread didn't
+                            try: #try to turn UIreceive thread back on
+                                if(not UIreceiverThread.is_alive()):
+                                    tempUIreceive[0] = True
+                                    UIreceiverThread.start()
+                                #else:
+                                #    print("zombie UIreceiver thread?")
+                            except:
+                                print("couldn't restart UIreceive thread")
+                                tempUIreceive[0] = False
                     if(not threadKeepRunning[0]):
                         print("stopping mapTransmitterSocket.runOnThread() (from accepted client)")
             except socket.error as excep: #handleable exceptions, this will only end things on major exceptions (unexpected ones)
@@ -420,13 +458,6 @@ class mapTransmitterSocket:
                         errorResolved = True
                 if(not errorResolved):
                     print("mapTransmitterSocket.runOnThread(): major socket exception:", excep)
-                    if(UIreceive[0]):
-                        try:
-                            UIreceive[0] = False
-                            UIreceiverThread.join(1)
-                            print("UIreceiverThread still alive?:", UIreceiverThread.is_alive())
-                        except:
-                            print("couldn't stop UIreceiverThread(?)")
                     try:
                         clientSocket.close()
                     except Exception as closeExcep:
@@ -441,13 +472,6 @@ class mapTransmitterSocket:
                     return()
             except KeyboardInterrupt:
                 print("mapTransmitterSocket.runOnThread(): keyboardInterrupt! closing everything")
-                if(UIreceive[0]):
-                    try:
-                        UIreceive[0] = False
-                        UIreceiverThread.join(1)
-                        print("UIreceiverThread still alive?:", UIreceiverThread.is_alive())
-                    except:
-                        print("couldn't stop UIreceiverThread(?)")
                 try:
                     clientSocket.close()
                 except Exception as excep:
@@ -462,13 +486,6 @@ class mapTransmitterSocket:
                 return()
             except Exception as excep:
                 print("mapTransmitterSocket.runOnThread(): other exception:", excep)
-                if(UIreceive[0]):
-                    try:
-                        UIreceive[0] = False
-                        UIreceiverThread.join(1)
-                        print("UIreceiverThread still alive?:", UIreceiverThread.is_alive())
-                    except:
-                        print("couldn't stop UIreceiverThread(?)")
                 try:
                     clientSocket.close()
                 except Exception as closeExcep:
@@ -481,6 +498,13 @@ class mapTransmitterSocket:
                 threadKeepRunning[0] = False
                 self.runningOnThread = None
                 return()
+            finally:
+                try: #regardless of whether it was started, try to stop it
+                    tempUIreceive[0] = False
+                    UIreceiverThread.join(1)
+                    print("UIreceiverThread still alive?:", UIreceiverThread.is_alive())
+                except:
+                    print("couldn't stop UIreceiverThread(?)")
 
 
 # # testing code

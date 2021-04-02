@@ -270,6 +270,7 @@ class mapReceiverSocket:
                     #     print("first packet received:", len(firstPacket))
                     failureCounter = 0
                     failureCountDecrementTimer = time.time()
+                    lastMapImportTime = time.time()
                     while(threadKeepRunning[0]):
                         if(self.usePacketSizeHeader):
                             receivedBytes = self.mapSock.recv(self.packetSizeHeaderLength) #get packet size
@@ -302,7 +303,7 @@ class mapReceiverSocket:
                                                 remainingBytes = self.mapSock.recv(packetSize-len(receivedBytes)) #this should wait/provide delay
                                                 receivedBytes += remainingBytes
                                                 if((len(receivedBytes) < packetSize) and (attemptsRemaining>0)): #only if the goal hasnt been accomplised
-                                                    time.sleep(0.005) #wait a tiny bit
+                                                    time.sleep(0.005) #wait a tiny bit to let the bytes flow into the (underwater) buffer
                                             # if(len(receivedBytes) == packetSize):
                                             #     print("packet fixed in", self.maxPacketFixAttempts-attemptsRemaining, "attempts", packetSize)
                                             if(len(receivedBytes) != packetSize):
@@ -335,6 +336,10 @@ class mapReceiverSocket:
                                 receivedObj = None
                             #print("receivedObj:", type(receivedObj), len(pickle.dumps(receivedObj)))
                             if(type(receivedObj) is Map):
+                                rightNow = time.time()
+                                if((rightNow-lastMapImportTime)>0):
+                                    print("PPS:", round(1/(rightNow-lastMapImportTime), 1))
+                                lastMapImportTime = rightNow
                                 copyImportMap(self.objectWithMap, receivedObj)
                             else:
                                 ## if other objects can be received, parse them here (above here, with an elif())
