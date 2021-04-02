@@ -164,6 +164,24 @@ def findMaxAttrIndex(inputList, attrName): #finds biggest attribute in 1D list o
     else:
         return(-1, 0)
 
+def sortValues(listOfValues, upwards): #sort a list of values (int, float, etc.) from min to max or the other way around
+    """sort the entered list (does NOT return NEW list) by value, either upwards or downwards"""
+    for i in range(len(listOfValues)):
+        for j in range(i, len(listOfValues)):
+            if(((listOfValues[j] < listOfValues[i]) and upwards) or ((listOfValues[j] > listOfValues[i]) and (not upwards))):
+                tempVal = listOfValues[i]
+                listOfValues[i] = listOfValues[j]
+                listOfValues[j] = tempVal
+    return(listOfValues)
+
+def average(listOfValues):
+    """get average value of list (empty list returns 0)"""
+    if(len(listOfValues) > 0): #avoid divide by 0
+        return(sum(listOfValues)/len(listOfValues))
+    else:
+        #print("averaging 0 values!?")
+        return(0)
+
 #removed in favor of copy.deepcopy()
 # def deepCopy(source): #can copy any list, variable or class (copy values, not pointers)
 #     #print(type(source))
