@@ -21,7 +21,7 @@ camera:
 
 other:
 - pressing P makes it try to find a path (requires connected cones on both side of track) (ONLY IF pathFinding.py is present)
-- pressing C clears the car position history line
+- pressing C clears the car position history line, C+CTRL clears everything
 - pressing A toggles auto-driving (only has effect if pathPlanning(Temp).py is present)
 - pressing +/- increases/decreases auto-driving target speed
 - pressing Q toggles drawing qubic splines (only has effect if pathPlanning(Temp).py is present)
