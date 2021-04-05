@@ -53,7 +53,7 @@ print()
 
 try:
     mapSender = MS.mapTransmitterSocket(host='', port=65432, objectWithMap=sim1)
-    mapSender.mapSendInterval = 0.5
+    mapSender.mapSendInterval = 0.2 #start safe, you can bring this number down if the connection is good (FPS = 1/this)
     threadKeepRunning = [True] #an argument (functional pointer) shared between the main and mapSockThread and main thread
     autoMapSend = [True] #an argument (functional pointer) shared between the main and mapSockThread and main thread
     UIreceive = [True] #an argument (functional pointer) shared between the main and mapSockThread and main thread
@@ -76,7 +76,7 @@ try:
         DD.frameRefresh() #not done in redraw() to accomodate multi-sim options
         
         # if((rightNow-mapSaveTimer)>0.25):
-        #     sim1.mapList.append(copyExtractMap(sim1))
+        #     sim1.mapList.append(MS.deepCopyExtractMap(sim1))
         #     if(len(sim1.mapList) > 40):
         #         sim1.mapList.pop(0)
         #     #print((time.time()-mapSaveTimer)*1000)

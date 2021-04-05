@@ -78,7 +78,7 @@ class pygameDrawer():
         
         self.isRemote = False
         self.remoteUIsender = None
-        
+        self.remoteFPS = 5
         
         self.drawTargetConeLines = False #just for UI purposes, to toggle between showing and not showing how the targets are made
         
@@ -160,8 +160,8 @@ class pygameDrawer():
                 FPSstrings.append(str(round(GF.average(self.FPSdata), 1))) #average FPS
                 FPSstrings.append(str(min(self.FPSdata)))                  #minimum FPS
                 FPSstrings.append(str(max(self.FPSdata)))                  #maximum FPS
-                #GF.sortValues(self.FPSdata, True)
-                #FPSstrings.append(str(self.FPSdata[int((len(self.FPSdata)-1)/2)])) #median FPS
+                GF.sortValues(self.FPSdata, True)
+                FPSstrings.append(str(self.FPSdata[int((len(self.FPSdata)-1)/2)])) #median FPS
                 #print("FPS:", round(GF.average(self.FPSdata), 1), min(self.FPSdata), max(self.FPSdata), self.FPSdata[int((len(self.FPSdata)-1)/2)])
             else:
                 FPSstrings = ["inf"]
@@ -432,6 +432,11 @@ def remoteAutoDrivingUpdate(socketToSendFrom, autoMode, targetSpeed):
     #print("remoteAutoDrivingUpdate")
     remoteInstructionSend(socketToSendFrom, ['AUTO', autoMode, targetSpeed])
 
+def remoteAdjustMapSendInterval(socketToSendFrom, newMapSendInterval):
+    """instruct remote instance to send more/less map packets"""
+    #print("remoteAdjustMapSendInterval")
+    remoteInstructionSend(socketToSendFrom, ['FPSADJ', int(newMapSendInterval)])
+
 #def remoteWholeMapLoad(socketToSendFrom, mapToLoad): #for debugging/testing, when you need to load an entire map object over the network
 
 #cursor in the shape of a flag
@@ -627,13 +632,12 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
         if(key==pygame.K_p): # p
             if(pygamesimInput.pathFinderPresent or pygamesimInput.isRemote):
                 if(pygamesimInput.isRemote):
-                    remotePathFind(pygamesimInput.remoteUIsender, 1)
-                    #remotePathFind(pygamesimInput.remoteUIsender, -1) #less than 1 means as many as possible
+                    #remotePathFind(pygamesimInput.remoteUIsender, 1) #find 1 path point
+                    remotePathFind(pygamesimInput.remoteUIsender, -1) #find as many path points as it can
                 else:
-                    pygamesimInput.mapToDraw.makePath()
-                    # doesNothing = 0
-                    # while(pygamesimInput.mapToDraw.makePath()): #stops when path can no longer be advanced
-                    #     doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
+                    #pygamesimInput.mapToDraw.makePath() #find a single path point
+                    while(pygamesimInput.mapToDraw.makePath()): #stops when path can no longer be advanced
+                        doesNothing = 1  # "python is so versitile, you can do anything" :) haha good joke
             if(pygamesimInput.pathPlanningPresent):
                 pygamesimInput.makePathSpline()
         elif((key==pygame.K_a) or ((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)) or (key==pygame.K_MINUS)):
@@ -677,6 +681,14 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
                 pygamesimInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
                 pygamesimInput.movingViewOffset = False
+        elif(key==pygame.K_RIGHTBRACKET):
+            pygamesimInput.remoteFPS += 1
+            remoteAdjustMapSendInterval(pygamesimInput.remoteUIsender, int(pygamesimInput.remoteFPS))
+        elif(key==pygame.K_LEFTBRACKET):
+            pygamesimInput.remoteFPS -= 1
+            if(pygamesimInput.remoteFPS <= 0):
+                pygamesimInput.remoteFPS = 1
+            remoteAdjustMapSendInterval(pygamesimInput.remoteUIsender, int(pygamesimInput.remoteFPS))
 
 def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
     """(UI element) return the pygameDrawer that the mouse is hovering over, or the one you interacted with last"""

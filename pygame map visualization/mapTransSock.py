@@ -220,6 +220,9 @@ class mapTransmitterSocket:
                     print("failed to perform 'AUTO' instruction, as car.pathFolData is None")
             else:
                 print("ignored 'AUTO' instruction, because self.objectWithMap.pathPlanningPresent == False")
+        elif(instruction[0] == 'FPSADJ'):
+            print("ajustding mapsPerSecond to:", instruction[1])
+            self.mapSendInterval = min(max(1.0/float(instruction[1]), 0.03), 2.0)
         else:
             print("can't parse unknown instruction:", instruction[0])
             return(False)
@@ -374,6 +377,10 @@ class mapTransmitterSocket:
                 print("mapTransmitterSocket.runOnThread(): cliend found:", clientAddress)
                 time.sleep(1.0) #wait a little while to avoid overloading client (and potentially getting drastically out of sync, especially when sending large packets
                 print("starting transmission!")
+                if(self.mapSendInterval > 0):
+                    mapsPerSecond = 1/self.mapSendInterval #how many Map objects are being sent per second
+                    self.manualSendBuffer.append(['FPSREP', int(mapsPerSecond)]) #send the FPS as a UI report
+                    print("UI reporting FPS:", mapsPerSecond)
                 with clientSocket: #python's favorite way of handling a socket, this should (i think) close it up afterwards
                     if(UIreceive[0]): #if the external (main thread) overlord wants remote UI to be enabled
                         tempUIreceive[0] = True

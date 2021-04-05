@@ -341,6 +341,17 @@ class mapReceiverSocket:
                                     print("PPS:", round(1/(rightNow-lastMapImportTime), 1))
                                 lastMapImportTime = rightNow
                                 copyImportMap(self.objectWithMap, receivedObj)
+                            elif(((type(receivedObj[0]) is str) if (len(receivedObj) >= 2) else False) if (type(receivedObj) is list) else False):
+                                #tiny UIparser:
+                                #print("UI report received:", receivedObj)
+                                if(receivedObj[0] == 'FPSREP'):
+                                    try:
+                                        self.objectWithMap.remoteFPS = int(receivedObj[1])
+                                        print("received FPS UI report:", self.objectWithMap.remoteFPS)
+                                    except Exception as excep:
+                                        print("'FPSREP' UI report failed:", excep)
+                                else:
+                                    print("UI report unknown:", receivedObj)
                             else:
                                 ## if other objects can be received, parse them here (above here, with an elif())
                                 print("non-map object received:", receivedObj)

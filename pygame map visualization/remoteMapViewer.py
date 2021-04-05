@@ -26,8 +26,6 @@ class pygamesimRemote(CC.coneConnecter, PP.pathPlanner, MS.mapReceiverSocket, DD
         
         #self.carPolygonMode = True #if you dont want to use the car sprite, set this to true (but if the sprite wasnt loaded this will be used automatically)
         
-        #self.mapList = [copyExtractMap(self)]
-        
         self.threadKeepRunning = [True]
         try:
             self.mapSockThread = thr.Thread(target=self.runOnThread, name="mapSockThread", args=(self.threadKeepRunning, ), daemon=True)
@@ -53,33 +51,23 @@ class pygamesimRemote(CC.coneConnecter, PP.pathPlanner, MS.mapReceiverSocket, DD
 resolution = [1200, 600]
 
 DD.pygameInit(resolution)
-sim1 = pygamesimRemote('127.0.0.1', 65432, DD.window, resolution)
+sim1 = pygamesimRemote('pi4thijs.local', 65432, DD.window, resolution)
 
 try:
-    #sim1.manualConnect()
-    
     timeSinceLastUpdate = time.time()
     while DD.windowKeepRunning:
         rightNow = time.time()
         DD.handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
         
-        #sim1.manualReceive(True) #this way, framerate is limited to sending rate
         if(DD.windowKeepRunning): #the pygame.QUIT event may have set this to False at this point
             DD.windowKeepRunning = sim1.threadKeepRunning[0] #stop window if thread stopped
         
-        if(sim1.pathPlanningPresent): #recalculate splines
+        if(sim1.pathPlanningPresent): #recalculate splines every frame, because why not (this one doesnt need to be all that efficient)
             sim1.makeBoundrySplines()
             sim1.makePathSpline()
         
         sim1.redraw()
         DD.frameRefresh() #not done in redraw() to accomodate multi-sim options
-        
-        # if((rightNow-mapSaveTimer)>0.25):
-        #     sim1.mapList.append(copyExtractMap(sim1))
-        #     if(len(sim1.mapList) > 40):
-        #         sim1.mapList.pop(0)
-        #     #print((time.time()-mapSaveTimer)*1000)
-        #     mapSaveTimer = rightNow
         
         timeSinceLastUpdate = rightNow #save time (from start of loop) to be used next time
         rightNow = time.time() #this is only for the framerate limiter (time.sleep() doesn't accept negative numbers, this solves that)
