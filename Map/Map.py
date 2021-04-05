@@ -1,19 +1,9 @@
 import numpy as np
+import time
 import generalFunctions as GF
 
-# #constants for distanceToConeSquared, can be replaced with strings, but this is faster
-# global DONT_SORT, SORTBY_DIST, SORTBY_ANGL, SORTBY_ANGL_DELT, SORTBY_ANGL_DELT_ABS
-# DONT_SORT = 0
-# SORTBY_DIST = 1
-# SORTBY_ANGL = 2
-# SORTBY_ANGL_DELT = 3
-# SORTBY_ANGL_DELT_ABS = 4
-# global NO_CONN_EXCL, EXCL_UNCONN, EXCL_SING_CONN, EXCL_DUBL_CONN
-# NO_CONN_EXCL = 0
-# EXCL_UNCONN = 1
-# EXCL_SING_CONN = 2
-# EXCL_DUBL_CONN = 3
-# EXCL_ANY_CONN = 4
+
+
 
 
 class Map:
@@ -28,6 +18,10 @@ class Map:
         self.targets_full_circle = False #if the target list loops around
         
         #self.newConeID = 0 #add 1 after adding a cone #TO BE REPLACED BY PANDAS INDEXING
+        
+        self.clockStart = time.time()
+        self.clock = self.clockGet #pointer to clock function (can be changed to a simulated one)
+    
     
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
@@ -162,6 +156,12 @@ class Map:
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
     
+    def clockGet(self): #a function that is passed to self.clock by default
+        return(time.time() - self.clockStart)
+    
+    def clockSet(self, clockFunction): #set a different (simulation) function for self.clock, and insert a pointer to the self as a default argument (only used if function HAS an argument, if this is an issue, avoid usage of setClock() and edit self.clock manually)
+        self.clock = clockFunction
+        self.clock.__defaults__ = (self, ) #insert this map object by default (little hacky, may be removed later)
     
     def getConeChainLen(self, currentCone: Cone, prevCone=None, lengthMem=1): #(itteratively) determine the lenght of a sequence of connected cones (note: uses Cone.ID)
         """ get the length of the 'chain' of cones that the input cone is connected to """
