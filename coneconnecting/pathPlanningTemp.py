@@ -35,11 +35,12 @@ class pathPlanner(Map):
         
         #self.turning_sharpness = 1.8
         
+        self.targetDistSpeedMultiplier = 0.25 #at high speed, the tolerance for targer reached distance should increase (because turning radius increases and accuracy does not). To disable this, set it to 0
         self.targetReachedThreshold = 0.3 #if distance to target (regardless of orientation) is less than this, target is reached (larger means less likely to spin off, smaller means more accurate)
         ##if the target can't be reached, due to turning radius limitations (TBD: slowing down), then passing is enough
         self.targetPassedDistThreshold = self.targetReachedThreshold*2.0 #if it passes a target (without hitting it perfectly), the distance to target should still be less than this
-        self.targetPassedAngleThreshold = np.deg2rad(80) #if it passes a target (without hitting it perfectly), the angle to target will probably be more than this
-        self.targetMissedAngleThreshold = np.deg2rad(150) #if the angle to target is larger than this, (panic, and) move on to the next target (or something)
+        self.targetPassedAngleThreshold = np.deg2rad(75) #if it passes a target (without hitting it perfectly), the angle to target will probably be more than this
+        self.targetMissedAngleThreshold = np.deg2rad(140) #if the angle to target is larger than this, (panic, and) move on to the next target (or something)
         
     def nextTarget(self, currentTarget):
         """returns the next target in the target_list"""
@@ -54,7 +55,7 @@ class pathPlanner(Map):
                     print("PANIC, ran out of targets")
                     return(currentTarget)
     
-    def targetUpdate(self, currentTarget, distToTarget, angleToTarget):
+    def targetUpdate(self, currentTarget, distToTarget, angleToTarget, velocity):
         """returns the next target if the current one is reached/passed/missed, returns the current target if the car is still on track to reach it"""
         if(currentTarget is None): #if the first target hasn't been selected yet
             print("selecting totally new target")
@@ -65,11 +66,11 @@ class pathPlanner(Map):
                 print("there are no targets, how am i supposed to update it >:(")
                 return(currentTarget)
         else:
-            if(distToTarget < self.targetReachedThreshold):
+            if(distToTarget < (self.targetReachedThreshold + (self.targetDistSpeedMultiplier*self.targetReachedThreshold*(velocity-1.0)))):
                 #print("target reached normally", distToTarget, np.rad2deg(angleToTarget))
                 #currentTarget.passed += 1
                 return(self.nextTarget(currentTarget))
-            elif((distToTarget < self.targetPassedDistThreshold) and (abs(angleToTarget) > self.targetPassedAngleThreshold)):
+            elif((distToTarget < (self.targetPassedDistThreshold + (self.targetDistSpeedMultiplier*self.targetPassedDistThreshold*(velocity-1.0)))) and (abs(angleToTarget) > self.targetPassedAngleThreshold)):
                 print("target passed kinda wonky", distToTarget, np.rad2deg(angleToTarget))
                 #currentTarget.passed += 1
                 return(self.nextTarget(currentTarget))
@@ -83,27 +84,33 @@ class pathPlanner(Map):
     def calcAutoDriving(self, saveOutput=True):
         """calculate the steering angle (and speed) required to reach the current target
             (default) if input parameter True the output will be saved to the Car"""
+        if(self.car.pathFolData is None):
+            self.car.pathFolData = pathPlannerData()
         if(len(self.target_list) == 0):
             print("can't autodrive, there are no targets")
             self.car.pathFolData.auto = False
             return(0.0, 0.0)
-        if(self.car.pathFolData.nextTarget is None):
-            self.car.pathFolData.nextTarget = self.targetUpdate(None, 0, 0)
-        dist, angle = GF.distAngleBetwPos(self.car.position, self.car.pathFolData.nextTarget.position)
-        angle = GF.radRoll(angle-self.car.angle)
-        prevTarget = self.car.pathFolData.nextTarget
-        self.car.pathFolData.nextTarget = self.targetUpdate(self.car.pathFolData.nextTarget, dist, angle)
-        if(prevTarget != self.car.pathFolData.nextTarget): #if it didnt change there's no need to spend time recalculating dist & angle
-            dist, angle = GF.distAngleBetwPos(self.car.position, self.car.pathFolData.nextTarget.position)
+        if((self.car.pathFolData.nextTarget is None) and saveOutput):
+            self.car.pathFolData.nextTarget = self.targetUpdate(None, 0, 0, 0)
+        if(self.car.pathFolData.nextTarget is not None): #if saveOutput hasn't prevented the first target from being set
+            prevTarget = self.car.pathFolData.nextTarget
+            dist, angle = GF.distAngleBetwPos(self.car.position, prevTarget.position)
             angle = GF.radRoll(angle-self.car.angle)
-        
-        #desired_steering = min(max(np.arctan(angle/(dist**self.turning_sharpness)), -25), 25)
-        desired_steering = min(max(angle,-self.car.maxSteeringAngle),self.car.maxSteeringAngle)
-        desired_velocity = self.car.pathFolData.targetVelocity
-        if(saveOutput):
-            self.car.desired_steering = desired_steering
-            self.car.desired_velocity = desired_velocity
-        return(desired_velocity, desired_steering)
+            nextTarget = self.targetUpdate(prevTarget, dist, angle, self.car.velocity) #check whether the target should be updated (if prevTarget reached/passed/missed), and return next/current target
+            if(prevTarget != nextTarget): #if it didnt change there's no need to spend time recalculating dist & angle
+                dist, angle = GF.distAngleBetwPos(self.car.position, nextTarget.position)
+                angle = GF.radRoll(angle-self.car.angle)
+            
+            #desired_steering = min(max(np.arctan(angle/(dist**self.turning_sharpness)), -25), 25)
+            desired_steering = min(max(angle,-self.car.maxSteeringAngle),self.car.maxSteeringAngle)
+            desired_velocity = self.car.pathFolData.targetVelocity
+            if(saveOutput):
+                self.car.pathFolData.nextTarget = nextTarget
+                self.car.desired_steering = desired_steering
+                self.car.desired_velocity = desired_velocity
+            return(desired_velocity, desired_steering, nextTarget)
+        else: #if no first target was selected (saveOutput=False)
+            return(0.0, 0.0, self.targetUpdate(None, 0, 0, 0))
     
     ## cubic spline 
     def makeBoundrySpline(self, inputConeList):
