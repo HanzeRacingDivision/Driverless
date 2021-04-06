@@ -4,7 +4,9 @@ python requirements:
 - (only for real-life model car control) pyserial (only in carMCUclass.py)
 
 how to use: <br/>
-- see 'generalSim.py' for an example
+- see 'simpleSim.py' for a minimal simulation program (currently also runs as fast as PC allows, see Map.clock and how it was replaced)
+- see 'generalSim.py' for an extensive feature display
+- see 'headless.py' and 'remoteMapViewer.py' for an example of remote map viewing (and editing!)
 
 cones:
 - left mouse button places left cones (yellow)
@@ -26,6 +28,7 @@ other:
 - pressing +/- increases/decreases auto-driving target speed
 - pressing Q toggles drawing qubic splines (only has effect if pathPlanning(Temp).py is present)
 - pressing T toggles whether the cone-lines that determined the targets are drawn (only has effect if pathFinding.py is present)
+- pressing [/] (left and right square bracket) increases the rate at which maps are transmitted (ONLY IN remote viewers (remoteMapViewer.py))
 
 driving (temporary): COMMENTED OUT AT BOTTOM OF drawDriverless.py
 - arrow keys (only if autodriving is off, and has no effect on real car (if realCar is connected))
