@@ -92,7 +92,6 @@ try:
         ## after all the important stuff:
         FPSrightNow = sim1.clock() #this is only for the framerate limiter (time.sleep() doesn't accept negative numbers, this solves that)
         if((FPSrightNow-rightNow) < 0.015): #60FPS limiter (optional)
-            print("sleeping:", round((FPSrightNow-rightNow)*1000, 1))
             time.sleep(0.0155-(FPSrightNow-rightNow))
 
 except KeyboardInterrupt:
