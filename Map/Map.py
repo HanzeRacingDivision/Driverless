@@ -3,13 +3,18 @@ import time
 import generalFunctions as GF
 
 
-
+def defaultClock(clockStart): #a function that is passed to Map.clock by default
+    return(time.time() - clockStart)
 
 
 class Map:
     """ A parent map class that holds all variables that make up a (basic) track """
     def __init__(self):  # variables here that define the scenario/map
-        self.car = self.Car(self)
+        self.clockStart = time.time()
+        self.clock = None
+        self.clockSet(defaultClock)
+        
+        self.car = self.Car(self.clock)
         self.left_cone_list = []
         self.right_cone_list = []
         self.finish_line_cones = [] #holds 2 Cone objects, 1 left and 1 right (redundant, becuase Cone.isFinish attribute, but this will save a lot of list-searching time)
@@ -19,13 +24,10 @@ class Map:
         
         #self.newConeID = 0 #add 1 after adding a cone #TO BE REPLACED BY PANDAS INDEXING
         
-        self.clockStart = time.time()
-        self.clock = self.clockGet #pointer to clock function (can be changed to a simulated one)
-    
     
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
-        def __init__(self, mapThisIsIn):
+        def __init__(self, clockFunc):
             self.position = np.array([0.0, 0.0])
             self.angle = 0.0 #car orientation in radians
             self.velocity = 0.0 #measured and filtered car 'forward' (wheel) speed in meters/second (used to update position)
@@ -40,6 +42,8 @@ class Map:
             
             self.maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept serial commands outside this range)
             
+            self.clockFunc = clockFunc
+            
             ## moved to pathPlanningTemp (and some renamed), can be found in self.pathFolData
             #self.auto = False #(thijs) could do with a clearer name like 'driving' or 'self_driving_active' or something
             #self.max_velocity = 5 #in m/s
@@ -52,7 +56,7 @@ class Map:
             #self.acceleration = 0.0 #acceleration in meters/second^2
             #self.fov_range = 60  #(thijs) this is the actual (camera) field of view variable, but it's only useful for the simulation, so delete this?
             
-            #self.lastUpdateTime = self.clock() #TBD, timestamp for 
+            #self.lastUpdateTime = self.clockFunc() #TBD, timestamp for 
             
             self.coneConData = None #extra data specifically for cone-connection
             self.pathFolData = None #extra data specifically for path-planning
@@ -61,7 +65,7 @@ class Map:
         def update(self, dt):
             """ update the position of the car, based on velocity, steering and time-passage """
             # if(dt < 0.0001):
-            #     timeRightNow = self.clock() #python is not the fastest language, using time.time() at different points in this function will give different values, this won't
+            #     timeRightNow = self.clockFunc() #python is not the fastest language, using time.time() at different points in this function will give different values, this won't
             #     dt = time.time() - lastUpdateTime
             
             #self.velocity += self.acceleration * dt #only for keyboard driving, unless carMCU control system changes
@@ -156,12 +160,9 @@ class Map:
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
     
-    def clockGet(self): #a function that is passed to self.clock by default
-        return(time.time() - self.clockStart)
-    
     def clockSet(self, clockFunction): #set a different (simulation) function for self.clock, and insert a pointer to the self as a default argument (only used if function HAS an argument, if this is an issue, avoid usage of setClock() and edit self.clock manually)
         self.clock = clockFunction
-        self.clock.__defaults__ = (self, ) #insert this map object by default (little hacky, may be removed later)
+        self.clock.__defaults__ = (self.clockStart, ) #insert the starting time as the default argument
     
     def getConeChainLen(self, currentCone: Cone, prevCone=None, lengthMem=1): #(itteratively) determine the lenght of a sequence of connected cones (note: uses Cone.ID)
         """ get the length of the 'chain' of cones that the input cone is connected to """
