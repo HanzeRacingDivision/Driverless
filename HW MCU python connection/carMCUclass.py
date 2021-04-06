@@ -16,7 +16,7 @@ import generalFunctions as GF #(homemade) some useful functions for everyday eas
 
 class carMCU:
     """a class for handling the serial connection to the real car"""
-    def __init__(self, connectAtInit=True, comPort=None, autoFind=True):
+    def __init__(self, connectAtInit=True, comPort=None, autoFind=True, clockFunc=time.time): #if no clock function is supplied, time.time is used
         self.carMCUserial = serial.Serial()
         self.carMCUserial.baudrate = 115200
         self.carMCUserial.timeout = 0.01 #a 10ms timeout (should only be needed for readline(), which i don't use)
@@ -27,6 +27,8 @@ class carMCU:
         if(connectAtInit):
             self.connect(comPort, autoFind) #attempt to connect upon class creation
         
+        self.clockFunc = clockFunc #clock function, can just be time.time, can also be Map.clock
+        
         # constants
         self.minimumSerialLength = 14 #the minimum length of a feedback message is "x.xx x.xx x.x\r"
         self.unfinTimeout = 0.015 #if the unfinished message is older than this, just dump it (this value should be larger than the time between getFeedback() calls
@@ -34,8 +36,8 @@ class carMCU:
         self.defaultGetFeedbackInterval = 0.005 #used in runOnThread()
         # variables
         self.unfinString = '' #data may come in unfinished, store that unfinished data here (untill the rest is found)
-        self.unfinTimestamp = time.time() #a timestamp to remember how old the last unfinished message is (if it's too old, discard it)
-        self.lastSendTime = time.time() #timestamp of last sendSpeedAngle() (attempt)
+        self.unfinTimestamp = self.clockFunc() #a timestamp to remember how old the last unfinished message is (if it's too old, discard it)
+        self.lastSendTime = self.clockFunc() #timestamp of last sendSpeedAngle() (attempt)
         
         # sensor feedback data in First In First Out buffers, entry [0] is the newest, entry[len()-1] is the oldest
         self.maxFIFOlength = 10 #can safely be changed at runtime (excess FIFO entries will be removed at next write-oppertunity (once the next datapoint comes in))
@@ -44,6 +46,8 @@ class carMCU:
         self.distFIFO = []
         self.angleFIFO = []
         self.distTotalFIFO = [0]; #total sum of all distance feedbacks
+        
+        
     
     def _autoFindComPort(self):
         """attempt to find a new/singular COM-port (unplugging and replugging the serial device will make this function return that device)"""
@@ -144,7 +148,7 @@ class carMCU:
     
     def sendSpeedAngle(self, speed, angle): #NOTE: 'angle' input for this function should be in radians
         """send a speed and steering angle to the carMCU"""
-        rightNow = time.time()
+        rightNow = self.clockFunc()
         if(abs(angle) > self.maxSteeringAngle): #an extra little check
             print("can't sendSpeedAngle, steering angle too large:", np.rad2deg(angle))
         else:
@@ -177,7 +181,7 @@ class carMCU:
         if(len(splitString) != 3):
             print("len(splitString) wrong, can't parse string:", stringToParse.encode()) #encodet to make '\n', '\r' and ' ' visible
             return(False)
-        self._FIFOwrite(time.time(), self.feedbackTimestampFIFO, self.maxFIFOlength)
+        self._FIFOwrite(self.clockFunc(), self.feedbackTimestampFIFO, self.maxFIFOlength)
         self._FIFOwrite(float(splitString[0]), self.speedFIFO, self.maxFIFOlength)
         self._FIFOwrite(float(splitString[1]), self.distFIFO, self.maxFIFOlength)
         self._FIFOwrite(np.deg2rad(float(splitString[2])), self.angleFIFO, self.maxFIFOlength)
@@ -206,9 +210,9 @@ class carMCU:
                 splitData = receivedString.split('\n')
                 # special case (unfinished data from (recent) last message)
                 if(((len(self.unfinString)+len(receivedString)) < (2*self.minimumSerialLength)) and \
-                   (len(self.unfinString) > 0) and ((time.time() - self.unfinTimestamp) < self.unfinTimeout)): #if there's unfinished data
+                   (len(self.unfinString) > 0) and ((self.clockFunc() - self.unfinTimestamp) < self.unfinTimeout)): #if there's unfinished data
                     self.unfinString += splitData[0]
-                    #print("appending unfinString (top):", self.unfinString.encode(), "after", int((time.time() - self.unfinTimestamp)*1000), "ms")
+                    #print("appending unfinString (top):", self.unfinString.encode(), "after", int((self.clockFunc() - self.unfinTimestamp)*1000), "ms")
                     if((len(self.unfinString) >= self.minimumSerialLength) and (self.unfinString.endswith('\r'))):
                         while(self.unfinString.count('\r') > 1): #only in case of a skipped '\n'
                             print("multiple '\r' in unfinString:", self.unfinString.encode())
@@ -241,7 +245,7 @@ class carMCU:
                             return(result)
                         else:
                             self.unfinString = splitData[len(splitData)-i-1]
-                            self.unfinTimestamp = time.time()
+                            self.unfinTimestamp = self.clockFunc()
                             #print("setting unfinString:", self.unfinString.encode())
                 # if the code gets here, it means no valid datapoints were found in splitData
                 #print("no valid datapoints in splitData, unfinString:", self.unfinString.encode())
@@ -252,35 +256,52 @@ class carMCU:
             print("can't getFeedback(), carMCU is not connected")
             return(False)
     
-    def runOnThread(self, autoreconnect=False):
-        """(run this on a thread) runs getFeedback() forever and handles exceptions (supports hotplugging serial devices)"""
-        carMCUconThreadkeepRunning = True
-        while(carMCUconThreadkeepRunning): #super robust, might cause CPU overload though
+    def runOnThread(self, threadKeepRunning, autoreconnect=False):
+        """(run this on a thread) runs getFeedback() forever and handles exceptions (supports hotplugging serial devices)
+            USAGE: enter a 1-sized list with a boolean (e.g.: 'keepRunning=[True]; runOnThread(keepRunning)'), 
+            to stop the thread, set that boolean to False and then run thisThread.join()"""
+        if(((type(threadKeepRunning[0]) is not bool) if (len(threadKeepRunning)==1) else True) if (type(threadKeepRunning) is list) else True): #bad usage checking
+            print("bad usage of carMCU.runOnThread(), please enter a 1-sized list with a boolean (python pointer hack)")
+            #raise
+            return()
+        #import threading as thr
+        #myThread = thr.current_thread()
+        while(threadKeepRunning[0]): #super robust, might cause CPU overload though
             try:
-                while((not self.carMCUserial.is_open) and autoreconnect):
+                while((not self.carMCUserial.is_open) and autoreconnect and threadKeepRunning[0]):
                     print("carMCU reconnecting with port:", self.carMCUserial.port)
                     self.connect(self.carMCUserial.port, False) #try to connect again with the same comPort
                     if(not self.carMCUserial.is_open):
                         time.sleep(0.5) #wait a bit between connection attempts
-                while(self.carMCUserial.is_open):
+                while(self.carMCUserial.is_open and threadKeepRunning[0]):
                     self.getFeedback() #run this to get the data
                     time.sleep(self.defaultGetFeedbackInterval) #wait just a little bit, as to not needlessly overload the CPU
                 if(not autoreconnect):
                     print("carMCU connection on thread stopped becuase is_open:", self.carMCUserial.is_open)
                     return()
+                if(not threadKeepRunning[0]):
+                    print("stopping carMCU runOnThread function...")
+                    return()
             except serial.SerialException as excepVar:
-                print("carMCU serial exception")
+                print("carMCU serial exception, dealing with it...")
                 if(excepVar.args[0].find("Access is denied.")): #this is in the error message that happens when you unplug an active device
                     self.connect(self.carMCUserial.port, False, True) #try to connect again with the same comPort (will probably result in just disconnecting)
                 time.sleep(0.25)
             except KeyboardInterrupt:
-                print("attempting to close carMCU serial connection...")
-                self.disconnect()
-                carMCUconThreadkeepRunning = False
+                print("keyboardInterrupt! attempting to close carMCU serial connection...")
+                try:
+                    self.disconnect()
+                except:
+                    print("couldn't disconnect")
+                threadKeepRunning[0] = False
                 return()
             except Exception as excepVar:
                 print("carMCU other exception:", excepVar)
-                carMCUconThreadkeepRunning = False
+                try:
+                    self.disconnect()
+                except:
+                    print("couldn't disconnect")
+                threadKeepRunning[0] = False
                 return()
 
 
@@ -288,10 +309,11 @@ class carMCU:
 class realCar(carMCU, Map.Car):
     """ a TEMPORARY class that uses carMCU sensor feedback to get car state (position, velocity, etc.)
         (overwrites Map.Car.update() and carMCU.runOnThread()) """
-    def __init__(self, pos=[0,0], angle=0, connectAtInit=True, comPort=None, autoFind=True):
-        Map.Car.__init__(self, pos, angle)
-        carMCU.__init__(self, connectAtInit, comPort, autoFind)
-        self.timeSinceLastUpdate = time.time()
+    def __init__(self, mapThisIsIn, connectAtInit=True, comPort=None, autoFind=True):
+        Map.Car.__init__(self, mapThisIsIn)
+        self.mapThisIsIn = mapThisIsIn
+        carMCU.__init__(self, connectAtInit, comPort, autoFind, mapThisIsIn.clock)
+        self.timeSinceLastUpdate = mapThisIsIn.clock()
         self.skippedUpdateCheckVar = 0.0
     
     def update(self, inputDt=0): #this update() overwrites the update() in Map.Car, but this doesnt use the dt argument (because timestamps from the FIFO are used)
@@ -365,40 +387,60 @@ class realCar(carMCU, Map.Car):
             self.timeSinceLastUpdate = self.feedbackTimestampFIFO[0]
             #print([round(self.position[0], 2), round(self.position[1], 2)], round(GF.radRoll(self.angle),2), round(self.velocity,2), round(self.skippedUpdateCheckVar,2))
     
-    def runOnThread(self, autoreconnect=False): #overwrites runOnThread() in carMCU class
-        """(run this on a thread) runs getFeedback() and update() forever and handles exceptions (supports hotplugging serial devices)"""
-        carMCUconThreadkeepRunning = True
-        while(carMCUconThreadkeepRunning): #super robust, might cause CPU overload though
+    def runOnThread(self, threadKeepRunning, autoreconnect=False): #overwrites runOnThread() in carMCU class
+        """(run this on a thread) runs getFeedback() and update() forever and handles exceptions (supports hotplugging serial devices)
+            USAGE: enter a 1-sized list with a boolean (e.g.: 'keepRunning=[True]; runOnThread(keepRunning)'), 
+            to stop the thread, set that boolean to False and then run thisThread.join()"""
+        if(((type(threadKeepRunning[0]) is not bool) if (len(threadKeepRunning)==1) else True) if (type(threadKeepRunning) is list) else True): #bad usage checking
+            print("bad usage of carMCU.runOnThread(), please enter a 1-sized list with a boolean (python pointer hack)")
+            #raise
+            return()
+        #import threading as thr
+        #myThread = thr.current_thread()
+        while(threadKeepRunning[0]): #super robust, might cause CPU overload though
             try:
-                while((not self.carMCUserial.is_open) and autoreconnect):
+                while((not self.carMCUserial.is_open) and autoreconnect and threadKeepRunning[0]):
                     print("carMCU reconnecting with port:", self.carMCUserial.port)
                     self.connect(self.carMCUserial.port, False) #try to connect again with the same comPort
                     if(not self.carMCUserial.is_open):
                         time.sleep(0.5) #wait a bit between connection attempts
-                while(self.carMCUserial.is_open):
+                while(self.carMCUserial.is_open and threadKeepRunning[0]):
                     self.getFeedback() #get serial data and parse into values for the fifos
                     self.update()      #parse fifos to get position
                     time.sleep(self.defaultGetFeedbackInterval) #wait just a little bit, as to not needlessly overload the CPU
                 if(not autoreconnect):
                     print("carMCU connection on thread stopped becuase is_open:", self.carMCUserial.is_open)
                     return()
+                if(not threadKeepRunning[0]):
+                    print("stopping carMCU runOnThread function...")
+                    return()
             except serial.SerialException as excepVar:
-                print("carMCU serial exception")
+                print("carMCU serial exception, dealing with it...")
                 if(excepVar.args[0].find("Access is denied.")): #this is in the error message that happens when you unplug an active device
                     self.connect(self.carMCUserial.port, False, True) #try to connect again with the same comPort (will probably result in just disconnecting)
                 time.sleep(0.25)
             except KeyboardInterrupt:
-                print("attempting to close carMCU serial connection...")
-                self.disconnect()
-                carMCUconThreadkeepRunning = False
+                print("keyboardInterrupt! attempting to close carMCU serial connection...")
+                try:
+                    self.disconnect()
+                except:
+                    print("couldn't disconnect")
+                threadKeepRunning[0] = False
                 return()
             except Exception as excepVar:
                 print("carMCU other exception:", excepVar)
-                carMCUconThreadkeepRunning = False
+                try:
+                    self.disconnect()
+                except:
+                    print("couldn't disconnect")
+                threadKeepRunning[0] = False
                 return()
 
 
 # testing code, turn on a print() inside a function of interest (like car.update()) to see it working
 if __name__ == '__main__':
-    someCar = realCar(comPort='COM8')
-    someCar.runOnThread()
+    mapWithCar = Map() #map doesnt actually need to contain car object, it just needs to be initialized and have a .clock function
+    someCar = realCar(mapWithCar, True, 'COM5', False)
+    keepRunning = [True]
+    someCar.runOnThread(keepRunning) #not how it's meant to be used, for the record.
+    someCar.disconnect()
