@@ -8,8 +8,8 @@ import generalFunctions as GF
 
 class Map:
     """ A parent map class that holds all variables that make up a (basic) track """
-    def __init__(self, carStartPos=[0,0]):  # variables here that define the scenario/map
-        self.car = self.Car([carStartPos[0], carStartPos[1]])
+    def __init__(self):  # variables here that define the scenario/map
+        self.car = self.Car(self)
         self.left_cone_list = []
         self.right_cone_list = []
         self.finish_line_cones = [] #holds 2 Cone objects, 1 left and 1 right (redundant, becuase Cone.isFinish attribute, but this will save a lot of list-searching time)
@@ -25,9 +25,9 @@ class Map:
     
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
-        def __init__(self, pos=[0,0], angle=0.0):
-            self.position = np.array([float(pos[0]), float(pos[1])])
-            self.angle = angle #car orientation in radians
+        def __init__(self, mapThisIsIn):
+            self.position = np.array([0.0, 0.0])
+            self.angle = 0.0 #car orientation in radians
             self.velocity = 0.0 #measured and filtered car 'forward' (wheel) speed in meters/second (used to update position)
             self.steering = 0.0 #measured and filtered steering angle in radians (used to update position)
             self.wheelbase = 0.25 #meters
@@ -52,7 +52,7 @@ class Map:
             #self.acceleration = 0.0 #acceleration in meters/second^2
             #self.fov_range = 60  #(thijs) this is the actual (camera) field of view variable, but it's only useful for the simulation, so delete this?
             
-            #self.lastUpdateTime = time.time() #TBD, timestamp for 
+            #self.lastUpdateTime = self.clock() #TBD, timestamp for 
             
             self.coneConData = None #extra data specifically for cone-connection
             self.pathFolData = None #extra data specifically for path-planning
@@ -61,7 +61,7 @@ class Map:
         def update(self, dt):
             """ update the position of the car, based on velocity, steering and time-passage """
             # if(dt < 0.0001):
-            #     timeRightNow = time.time() #python is not the fastest language, using time.time() at different points in this function will give different values, this won't
+            #     timeRightNow = self.clock() #python is not the fastest language, using time.time() at different points in this function will give different values, this won't
             #     dt = time.time() - lastUpdateTime
             
             #self.velocity += self.acceleration * dt #only for keyboard driving, unless carMCU control system changes
