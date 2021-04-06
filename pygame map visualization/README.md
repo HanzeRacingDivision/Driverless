@@ -38,4 +38,5 @@ meaning of the colors and other visual aspects: <br/>
 - yellow cones are yellow circles, connections between them are yellow lines. Same for blue cones except in blue...
 - holding F (finish button) makes your cursor into a racing-finish flag (fun, right)
 - if there are 2 valid finish cones, a red (finish) line will be drawn between them
-- (currently) the car is a green box with a red arrow, indicating the forward direction
+- the car is drawn as a car sprite, or (if loading that failed) a green box with a red arrow
+- the frames per second are displayed in the topright as average \n minimum \n maxximum \n median
