@@ -171,7 +171,7 @@ class pygameDrawer():
             for FPSstr in FPSstrings:
                 self.FPSrenderedFonts.append(self.pygameFont.render(FPSstr, False, [255-self.bgColor[0], 255-self.bgColor[1], 255-self.bgColor[2]], self.bgColor)) #render string (only 1 line per render allowed), no antialiasing, text color opposite of bgColor, background = bgColor
         for i in range(len(self.FPSrenderedFonts)):
-            self.window.blit(self.FPSrenderedFonts[i], [self.drawOffset[0]+self.drawSize[0]-self.fontSize*1.5,self.drawOffset[1] + 5 + (i*self.fontSize)])
+            self.window.blit(self.FPSrenderedFonts[i], [self.drawOffset[0]+ self.drawSize[0]-5-self.FPSrenderedFonts[i].get_width(),self.drawOffset[1]+ 5+(i*self.fontSize)])
     
     def drawCones(self, drawLines=True):
         """draw the cones and their connections

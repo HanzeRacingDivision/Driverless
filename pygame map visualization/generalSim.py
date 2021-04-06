@@ -49,7 +49,6 @@ DD.pygameInit(resolution)
 sim1 = pygamesimLocal(DD.window, resolution)
 
 timeSinceLastUpdate = sim1.clock()
-FPSlimitTimer = sim1.clock()
 #mapSaveTimer = sim1.clock()
 print("printing serial ports:")
 [print(entry.name) for entry in RC.serial.tools.list_ports.comports()]
@@ -67,7 +66,6 @@ try:
     ##note: mapSender.manualSendBuffer is a list to which you can append things (any object) to be sent to the connected client (if any)
     
     while DD.windowKeepRunning:
-        FPSrightNow = sim1.clock() #this is only for the framerate limiter (time.sleep() doesn't accept negative numbers, this solves that)
         rightNow = sim1.clock()
         dt = rightNow - timeSinceLastUpdate
         DD.handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
@@ -92,9 +90,10 @@ try:
         timeSinceLastUpdate = rightNow #save time (from start of loop) to be used next time
         
         ## after all the important stuff:
-        if((FPSrightNow-FPSlimitTimer) < 0.015): #60FPS limiter (optional)
-            time.sleep(0.0155-(FPSrightNow-FPSlimitTimer))
-        FPSlimitTimer = FPSrightNow
+        FPSrightNow = sim1.clock() #this is only for the framerate limiter (time.sleep() doesn't accept negative numbers, this solves that)
+        if((FPSrightNow-rightNow) < 0.015): #60FPS limiter (optional)
+            print("sleeping:", round((FPSrightNow-rightNow)*1000, 1))
+            time.sleep(0.0155-(FPSrightNow-rightNow))
 
 except KeyboardInterrupt:
     print("main thread keyboard interrupt")
