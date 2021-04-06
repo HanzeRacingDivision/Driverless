@@ -19,9 +19,9 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameD
         Map.__init__(self) #init map class
         
         #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal
-        self.car = SC.simCar(self) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
+        self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         
-        #self.car = RC.realCar(comPort='COM8')
+        #self.car = RC.realCar(self.clock, comPort='COM8')
         
         CC.coneConnecter.__init__(self)
         PF.pathFinder.__init__(self)
@@ -109,8 +109,8 @@ finally:
         print("mapSockThread still alive?:", mapSockThread.is_alive())
     except Exception as excep:
         print("couldn't stop thread?:", excep)
-    DD.pygameEnd() #correctly shut down pygame window
     try:  #alternatively:  if(type(sim1.car) is RC.realCar):
         sim1.car.disconnect()
     except Exception as excep:
         print("failed to run car.disconnect():", excep)
+    DD.pygameEnd() #correctly shut down pygame window

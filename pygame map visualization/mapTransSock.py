@@ -14,18 +14,20 @@ import generalFunctions as GF #only used for cone deletion (UI parser)
 ## this is used to shrink the sent object to only include (important) map objects, no drawing data
 from Map import Map #only used in copyExtractMap
 from copy import deepcopy #only used in copyExtractMap
-def deepCopyExtractMap(classWithMapParent): #copy ONLY the map class attributes from any (child) class into a new map object
+def deepCopyExtractMap(classWithMapParent):
+    """copy ONLY the map class attributes from any (child) class into a new map object"""
     returnObject = Map() #make new instance of same class as source
     for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
-            if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-                setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #deepcopy attribute
+        if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
+            setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #deepcopy attribute
     return(returnObject)
 
-def shallowCopyExtractMap(classWithMapParent): #copy ONLY the map class attributes from any (child) class into a 'new' map object (consisting of pointers)
+def shallowCopyExtractMap(classWithMapParent):
+    """copy ONLY the map class attributes from any (child) class into a 'new' map object (consisting of pointers)"""
     returnObject = Map() #make new instance of same class as source
     for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
-            if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-                setattr(returnObject, attrName, getattr(classWithMapParent, attrName)) #copy attribute (pointer)
+        if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
+            setattr(returnObject, attrName, getattr(classWithMapParent, attrName)) #copy attribute (pointer)
     return(returnObject)
 
 
@@ -406,7 +408,7 @@ class mapTransmitterSocket:
                                 # if((pickleEnd-pickleStart)>0):
                                 #     print("pickle:", round(1/(pickleEnd-pickleStart), 1))
                                 
-                                #print("sending map of size:", len(bytesToSend))
+                                print("sending map of size:", len(bytesToSend))
                                 if(self.usePacketSizeHeader):
                                     if(len(bytesToSend) > 999999):
                                         print("manualSendBuffer entry too large:", len(bytesToSend))

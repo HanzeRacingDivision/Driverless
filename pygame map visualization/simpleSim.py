@@ -6,13 +6,13 @@ import simulatedCar   as SC
 import drawDriverless as DD
 
 
-import time
-# def simClock(mapSelf):
-#     return((time.time()-mapSelf.clockStart)*4)
+# import time
+# def simClock(clockStart):
+#     return((time.time()-clockStart)*4)
 global discreteClock, discreteClockStep
 discreteClock = 0
 discreteClockStep = 0.05
-def simClock(mapSelf):
+def simClock(clockStart):
     return(discreteClock)
 
 
@@ -21,7 +21,7 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameD
         Map.__init__(self) #init map class
         
         self.clockSet(simClock) #an altered clock, only for simulations where the speed is faster/slower than normal
-        self.car = SC.simCar(self) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
+        self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         
         CC.coneConnecter.__init__(self)
         PF.pathFinder.__init__(self)

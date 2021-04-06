@@ -18,9 +18,9 @@ class pygamesimHeadless(CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
         Map.__init__(self) #init map class
         
         #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal
-        self.car = SC.simCar(self) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
+        self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         
-        #self.car = RC.realCar(comPort='COM8')
+        #self.car = RC.realCar(self.clock, comPort='COM8')
         
         CC.coneConnecter.__init__(self)
         PF.pathFinder.__init__(self)

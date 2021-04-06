@@ -12,7 +12,8 @@ import time
 
 ## this is used to shrink the sent object to only include (important) map objects, no drawing data
 from Map import Map #only used in copyImportMap
-def copyImportMap(classWithMapParent, mapToImport): #save all attributes from mapToImport to those by the same name in classWithMapParent
+def copyImportMap(classWithMapParent, mapToImport):
+    """save all attributes from mapToImport to those by the same name in classWithMapParent"""
     for attrName in dir(mapToImport): #dir(class) returs a list of all class attributes
         if((not attrName.startswith('_')) and (not callable(getattr(mapToImport, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
             setattr(classWithMapParent, attrName, getattr(mapToImport, attrName)) #copy attribute
