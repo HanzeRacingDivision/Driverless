@@ -9,19 +9,19 @@ import time
 import threading as thr
 
 class pygamesimRemote(CC.coneConnecter, PP.pathPlanner, MS.mapReceiverSocket, DD.pygameDrawer):
-    def __init__(self, host, port, window, drawSize=(700,350), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
+    def __init__(self, host, port, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self)
         CC.coneConnecter.__init__(self)
         PP.pathPlanner.__init__(self)
         MS.mapReceiverSocket.__init__(self, host, port, self)
-        DD.pygameDrawer.__init__(self, self, window, drawSize, drawOffset, viewOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
+        DD.pygameDrawer.__init__(self, self, window, drawSize, drawOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
         #tell the drawing class which parts are present
         self.coneConnecterPresent = True
         self.pathFinderPresent = False #note: in remote mode, this has no effect (in the current version at least)
         self.pathPlanningPresent = True
         self.SLAMPresent = False
         
-        self.isRemote = True
+        self.isRemote = True #tell the drawing class to apply UI elements remotely
         self.remoteUIsender = self #mapReceiverSocket class is part of 'self'
         
         #self.carPolygonMode = True #if you dont want to use the car sprite, set this to true (but if the sprite wasnt loaded this will be used automatically)

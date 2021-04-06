@@ -13,11 +13,11 @@ import generalFunctions as GF #(homemade) some useful functions for everyday eas
 
 class pygameDrawer():
     """a class to draw Map objects (also includes drawing of UI some elements for manually making tracks)"""
-    def __init__(self, mapToDraw, window, drawSize=(1200,600), drawOffset=(0,0), viewOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
+    def __init__(self, mapToDraw, window, drawSize=(1200,600), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         self.window = window #pass on the window object (pygame)
         self.drawSize = (int(drawSize[0]),int(drawSize[1])) #width and height of the display area (does not have to be 100% of the window)
         self.drawOffset = (int(drawOffset[0]), int(drawOffset[1])) #draw position offset, (0,0) is topleft
-        self.viewOffset = [float(viewOffset[0]), float(viewOffset[1])] #'camera' view offsets, changing this affects the real part of realToPixelPos()
+        self.viewOffset = [0.0, 0.0] #'camera' view offsets, changing this affects the real part of realToPixelPos()
         self.carCamOrient = carCamOrient #orientation of the car (and therefore everything) on the screen. 0 is towards the right
         self.sizeScale = sizeScale #pixels per meter
         self.carCam = startWithCarCam #it's either carCam (car-centered cam, with rotating but no viewOffset), or regular cam (with viewOffset, but no rotating)
@@ -82,7 +82,7 @@ class pygameDrawer():
         
         self.drawTargetConeLines = False #just for UI purposes, to toggle between showing and not showing how the targets are made
         
-        self.carHistTimer = time.time()
+        self.carHistTimer = self.mapToDraw.clock()
         self.carHistPoints = []
         self.carHistTimeStep = 0.15
         self.carHistMinSquaredDistThresh = 0.1**2 #only save new positions if the car is moving
@@ -94,9 +94,9 @@ class pygameDrawer():
         self.FPSdisplayTimer = time.time()
         self.FPSrenderedFonts = []
         
-        #self.carKeyboardControlTimer = time.time()
+        self.carKeyboardControlTimer = time.time() #ONLY USED FOR KEYBOARD DRIVING (commented out)
         
-        try: #if there's no car object, this will not crash the entire program
+        try:
             self.viewOffset = [(-self.car.position[0]) + ((self.drawSize[0]/self.sizeScale)/2), (-self.car.position[1]) + ((self.drawSize[1]/self.sizeScale)/2)]
         except Exception as theExcept:
             print("couldn't set viewOffset to car pos:", theExcept)
@@ -293,8 +293,8 @@ class pygameDrawer():
                 carPos = self.realToPixelPos(carToDraw.position)
                 pygame.draw.line(self.window, [255, 255, 255], carPos, targetPos, 1)
         
-        if((time.time() - self.carHistTimer) > self.carHistTimeStep):
-            self.carHistTimer = time.time()
+        if((self.mapToDraw.clock() - self.carHistTimer) > self.carHistTimeStep):
+            self.carHistTimer = self.mapToDraw.clock()
             rearAxlePos = GF.distAnglePosToPos(carToDraw.wheelbase/2, GF.radInv(carToDraw.angle), carToDraw.position)
             if((GF.distSqrdBetwPos(self.carHistPoints[-1][0], rearAxlePos) > self.carHistMinSquaredDistThresh) if (len(self.carHistPoints) > 1) else True):
                 self.carHistPoints.append([rearAxlePos]) #you can add any number of points to store, as long as the first one is rearAxlePos
@@ -668,12 +668,33 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
         elif(key==pygame.K_h): # h
             pygamesimInput.headlights = not pygamesimInput.headlights #only has an effect if car sprite is used (.carPolygonMode)
         elif(key==pygame.K_c): # c
+            # if(pygame.key.get_pressed()[pygame.K_LCTRL]): #causes too many problems, just restart the program or run pygamesimInput.__init__ again
+            #     pygamesimInput.mapToDraw.left_cone_list.clear()
+            #     pygamesimInput.mapToDraw.right_cone_list.clear()
+            #     pygamesimInput.mapToDraw.finish_line_cones.clear()
+            #     pygamesimInput.mapToDraw.target_list.clear()
+            #     pygamesimInput.mapToDraw.targets_full_circle = False
+            #     #pygamesimInput.mapToDraw.clockStart = time.time()
+                
+            #     ## needlessly complicated, but (currently) function way of resetting object, which ONLY WORKS IF the __init__() argument names are the same as the class attribute names they go into
+            #     initArgNames = getattr(getattr(getattr(pygamesimInput.mapToDraw.car, '__init__'), '__code__'), 'co_varnames')
+            #     classAttrNames = dir(pygamesimInput.mapToDraw.car)
+            #     argList = []
+            #     for name in initArgNames:
+            #         if(name in classAttrNames):
+            #             argList.append(getattr(pygamesimInput.mapToDraw.car, name))
+            #     argTuple = tuple(argList)
+            #     pygamesimInput.mapToDraw.car = pygamesimInput.mapToDraw.car.__class__(*argTuple)
+                
+            #     if(pygamesimInput.mapToDraw.car.pathFolData is not None):
+            #         pygamesimInput.mapToDraw.car.pathFolData = pygamesimInput.mapToDraw.car.pathFolData.__class__() #reset class
+                
+            #     if(pygamesimInput.pathPlanningPresent):
+            #         pygamesimInput.left_spline = [[], []]
+            #         pygamesimInput.right_spline = [[], []]
+            #         pygamesimInput.path_midpoints_spline = [[], []]
             pygamesimInput.carHistPoints = []
-            if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
-                aNewCleanMap = Map() #make new instance of the Map class
-                for attrName in dir(aNewCleanMap): #dir(class) returs a list of all class attributes
-                        if((not attrName.startswith('_')) and (not callable(getattr(aNewCleanMap, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-                            setattr(pygamesimInput, attrName, getattr(aNewCleanMap, attrName)) #copy attribute
+            pygamesimInput.carHistTimer = pygamesimInput.mapToDraw.clock() #reset timer
         elif(key==pygame.K_v): # v
             pygamesimInput.carCam = not pygamesimInput.carCam
             if(pygamesimInput.carCam and pygamesimInput.movingViewOffset): #if you switched to carCam while you were moving viewOffset, just stop moving viewOffset (same as letting go of MMB)

@@ -16,8 +16,12 @@ import threading as thr
 class pygamesimHeadless(CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
     def __init__(self):
         Map.__init__(self) #init map class
-        self.car = SC.simCar() #simCar has Map.Car as a parent class, so all regular Car stuff will still work
+        
+        #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal
+        self.car = SC.simCar(self) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
+        
         #self.car = RC.realCar(comPort='COM8')
+        
         CC.coneConnecter.__init__(self)
         PF.pathFinder.__init__(self)
         PP.pathPlanner.__init__(self)
@@ -26,7 +30,6 @@ class pygamesimHeadless(CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
         self.pathFinderPresent = True
         self.pathPlanningPresent = True
         self.SLAMPresent = False
-        
         
         if(self.pathPlanningPresent):
             self.car.pathFolData = PP.pathPlannerData()
@@ -37,8 +40,9 @@ class pygamesimHeadless(CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
 
 sim1 = pygamesimHeadless()
 
-timeSinceLastUpdate = time.time()
-mapSaveTimer = time.time()
+timeSinceLastUpdate = sim1.clock()
+FPSlimitTimer = sim1.clock()
+mapSaveTimer = sim1.clock()
 print("printing serial ports:")
 [print(entry.name) for entry in RC.serial.tools.list_ports.comports()]
 print("done printing ports.")
@@ -55,10 +59,11 @@ try:
     ##note: mapSender.manualSendBuffer is a list to which you can append things (any object) to be sent to the connected client (if any)
     
     while threadKeepRunning[0]: #stop evrything if mapSockThread stops
-        rightNow = time.time()
+        FPSrightNow = sim1.clock() #this is only for the framerate limiter (time.sleep() doesn't accept negative numbers, this solves that)
+        rightNow = sim1.clock()
         dt = rightNow - timeSinceLastUpdate
         
-        if((sim1.car.pathFolData.auto) if sim1.pathPlanningPresent else False):
+        if((sim1.car.pathFolData.auto) if (sim1.pathPlanningPresent and (sim1.car.pathFolData is not None)) else False):
             sim1.calcAutoDriving()
             sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
         sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
@@ -68,14 +73,15 @@ try:
         #     sim1.mapList.append(copyExtractMap(sim1))
         #     if(len(sim1.mapList) > 40):
         #         sim1.mapList.pop(0)
-        #     #print((time.time()-mapSaveTimer)*1000)
+        #     #print((sim1.clock()-mapSaveTimer)*1000)
         #     mapSaveTimer = rightNow
         
         timeSinceLastUpdate = rightNow #save time (from start of loop) to be used next time
         
-        rightNow = time.time() #this is only for the framerate limiter (time.sleep() doesn't accept negative numbers, this solves that)
-        if((rightNow-timeSinceLastUpdate) < 0.015): #60FPS limiter
-            time.sleep(0.0155-(rightNow-timeSinceLastUpdate))
+        ## after all the important stuff:
+        if((FPSrightNow-FPSlimitTimer) < 0.015): #60FPS limiter (optional)
+            time.sleep(0.0155-(FPSrightNow-FPSlimitTimer))
+        FPSlimitTimer = FPSrightNow
 
 except KeyboardInterrupt:
     print("main thread keyboard interrupt")

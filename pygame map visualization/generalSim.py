@@ -15,21 +15,25 @@ import threading as thr
 ## copyExtractMap() is moved to mapTransSock, you can still call it with MS.copyExtractMap()
 
 class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
-    def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), viewOffset=[0,0], carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
+    def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
-        self.car = SC.simCar() #simCar has Map.Car as a parent class, so all regular Car stuff will still work
+        
+        #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal
+        self.car = SC.simCar(self) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
+        
         #self.car = RC.realCar(comPort='COM8')
+        
         CC.coneConnecter.__init__(self)
         PF.pathFinder.__init__(self)
         PP.pathPlanner.__init__(self)
-        DD.pygameDrawer.__init__(self, self, window, drawSize, drawOffset, viewOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
+        DD.pygameDrawer.__init__(self, self, window, drawSize, drawOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
         #tell the drawing class which parts are present
         self.coneConnecterPresent = True
         self.pathFinderPresent = True
         self.pathPlanningPresent = True
         self.SLAMPresent = False
         
-        self.isRemote = False
+        self.isRemote = False #tell the drawing class to apply UI elements locally
         
         #self.carPolygonMode = True #if you dont want to use the car sprite, set this to true (but if the sprite wasnt loaded this will be used automatically)
         
@@ -44,8 +48,9 @@ resolution = [1200, 600]
 DD.pygameInit(resolution)
 sim1 = pygamesimLocal(DD.window, resolution)
 
-timeSinceLastUpdate = time.time()
-mapSaveTimer = time.time()
+timeSinceLastUpdate = sim1.clock()
+FPSlimitTimer = sim1.clock()
+#mapSaveTimer = sim1.clock()
 print("printing serial ports:")
 [print(entry.name) for entry in RC.serial.tools.list_ports.comports()]
 print("done printing ports.")
@@ -62,11 +67,12 @@ try:
     ##note: mapSender.manualSendBuffer is a list to which you can append things (any object) to be sent to the connected client (if any)
     
     while DD.windowKeepRunning:
-        rightNow = time.time()
+        FPSrightNow = sim1.clock() #this is only for the framerate limiter (time.sleep() doesn't accept negative numbers, this solves that)
+        rightNow = sim1.clock()
         dt = rightNow - timeSinceLastUpdate
         DD.handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
         
-        if((sim1.car.pathFolData.auto) if sim1.pathPlanningPresent else False):
+        if((sim1.car.pathFolData.auto) if (sim1.pathPlanningPresent and (sim1.car.pathFolData is not None)) else False):
             sim1.calcAutoDriving()
             sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
         sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
@@ -75,18 +81,20 @@ try:
         sim1.redraw()
         DD.frameRefresh() #not done in redraw() to accomodate multi-sim options
         
+        ## you can 
         # if((rightNow-mapSaveTimer)>0.25):
         #     sim1.mapList.append(MS.deepCopyExtractMap(sim1))
         #     if(len(sim1.mapList) > 40):
         #         sim1.mapList.pop(0)
-        #     #print((time.time()-mapSaveTimer)*1000)
+        #     #print((sim1.clock()-mapSaveTimer)*1000)
         #     mapSaveTimer = rightNow
         
         timeSinceLastUpdate = rightNow #save time (from start of loop) to be used next time
         
-        rightNow = time.time() #this is only for the framerate limiter (time.sleep() doesn't accept negative numbers, this solves that)
-        if((rightNow-timeSinceLastUpdate) < 0.015): #60FPS limiter
-            time.sleep(0.0155-(rightNow-timeSinceLastUpdate))
+        ## after all the important stuff:
+        if((FPSrightNow-FPSlimitTimer) < 0.015): #60FPS limiter (optional)
+            time.sleep(0.0155-(FPSrightNow-FPSlimitTimer))
+        FPSlimitTimer = FPSrightNow
 
 except KeyboardInterrupt:
     print("main thread keyboard interrupt")
