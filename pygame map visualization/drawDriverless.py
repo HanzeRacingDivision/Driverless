@@ -76,9 +76,9 @@ class pygameDrawer():
         self.pathPlanningPresent = False
         self.SLAMPresent = False
         
-        self.isRemote = False
+        self.isRemote = False  #maybe these shouldn't be initialised here, but this does avoid errors
         self.remoteUIsender = None
-        self.remoteFPS = 5
+        self.remoteFPS = 5 #this should be initialised here though
         
         self.drawTargetConeLines = False #just for UI purposes, to toggle between showing and not showing how the targets are made
         
@@ -160,7 +160,7 @@ class pygameDrawer():
                 FPSstrings.append(str(round(GF.average(self.FPSdata), 1))) #average FPS
                 FPSstrings.append(str(min(self.FPSdata)))                  #minimum FPS
                 FPSstrings.append(str(max(self.FPSdata)))                  #maximum FPS
-                GF.sortValues(self.FPSdata, True)
+                self.FPSdata.sort()
                 FPSstrings.append(str(self.FPSdata[int((len(self.FPSdata)-1)/2)])) #median FPS
                 #print("FPS:", round(GF.average(self.FPSdata), 1), min(self.FPSdata), max(self.FPSdata), self.FPSdata[int((len(self.FPSdata)-1)/2)])
             else:
