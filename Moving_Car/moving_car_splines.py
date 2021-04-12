@@ -6,7 +6,7 @@ import time
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy.interpolate import splprep, splev
-
+import pandas as pd
 
 
 class Car:
@@ -165,7 +165,7 @@ class PathPlanning:
         image_path6 = os.path.join(current_dir, "right_spline_s.png")
         right_spline_image = pygame.image.load(image_path6)
 
-        car = Car(5,11)
+        car = Car(15,3)
 
         ppu = 32
         time_start = time.time()
@@ -195,6 +195,7 @@ class PathPlanning:
         fullscreen = False
         track_number = 0
         cruising_speed = 2.5
+        cone_connect_list = False
         
         
         def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length = 10, exclude_corners = True):
@@ -216,6 +217,69 @@ class PathPlanning:
         
             return [pygame.draw.line(surface, color, tuple(dash_knots[n]), tuple(dash_knots[n+1]), width)
                     for n in range(int(exclude_corners), dash_amount - int(exclude_corners), 2)]    
+        
+        
+        def save_map(left_cones, right_cones):
+            cone_x = []
+            cone_y = []
+            cone_type = []
+            print('SAVE MAP AS : ')
+            name = input()
+        
+            for i in range(len(left_cones)):
+                cone_x.append(left_cones[i].position.x)
+                cone_y.append(left_cones[i].position.y)
+                cone_type.append('LEFT')
+                
+            for i in range(len(right_cones)):
+                cone_x.append(right_cones[i].position.x)
+                cone_y.append(right_cones[i].position.y)
+                cone_type.append('RIGHT')       
+                
+                
+            if cone_connect_list == True:
+                map_file = pd.DataFrame({'Cone_Type' : cone_type,
+                                         'Cone_X' : cone_x,
+                                         'Cone_Y' : cone_y,
+                                         'Prev_Cone_Index': prev_cone_index,
+                                         'Next_Cone_Index' : next_cone_index})
+            else:
+                map_file = pd.DataFrame({'Cone_Type' : cone_type,
+                                         'Cone_X' : cone_x,
+                                         'Cone_Y' : cone_y})
+        
+            map_file.to_csv(f'{name}.csv')
+        
+        
+        
+        
+        
+        def load_map(mouse_pos_list):
+            
+            left_cones = []
+            right_cones = []
+            print('LOAD MAP : ')
+            name = input()
+            
+            map_path = os.path.join(current_dir, f"{name}.csv")
+            map_file = pd.read_csv(map_path)
+            
+            for i in range(len(map_file.iloc[:,0])):
+                if map_file['Cone_Type'].iloc[i] == 'LEFT':
+
+                    left_cone = Cone(map_file['Cone_X'].iloc[i],map_file['Cone_Y'].iloc[i], 'left')
+                    left_cones.append(left_cone)
+                    mouse_pos_list.append((map_file['Cone_X'].iloc[i]*ppu,map_file['Cone_Y'].iloc[i]*ppu))             
+                
+                else:
+                    right_cone = Cone(map_file['Cone_X'].iloc[i],map_file['Cone_Y'].iloc[i], 'right')
+                    right_cones.append(right_cone)
+                    mouse_pos_list.append((map_file['Cone_X'].iloc[i]*ppu,map_file['Cone_Y'].iloc[i]*ppu))             
+                
+            
+            return left_cones, right_cones, mouse_pos_list
+        
+        
 
         
         while not self.exit:
@@ -235,7 +299,7 @@ class PathPlanning:
             
             
             #If t pressed then create target
-            if pressed[pygame.K_t]:
+            if  0 == 1: #pressed[pygame.K_t]        DISABLING THIS FUNCTIONALITY FOR NOW
                     mouse_pos = pygame.mouse.get_pos()
                     
                     if mouse_pos in mouse_pos_list:
@@ -314,8 +378,8 @@ class PathPlanning:
                 right_spline_linked == False
                 left_spline_linked == False
                 mouse_pos_list = []
-                left_spline = 0
-                right_spline = 0
+                #left_spline = 0
+                #right_spline = 0
                 path_midpoints_spline = 0
                 
                 
@@ -357,13 +421,44 @@ class PathPlanning:
                         car.headlights = False
                 
                 
-            #if s pressed then set to track mode
+            #if t pressed then set to track mode
             for event in events:
-                if event.type == pygame.KEYUP and event.key == pygame.K_s: 
+                if event.type == pygame.KEYUP and event.key == pygame.K_t: 
                     if track == False:
                         track = True
                     else:
                         track = False
+                        
+                        
+            #if S then save map
+            if  pressed[pygame.K_s]:
+                save_map(left_cones, right_cones)
+                
+                
+            #if D then load map
+            if  pressed[pygame.K_d]:
+                
+                #resetting most vars before loading
+                targets  = []
+                non_passed_targets = []
+                circles = []
+                left_cones = []
+                right_cones = []    
+                visible_left_cones = []
+                visible_right_cones = []
+                left_spline = []
+                right_spline = []
+                path_midpoints = []
+                right_spline_linked == False
+                left_spline_linked == False
+                mouse_pos_list = []
+                #left_spline = 0
+                #right_spline = 0
+                path_midpoints_spline = 0
+                
+                
+                left_cones, right_cones, mouse_pos_list = load_map(mouse_pos_list)
+
 
                 
                     
@@ -858,7 +953,7 @@ class PathPlanning:
                 text_pos = [10, 600]
                 self.screen.blit(text_surf, text_pos)            
                 
-                text_surf = text_font.render('Press T to place target', 1, (155, 155, 155))
+                text_surf = text_font.render('Press T to make track', 1, (155, 155, 155))
                 text_pos = [10, 620]
                 self.screen.blit(text_surf, text_pos)
                 
@@ -866,11 +961,11 @@ class PathPlanning:
                 text_pos = [10, 640]
                 self.screen.blit(text_surf, text_pos)
                 
-                text_surf = text_font.render('Press S to make track', 1, (155, 155, 155))
+                text_surf = text_font.render('Press S to save map', 1, (155, 155, 155))
                 text_pos = [10, 680]
                 self.screen.blit(text_surf, text_pos)
                 
-                text_surf = text_font.render('Press arrow keys to steer manually', 1, (155, 155, 155))
+                text_surf = text_font.render('Press D to load map', 1, (155, 155, 155))
                 text_pos = [10, 660]
                 self.screen.blit(text_surf, text_pos)
             else:
