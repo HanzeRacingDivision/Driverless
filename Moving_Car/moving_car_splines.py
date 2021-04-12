@@ -182,6 +182,8 @@ class PathPlanning:
         right_spline = 0
         path_midpoints = 0
         path_midpoints_spline = 0
+        first_visible_left_cone = 0
+        first_visible_right_cone = 0
         
         alpha = 0
         circles = []
@@ -196,6 +198,10 @@ class PathPlanning:
         track_number = 0
         cruising_speed = 2.5
         cone_connect_list = False
+        first_right_cone_found = False
+        first_left_cone_found = False
+        midpoint_created = False
+        track_number_changed = False
         
         
         def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length = 10, exclude_corners = True):
@@ -381,7 +387,11 @@ class PathPlanning:
                 #left_spline = 0
                 #right_spline = 0
                 path_midpoints_spline = 0
-                
+                first_visible_left_cone = 0
+                first_visible_right_cone = 0
+                first_right_cone_found = False
+                first_left_cone_found = False
+                track_number_changed = False
                 
                 
             #if 2 is pressed, increasing cruising speed
@@ -455,6 +465,11 @@ class PathPlanning:
                 #left_spline = 0
                 #right_spline = 0
                 path_midpoints_spline = 0
+                first_visible_left_cone = 0
+                first_visible_right_cone = 0
+                first_right_cone_found = False
+                first_left_cone_found = False
+                track_number_changed = False
                 
                 
                 left_cones, right_cones, mouse_pos_list = load_map(mouse_pos_list)
@@ -567,7 +582,7 @@ class PathPlanning:
                 
             #if currently no targets left and is a track, set all targets to non-passed and continue
             if len(targets) > 0 and len(non_passed_targets) == 0 and track == True and (right_spline_linked == True or left_spline_linked == True):
-                track_number += 1
+                #track_number += 1
                 non_passed_targets = targets.copy()
                 for target in targets:
                     target.passed = False
@@ -610,7 +625,13 @@ class PathPlanning:
             
             #cubic splines for left track boundaries
             
+            
             if len(visible_left_cones) > 1 and car.auto == True and new_visible_left_cone_flag == True:
+              
+                if first_left_cone_found == False:
+                    first_visible_left_cone = visible_left_cones[0]
+                    first_left_cone_found = True
+                
                 x = []
                 y = []
                 for left_cone in visible_left_cones:
@@ -640,6 +661,11 @@ class PathPlanning:
             #cubic splines for right track boundaries
 
             if len(visible_right_cones) > 1 and car.auto == True and new_visible_right_cone_flag == True:
+                
+                if first_right_cone_found == False:
+                    first_visible_right_cone = visible_right_cones[0]
+                    first_right_cone_found = True
+                    
                 x = []
                 y = []
                 for right_cone in visible_right_cones:
@@ -653,6 +679,7 @@ class PathPlanning:
                     K = 1
                 elif len(visible_right_cones) == 3:
                     K = 2
+                                    
                 else:
                     K = 2
                     
@@ -772,7 +799,23 @@ class PathPlanning:
                                 non_passed_targets.append(new_target)
                                 target_locations.append(new_target_loc)
                  
+                    
+            if first_visible_left_cone != 0 and first_visible_right_cone != 0 and midpoint_created == False:     
+                start_midpoint_x = np.mean([first_visible_left_cone.position.x,first_visible_right_cone.position.x])
+                start_midpoint_y = np.mean([first_visible_left_cone.position.y,first_visible_right_cone.position.y])     
+                midpoint_created = True
+                
+            if first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu and track_number_changed == False:
+                track_number += 1
+                track_number_changed = True
+                
+            elif first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) > 20/ppu:
+                track_number_changed = False
+                
+                  #if close to this co-ordinate, add lap to track, but only once
 
+                    
+                    
             # Logic
             car.update(dt)
             
@@ -856,6 +899,12 @@ class PathPlanning:
                 for i in range(len(right_spline[0])):
                     self.screen.blit(right_spline_image, Vector2(right_spline[0][i],right_spline[1][i]) * ppu - (3,3))
             
+            
+            if first_visible_left_cone != 0 and first_visible_right_cone != 0:
+                draw_line_dashed(self.screen, (255, 51, 0),(first_visible_left_cone.position.x* ppu ,first_visible_left_cone.position.y* ppu) , (first_visible_right_cone.position.x* ppu ,first_visible_right_cone.position.y* ppu) , width = 2, dash_length = 5, exclude_corners = True)
+            
+            
+            
            # if path_midpoints != 0 and len(path_midpoints) > 0:
              #  print(f'midpoints : {path_midpoints}')
            #    for i in range(len(path_midpoints[0])):
@@ -916,7 +965,7 @@ class PathPlanning:
                 self.screen.blit(text_surf, text_pos)
 
                 if track == True:
-                    text_surf = text_font.render(f'Laps: {track_number}', 1, (255, 255, 255))
+                    text_surf = text_font.render(f'Lap: {track_number}', 1, (255, 255, 255))
                     text_pos = [10, 120]
                     self.screen.blit(text_surf, text_pos)
                 
