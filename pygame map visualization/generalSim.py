@@ -1,4 +1,5 @@
 from Map import Map
+import map_loader as ML
 import coneConnecting as CC
 import pathFinding    as PF
 import pathPlanningTemp as PP
@@ -10,15 +11,23 @@ import mapTransSock   as MS
 import time
 #import numpy as np
 
-import threading as thr
+import threading as thr #used for mapTransSock
+
+import sys #used for importing files (map_loader) from commandline (DOS run argument)
 
 ## copyExtractMap() is moved to mapTransSock, you can still call it with MS.copyExtractMap()
 
-class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
+class pygamesimLocal(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
     def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
+        immediateFile = None
+        if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
+            print("found sys.argv[1], attempting to import:", sys.argv[1])
+            immediateFile = sys.argv[1]
+        ML.mapLoader.__init__(self, immediateFile, self) #import a file (if it was specified)
         
-        #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal
+        #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal  #DEPRICATED
+        #self.clock = your custom clock function here
         self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         
         #self.car = RC.realCar(self.clock, comPort='COM8')
@@ -68,6 +77,7 @@ try:
     while DD.windowKeepRunning:
         rightNow = sim1.clock()
         dt = rightNow - timeSinceLastUpdate
+        dt = min(dt, 0.5) #for huge framerate dips/standstills
         DD.handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
         
         if((sim1.car.pathFolData.auto) if (sim1.pathPlanningPresent and (sim1.car.pathFolData is not None)) else False):
@@ -94,10 +104,10 @@ try:
         if((FPSrightNow-rightNow) < 0.015): #60FPS limiter (optional)
             time.sleep(0.0155-(FPSrightNow-rightNow))
 
-except KeyboardInterrupt:
-    print("main thread keyboard interrupt")
-except Exception as excep:
-    print("main thread exception:", excep)
+# except KeyboardInterrupt:
+#     print("main thread keyboard interrupt")
+# except Exception as excep:
+#     print("main thread exception:", excep)
 finally:
     try:
         mapSender.manualClose()

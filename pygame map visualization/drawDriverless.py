@@ -636,8 +636,9 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
                     remotePathFind(pygamesimInput.remoteUIsender, -1) #find as many path points as it can
                 else:
                     #pygamesimInput.mapToDraw.makePath() #find a single path point
-                    while(pygamesimInput.mapToDraw.makePath()): #stops when path can no longer be advanced
-                        doesNothing = 1  # "python is so versitile, you can do anything" :) haha good joke
+                    limitCounter = 0
+                    while(pygamesimInput.mapToDraw.makePath() and (limitCounter<25)): #stops when path can no longer be advanced
+                        limitCounter += 1  # "python is so versitile, you can do anything" :) haha good joke
             if(pygamesimInput.pathPlanningPresent):
                 pygamesimInput.makePathSpline()
         elif((key==pygame.K_a) or ((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)) or (key==pygame.K_MINUS)):
@@ -773,6 +774,7 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
             try:
                 whereToLoad = currentPygamesimInput(pygamesimInputList, None, False)
                 whereToLoad.laod_map(eventToHandle.file, whereToLoad) #note: drag and drop functionality is a little iffy for multisim applications
+                print("loaded file successfully")
             except Exception as excep:
                 print("failed to load drag-dropped file, exception:", excep)
     

@@ -17,7 +17,8 @@ class pygamesimHeadless(CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
     def __init__(self):
         Map.__init__(self) #init map class
         
-        #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal
+        #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal  #DEPRICATED
+        #self.clock = your custom clock function here
         self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         
         #self.car = RC.realCar(self.clock, comPort='COM8')
@@ -81,10 +82,10 @@ try:
         if((FPSrightNow-rightNow) < 0.015): #60FPS limiter (optional)
             time.sleep(0.0155-(FPSrightNow-rightNow))
 
-except KeyboardInterrupt:
-    print("main thread keyboard interrupt")
-except Exception as excep:
-    print("main thread exception:", excep)
+# except KeyboardInterrupt:
+#     print("main thread keyboard interrupt")
+# except Exception as excep:
+#     print("main thread exception:", excep)
 finally:
     try:
         mapSender.manualClose()

@@ -20,7 +20,8 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameD
     def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
         
-        self.clockSet(simClock) #an altered clock, only for simulations where the speed is faster/slower than normal
+        #self.clockSet(simClock) #an altered clock, only for simulations where the speed is faster/slower than normal  #DEPRICATED
+        #self.clock = simClock #must be a function with no required parameters!
         self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         
         CC.coneConnecter.__init__(self)
@@ -28,9 +29,9 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameD
         PP.pathPlanner.__init__(self)
         DD.pygameDrawer.__init__(self, self, window, drawSize, drawOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
         #tell the drawing class which parts are present
-        self.coneConnecterPresent = True
-        self.pathFinderPresent = True
-        self.pathPlanningPresent = True
+        self.coneConnecterPresent = False
+        self.pathFinderPresent = False
+        self.pathPlanningPresent = False
         self.SLAMPresent = False
         
         self.isRemote = False #tell the drawing class to apply UI elements locally
@@ -66,9 +67,9 @@ try:
         
         timeSinceLastUpdate = rightNow #save time (from start of loop) to be used next time
         
-except KeyboardInterrupt:
-    print("main thread keyboard interrupt")
-except Exception as excep:
-    print("main thread exception:", excep)
+# except KeyboardInterrupt:
+#     print("main thread keyboard interrupt")
+# except Exception as excep:
+#     print("main thread exception:", excep)
 finally:
     DD.pygameEnd() #correctly shut down pygame window
