@@ -2,17 +2,14 @@ import numpy as np
 import time
 import generalFunctions as GF
 
-
-def defaultClock(clockStart): #a function that is passed to Map.clock by default
-    return(time.time() - clockStart)
+## IMPORTANT: clock requires major overhaul, as this just isnt working. Whenever a new map object is created (anywhere), it resets the clock, (i know why)
 
 
 class Map:
     """ A parent map class that holds all variables that make up a (basic) track """
     def __init__(self):  # variables here that define the scenario/map
         self.clockStart = time.time()
-        self.clock = None
-        self.clockSet(defaultClock)
+        self.clock = self.internalClock #default to internalClock
         
         self.car = self.Car(self.clock)
         self.left_cone_list = []
@@ -50,7 +47,7 @@ class Map:
             #self.max_acceleration = 4.0 #in m/s^2
             #self.max_steering = np.radians(25) #max angle (in either direction) in radians
             
-            #self.rearAxlePos = GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position) #updates in Car.update()
+            #self.rearAxlePos = self.getRearAxlePos() #updates in Car.update()
             ## there is no need for rearAxlePos to be stored, but it would make Car.update() slightly faster IF (and only if) Car.update() is the ONLY function in which the position is altered
             
             #self.acceleration = 0.0 #acceleration in meters/second^2
@@ -61,6 +58,9 @@ class Map:
             self.coneConData = None #extra data specifically for cone-connection
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
+        
+        def getRearAxlePos(self):
+            return(GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position))
         
         def update(self, dt):
             """ update the position of the car, based on velocity, steering and time-passage """
@@ -73,7 +73,7 @@ class Map:
             
             #turning math
             if((abs(self.steering) > 0.001) and (abs(self.velocity) > 0.001)): #avoid divide by 0 (and avoid complicated math in a simple situation)
-                rearAxlePos = GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position)
+                rearAxlePos = self.getRearAxlePos()
                 turning_radius = self.wheelbase/np.tan(self.steering)
                 angular_velocity = self.velocity/turning_radius
                 arcMov = angular_velocity * dt
@@ -160,7 +160,11 @@ class Map:
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
     
+    def internalClock(self): #a function that is passed to Map.clock by default
+        return(time.time() - self.clockStart)
+    
     def clockSet(self, clockFunction): #set a different (simulation) function for self.clock, and insert a pointer to the self as a default argument (only used if function HAS an argument, if this is an issue, avoid usage of setClock() and edit self.clock manually)
+        print("WARNING: Map.clockSet() will be removed in future versions, as this method results in the map clock being reset every time a new Map object is created (anywhere)")
         self.clock = clockFunction
         self.clock.__defaults__ = (self.clockStart, ) #insert the starting time as the default argument
     
