@@ -12,24 +12,6 @@ def copyImportMap(classWithMapParent, mapToImport):
         if((not attrName.startswith('_')) and (not callable(getattr(mapToImport, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
             setattr(classWithMapParent, attrName, getattr(mapToImport, attrName)) #copy attribute
 
-# from copy import deepcopy #only used in copyExtractMap
-# def deepCopyExtractMap(classWithMapParent):
-#     """copy ONLY the map class attributes from any (child) class into a new map object"""
-#     returnObject = Map() #make new instance of same class as source
-#     for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
-#         if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-#             setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #deepcopy attribute
-#     return(returnObject)
-
-# def shallowCopyExtractMap(classWithMapParent):
-#     """copy ONLY the map class attributes from any (child) class into a 'new' map object (consisting of pointers)"""
-#     returnObject = Map() #make new instance of same class as source
-#     for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
-#         if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-#             setattr(returnObject, attrName, getattr(classWithMapParent, attrName)) #copy attribute (pointer)
-#     return(returnObject)
-
-
 class mapLoader:
     fileExt = ".xlsx" #static
     def __init__(self, immediateFile=None, immediateLoadTarget=None):
@@ -43,7 +25,7 @@ class mapLoader:
         
         if(immediateFile is not None):
             print("loading map at startup:", immediateFile)
-            if(immediateLoadTarget is not None):
+            if(immediateLoadTarget is None):
                 print("loading startup map into self")
                 immediateLoadTarget = self
             self.laod_map(immediateFile, immediateLoadTarget)
