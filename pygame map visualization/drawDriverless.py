@@ -295,7 +295,7 @@ class pygameDrawer():
         
         if((self.mapToDraw.clock() - self.carHistTimer) > self.carHistTimeStep):
             self.carHistTimer = self.mapToDraw.clock()
-            rearAxlePos = GF.distAnglePosToPos(carToDraw.wheelbase/2, GF.radInv(carToDraw.angle), carToDraw.position)
+            rearAxlePos = carToDraw.getRearAxlePos()
             if((GF.distSqrdBetwPos(self.carHistPoints[-1][0], rearAxlePos) > self.carHistMinSquaredDistThresh) if (len(self.carHistPoints) > 1) else True):
                 self.carHistPoints.append([rearAxlePos]) #you can add any number of points to store, as long as the first one is rearAxlePos
                 if(len(self.carHistPoints) > self.carHistMaxLen):
@@ -575,7 +575,7 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                             pygamesimInput.mapToDraw.connectCone(overlappingCone)
                 else:
                     newConeID = GF.findMaxAttrIndex((pygamesimInput.mapToDraw.right_cone_list + pygamesimInput.mapToDraw.left_cone_list), 'ID')[1]
-                    aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, pygame.key.get_pressed()[pygame.K_f])
+                    aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, bool(pygame.key.get_pressed()[pygame.K_f]))
                     if(((pygamesimInput.mapToDraw.finish_line_cones[0].LorR != leftOrRight) if (len(pygamesimInput.mapToDraw.finish_line_cones) > 0) else True) if pygame.key.get_pressed()[pygame.K_f] else True):
                         if(pygamesimInput.isRemote):
                             remoteConePlace(pygamesimInput.remoteUIsender, aNewCone, pygame.key.get_pressed()[pygame.K_LSHIFT])
@@ -710,6 +710,11 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
             if(pygamesimInput.remoteFPS <= 0):
                 pygamesimInput.remoteFPS = 1
             remoteAdjustMapSendInterval(pygamesimInput.remoteUIsender, int(pygamesimInput.remoteFPS))
+        elif(key==pygame.K_s):
+            try:
+                pygamesimInput.save_map(pygamesimInput.mapToDraw) #currently, file name is auto-generated, because requesting UI text field input is a lot of effort, and python input() is blocking
+            except Exception as excep:
+                print("failed to save file, exception:", excep)
 
 def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
     """(UI element) return the pygameDrawer that the mouse is hovering over, or the one you interacted with last"""
@@ -760,11 +765,16 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
                 pygamesimInput.updateWindowSize(localNewSize, localNewDrawPos, autoMatchSizeScale=False)
         oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
-    # elif(eventToHandle.type == pygame.DROPFILE): #drag and drop files to import them
-    #     if((pygame.mouse.get_pos()[0] == 0) and (pygame.mouse.get_pos()[1] == 0) and (len(pygamesimInputList) > 1)):
-    #         print("skipping file import, please make sure to select the pygame window beforehand or something")
-    #     else:
-    #         currentPygamesimInput(pygamesimInputList, None, False).importConeLog(eventToHandle.file, True) #note: drag and drop functionality is a little iffy for multisim applications
+    elif(eventToHandle.type == pygame.DROPFILE): #drag and drop files to import them
+        if((pygame.mouse.get_pos()[0] == 0) and (pygame.mouse.get_pos()[1] == 0) and (len(pygamesimInputList) > 1)):
+            print("skipping file import, please make sure to select the pygame window beforehand or something")
+        else:
+            print("attempting to load drag-dropped file:", eventToHandle.file)
+            try:
+                whereToLoad = currentPygamesimInput(pygamesimInputList, None, False)
+                whereToLoad.laod_map(eventToHandle.file, whereToLoad) #note: drag and drop functionality is a little iffy for multisim applications
+            except Exception as excep:
+                print("failed to load drag-dropped file, exception:", excep)
     
     elif((eventToHandle.type == pygame.MOUSEBUTTONDOWN) or (eventToHandle.type == pygame.MOUSEBUTTONUP)):
         #print("mouse press", eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos)
