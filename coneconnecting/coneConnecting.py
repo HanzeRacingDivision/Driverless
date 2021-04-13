@@ -51,7 +51,7 @@ class coneConnecter(Map):
             return(False, None)
         else:
             currentExistingAngle = 0.0
-            if((currentConnectionCount>0) and (len(coneToConnect.coneConData[0])>0)): #only 1 of the 2 checks should be needed, but just to be safe
+            if((currentConnectionCount>0) and (len(coneToConnect.coneConData)>0)): #only 1 of the 2 checks should be needed, but just to be safe
                 currentExistingAngle = GF.radRoll(GF.radInv(coneToConnect.coneConData[0].angle))
             
             nearbyConeList = self.distanceToCone(coneToConnect.position, self.right_cone_list if coneToConnect.LorR else self.left_cone_list, 'SORTBY_DIST', [coneToConnect.ID], self.coneConnectionThreshold, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by distance, but that's not really needed given the (CURRENT) math
