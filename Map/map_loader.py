@@ -72,6 +72,7 @@ class mapLoader:
         #print(map_file)
         map_file = self.mapObjectToFile(mapToSave)
         map_file.to_excel(filename)
+        return(filename)
     
     def laod_map(self, filename, whereToLoad=None):
         if(not filename.endswith(self.fileExt)):
