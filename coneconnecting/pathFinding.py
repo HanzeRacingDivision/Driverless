@@ -98,7 +98,7 @@ class pathFinder(Map):
                             else:
                                 connectionToUse = (1 if (connectionCount >= 2) else 0)
                                 coneAvgConnAngle = cone.coneConData[connectionToUse].angle #see note on calculation with double connection above
-                            coneCandidateStrength *= 1.5-min(min(abs(GF.radDiff(GF.radInv(coneAvgConnAngle), self.car.angle)), abs(GF.radDiff(GF.radInv(coneAvgConnAngle), self.car.angle)))/self.pathConnectionMaxAngleDelta, 1)
+                            coneCandidateStrength *= 1.5-min(min(abs(GF.radDiff(coneAvgConnAngle, self.car.angle)), abs(GF.radDiff(GF.radInv(coneAvgConnAngle), self.car.angle)))/self.pathConnectionMaxAngleDelta, 1)
                             ## using existing chosen firstCone, only works for the right cone (this is an unequal check, so i hate it, but it does work to make sure the first line is straight (not diagonal))
                             if(LorR == 1): #TO BE IMPROVED, but i dont know quite how yet
                                 leftFirstConeConnectionCount = len(firstCones[0].connections) #this could technically be 0, if an unconnected finish cone was used
@@ -110,7 +110,7 @@ class pathFinder(Map):
                                         connectionToUse = (1 if (leftFirstConeConnectionCount >= 2) else 0)
                                         leftAvgConnAngle = firstCones[0].coneConData[connectionToUse].angle
                                     tempPathWidth, tempPathAngle = GF.distAngleBetwPos(firstCones[0].position, cone.position)
-                                    coneCandidateStrength *= 1.5-min(min(abs(GF.radDiff(GF.radInv(leftAvgConnAngle), tempPathAngle)), abs(GF.radDiff(GF.radInv(leftAvgConnAngle), tempPathAngle)))/self.pathConnectionMaxAngleDelta, 1)
+                                    coneCandidateStrength *= 1.5-min(min(abs(GF.radDiff(leftAvgConnAngle, tempPathAngle)), abs(GF.radDiff(GF.radInv(leftAvgConnAngle), tempPathAngle)))/self.pathConnectionMaxAngleDelta, 1)
                                     #you could also even do distance, but whatever
                             if(coneCandidateStrength > highestStrength):
                                 highestStrength = coneCandidateStrength

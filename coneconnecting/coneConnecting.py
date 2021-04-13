@@ -51,7 +51,7 @@ class coneConnecter(Map):
             return(False, None)
         else:
             currentExistingAngle = 0.0
-            if((currentConnectionCount>0) and (coneToConnect.coneConData is not None)): #only 1 of the 2 checks should be needed, but just to be safe
+            if((currentConnectionCount>0) and (len(coneToConnect.coneConData[0])>0)): #only 1 of the 2 checks should be needed, but just to be safe
                 currentExistingAngle = GF.radRoll(GF.radInv(coneToConnect.coneConData[0].angle))
             
             nearbyConeList = self.distanceToCone(coneToConnect.position, self.right_cone_list if coneToConnect.LorR else self.left_cone_list, 'SORTBY_DIST', [coneToConnect.ID], self.coneConnectionThreshold, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by distance, but that's not really needed given the (CURRENT) math
@@ -144,10 +144,11 @@ class coneConnecter(Map):
             ## make the connection:
             winningCone = nearbyConeList[bestCandidateIndex][0] #pointer to a Cone class object
             if(applyResult): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
+                dist, angle = GF.distAngleBetwPos(coneToConnect.position, winningCone.position)
                 ## input cone
                 coneToConnect.connections.append(winningCone) #save cone pointer in the .connections list
-                coneToConnect.coneConData.append(coneConnection(0.0, nearbyConeList[bestCandidateIndex][1], highestStrength))
+                coneToConnect.coneConData.append(coneConnection(angle, dist, highestStrength))
                 ## and the other cone
                 winningCone.connections.append(coneToConnect)
-                winningCone.coneConData.append(coneConnection(0.0, nearbyConeList[bestCandidateIndex][1], highestStrength))
+                winningCone.coneConData.append(coneConnection(GF.radInv(angle), dist, highestStrength))
             return(True, winningCone) #return the cone you connected with (or are capable of connecting with, if applyResult=False)
