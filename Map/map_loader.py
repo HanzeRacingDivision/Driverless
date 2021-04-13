@@ -6,11 +6,6 @@ from Map import Map
 
 import generalFunctions as GF
 
-def copyImportMap(classWithMapParent, mapToImport):
-    """save all attributes from mapToImport to those by the same name in classWithMapParent"""
-    for attrName in dir(mapToImport): #dir(class) returs a list of all class attributes
-        if((not attrName.startswith('_')) and (not callable(getattr(mapToImport, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-            setattr(classWithMapParent, attrName, getattr(mapToImport, attrName)) #copy attribute
 
 class mapLoader:
     fileExt = ".xlsx" #static
@@ -47,6 +42,8 @@ class mapLoader:
             mapCone = Map.Cone(row, [coneToCovert['Cone_X'], coneToCovert['Cone_Y']], (coneToCovert['Cone_Type'] == 'RIGHT'), coneToCovert['Finish'])
             listToAppend = (mapObj.right_cone_list if mapCone.LorR else mapObj.left_cone_list)
             listToAppend.append(mapCone)
+            if(coneToCovert['Finish']):
+                mapObj.finish_line_cones.append(mapCone)
         ## now that all the cones are imported, their connections can be established
         combinedConeList = mapObj.left_cone_list + mapObj.right_cone_list #this list is (or at least really really should) be the mapObj equivalent of the map_file, with the same order of items.
         for row in range(len(map_file)):  ## this work because: (combinedConeList[row].ID == row) is true
@@ -55,17 +52,23 @@ class mapLoader:
                 if(not np.isnan(coneIndex)):
                     combinedConeList[row].connections.append(combinedConeList[GF.findIndexByClassAttr(combinedConeList, 'ID', int(coneIndex))])
         if(self.coneConnecterPresent):
-            import coneConnecting as CC
-            for cone in combinedConeList:
-                for connectedCone in cone.connections:
-                    dist, angle = GF.distAngleBetwPos(cone.position, connectedCone.position)
-                    cone.coneConData.append(CC.coneConnection(angle, dist, -1.0))
-                    connectedCone.coneConData.append(CC.coneConnection(GF.radInv(angle), dist, -1.0))
+            try:
+                import coneConnecting as CC
+                for cone in combinedConeList:
+                    for connectedCone in cone.connections:
+                        dist, angle = GF.distAngleBetwPos(cone.position, connectedCone.position)
+                        cone.coneConData.append(CC.coneConnection(angle, dist, -1.0))
+                        #connectedCone.coneConData.append(CC.coneConnection(GF.radInv(angle), dist, -1.0)) #don't do this, becuase you'll do it double
+            except Exception as excep:
+                print("couldn't rebuild coneConData for connected cones, exception:", excep)
         return(mapObj)
+    
+    def generateFilename(self):
+        return(self.defaultFilename + datetime.datetime.now().strftime("%Y-%m-%d_%H;%M;%S") + self.fileExt)
     
     def save_map(self, mapToSave: Map, filename=None):
         if(filename is None): #automatic file naming
-            filename = self.defaultFilename + datetime.datetime.now().strftime("%Y-%m-%d_%H;%M;%S") + self.fileExt
+            filename = self.generateFilename()
         elif(not filename.endswith(self.fileExt)):
             filename += self.fileExt
         print("saving to file:", filename)
@@ -86,7 +89,16 @@ class mapLoader:
         #print(map_file)
         returnMap = self.mapFileToObject(map_file)
         if(whereToLoad is not None):
-            copyImportMap(whereToLoad, returnMap)
+            #copyImportMap(whereToLoad, returnMap) #has problems with car objects and clocks and all that nastyness
+            whereToLoad.left_cone_list = returnMap.left_cone_list
+            whereToLoad.right_cone_list = returnMap.right_cone_list
+            whereToLoad.finish_line_cones = returnMap.finish_line_cones
+            #whereToLoad.clockSet(whereToLoad.clock) #a terrible hack that can be removed once the clock system is reworked
+            try:
+                if(self.pathPlanningPresent):
+                    whereToLoad.makeBoundrySplines()
+            except Exception as excep:
+                print("couldn't makeBoundrySplines after loading map into", whereToLoad, ", exception:", excep)
         return(returnMap)
 
 
