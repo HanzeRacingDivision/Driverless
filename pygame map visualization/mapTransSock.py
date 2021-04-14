@@ -18,16 +18,28 @@ def deepCopyExtractMap(classWithMapParent):
     """copy ONLY the map class attributes from any (child) class into a new map object"""
     returnObject = Map() #make new instance of same class as source
     for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
-        if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
+        if((not attrName.startswith('__')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
             setattr(returnObject, attrName, deepcopy(getattr(classWithMapParent, attrName))) #deepcopy attribute
     return(returnObject)
+
+def shallowCopyCar(carObjToCopy, newReturnMap):
+    """copy ONLY the Map.car class attributes from any car object (like realCar and simCar)
+        littel hacky, maybe fix this at a later date"""
+    returnCar = Map.Car(newReturnMap.clock)
+    for attrName in dir(returnCar): #dir(class) returs a list of all class attributes
+        if((not attrName.startswith('__')) and (not callable(getattr(returnCar, attrName)))):
+            setattr(returnCar, attrName, getattr(carObjToCopy, attrName)) #copy attribute (pointer)
+    return(returnCar)
 
 def shallowCopyExtractMap(classWithMapParent):
     """copy ONLY the map class attributes from any (child) class into a 'new' map object (consisting of pointers)"""
     returnObject = Map() #make new instance of same class as source
     for attrName in dir(returnObject): #dir(class) returs a list of all class attributes
-        if((not attrName.startswith('_')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
-            setattr(returnObject, attrName, getattr(classWithMapParent, attrName)) #copy attribute (pointer)
+        if((not attrName.startswith('__')) and (not callable(getattr(returnObject, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
+            if(attrName == 'car'):
+                setattr(returnObject, attrName, shallowCopyCar(getattr(classWithMapParent, attrName), returnObject)) #the car object may have stuff like a serial port and whatnot
+            else:
+                setattr(returnObject, attrName, getattr(classWithMapParent, attrName)) #copy attribute (pointer)
     return(returnObject)
 
 
@@ -403,12 +415,12 @@ class mapTransmitterSocket:
                                 # pickleStart = time.time()
                                 # bytesToSend = pickle.dumps(extractedMap)
                                 # pickleEnd = time.time()
-                                # # if((pickleStart-extractStart)>0):
-                                # #     print("extract:", round(1/(pickleStart-extractStart), 1))
-                                # if((pickleEnd-pickleStart)>0):
-                                #     print("pickle:", round(1/(pickleEnd-pickleStart), 1))
+                                # if((pickleStart-extractStart)>0):
+                                #     print("extract:", round(1/(pickleStart-extractStart), 1))
+                                # # if((pickleEnd-pickleStart)>0):
+                                # #     print("pickle:", round(1/(pickleEnd-pickleStart), 1))
                                 
-                                print("sending map of size:", len(bytesToSend))
+                                #print("sending map of size:", len(bytesToSend))
                                 if(self.usePacketSizeHeader):
                                     if(len(bytesToSend) > 999999):
                                         print("manualSendBuffer entry too large:", len(bytesToSend))
@@ -445,6 +457,7 @@ class mapTransmitterSocket:
                             except:
                                 print("couldn't restart UIreceive thread")
                                 tempUIreceive[0] = False
+                                time.sleep(0.05)
                     if(not threadKeepRunning[0]):
                         print("stopping mapTransmitterSocket.runOnThread() (from accepted client)")
             except socket.error as excep: #handleable exceptions, this will only end things on major exceptions (unexpected ones)
