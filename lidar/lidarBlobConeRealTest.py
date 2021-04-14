@@ -5,36 +5,43 @@ import numpy as np
 
 import generalFunctions as GF
 from Map import Map
+import map_loader as ML
 import coneConnecting as CC
-#import pathFinding    as PF
-#import pathPlanningTemp as PP
+import pathFinding    as PF
+import pathPlanningTemp as PP
+import carMCUclass as RC
 #import simulatedCar   as SC
 import drawDriverless as DD
 
+import sys #used for importing files (map_loader) from commandline (DOS run argument)
 
-class pygamesimLocal(CC.coneConnecter, DD.pygameDrawer):
+class pygamesimLocal(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
     def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
+        ML.mapLoader.__init__(self)
         
         # self.clockSet(simClock) #an altered clock, only for simulations where the speed is faster/slower than normal
         # self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         
+        self.car = RC.realCar(self.clock, comPort='/dev/ttyUSB1')
+        
         CC.coneConnecter.__init__(self)
-        # PF.pathFinder.__init__(self)
-        # PP.pathPlanner.__init__(self)
+        PF.pathFinder.__init__(self)
+        PP.pathPlanner.__init__(self)
         DD.pygameDrawer.__init__(self, self, window, drawSize, drawOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
         #tell the drawing class which parts are present
-        self.coneConnecterPresent = False
-        self.pathFinderPresent = False
-        self.pathPlanningPresent = False
+        self.coneConnecterPresent = True
+        self.pathFinderPresent = True
+        self.pathPlanningPresent = True
         self.SLAMPresent = False
         
         self.isRemote = False #tell the drawing class to apply UI elements locally
         
         self.carPolygonMode = True #if you dont want to use the car sprite, set this to true (but if the sprite wasnt loaded this will be used automatically)
+        self.drawQubicSplines = False #just the initial state, press Q to change
         
-        # if(self.pathPlanningPresent):
-        #     self.car.pathFolData = PP.pathPlannerData()
+        if(self.pathPlanningPresent):
+            self.car.pathFolData = PP.pathPlannerData()
 
 
 
@@ -75,12 +82,13 @@ def makeCone(blob):
     overlaps, overlappingCone = sim1.overlapConeCheck(conePos)
     if(overlaps):
         ## SLAM code should replace this
-        overlappingCone.slamData.append([conePos, sim1.clock(), [v for v in sim1.car.position], sim1.car.velocity, overlappingCone.slamData[-1][-1]]) #cone position, timestamp, car position, car velocity, totalSpotCount
-        if(len(overlappingCone.slamData)>10): #limit number of sightings to remember
-            overlappingCone.slamData.pop(0) #delete oldest data
-        overlappingCone.position[0] = GF.average([item[0][0] for item in overlappingCone.slamData])
-        overlappingCone.position[1] = GF.average([item[0][1] for item in overlappingCone.slamData])
-        blob.extraData = overlappingCone
+        if(type(overlappingCone.slamData) is list):
+            overlappingCone.slamData.append([conePos, sim1.clock(), [v for v in sim1.car.position], sim1.car.velocity, overlappingCone.slamData[-1][-1]]) #cone position, timestamp, car position, car velocity, totalSpotCount
+            if(len(overlappingCone.slamData)>10): #limit number of sightings to remember
+                overlappingCone.slamData.pop(0) #delete oldest data
+            overlappingCone.position[0] = GF.average([item[0][0] for item in overlappingCone.slamData])
+            overlappingCone.position[1] = GF.average([item[0][1] for item in overlappingCone.slamData])
+            blob.extraData = overlappingCone
     else:
         ## SLAM code could replace this
         newConeID = GF.findMaxAttrIndex((sim1.right_cone_list + sim1.left_cone_list), 'ID')[1]
@@ -117,16 +125,25 @@ def callbackFunc(lidarSelf, newPacket, pointsAdded):
 
 
 
-resolution = [1200, 600]
+resolution = [700, 350]
 
 DD.pygameInit(resolution)
 global sim1
 sim1 = pygamesimLocal(DD.window, resolution)
 
+if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
+    print("found sys.argv[1], attempting to import:", sys.argv[1])
+    sim1.load_map(sys.argv[1], sim1)
+
 timeSinceLastUpdate = sim1.clock()
 
+print("printing serial ports:")
+[print(entry.name) for entry in RC.serial.tools.list_ports.comports()]
+print("done printing ports.")
+print()
+
 try:
-    lidar = CX.camsense_X1('COM19')
+    lidar = CX.camsense_X1('/dev/ttyUSB0')
     lidar.postParseCallback = callbackFunc
     
     while DD.windowKeepRunning:
@@ -136,10 +153,10 @@ try:
         
         LB.checkBlobAge(sim1.clock)
         lidar.run() #needs to be ran more than 300 times per second, otherwise the serial buffer will fill up
-        # if((sim1.car.pathFolData.auto) if (sim1.pathPlanningPresent and (sim1.car.pathFolData is not None)) else False):
-        #     sim1.calcAutoDriving()
-        #     sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
-        # sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
+        if((sim1.car.pathFolData.auto) if (sim1.pathPlanningPresent and (sim1.car.pathFolData is not None)) else False):
+            sim1.calcAutoDriving()
+            sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
+        sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
         sim1.car.update(dt)
         
         sim1.redraw()
@@ -157,4 +174,8 @@ finally:
         print("closed lidar serial port")
     except:
         print("coudln't close lidar serial port")
+    try:  #alternatively:  if(type(sim1.car) is RC.realCar):
+        sim1.car.disconnect()
+    except Exception as excep:
+        print("failed to run car.disconnect():", excep)
     DD.pygameEnd() #correctly shut down pygame window

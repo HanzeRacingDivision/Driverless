@@ -7,10 +7,11 @@ blobList = [] #list of blob class objects
 #the average point is just the average value of the list of points
 
 maxBlobPointCount = 33 #points, not angle
-maxBlobAverageGapSizeSqrd = 75**2 #if the average distance between points is larger than this, only applied if pointCount >= maxBlobAverageGapPoints
-maxBlobAverageGapPoints = 3
-maxBlobSingleGapSqrd = 100**2 #if the distance between the new datapoint and the last blob-point is larger than this, don't append, (make a new blob)
-blobOverlapThreshSqrd = 100**2 #if the distance between any of the points of any 2 blobs are less than this, consider it overlapping and delete the older one
+## the unit for points needs to match with these values!, currently in: meters
+maxBlobAverageGapSizeSqrd = 0.075**2 #if the average distance between points is larger than this, only applied if pointCount >= maxBlobAverageGapPoints
+maxBlobAverageGapPoints = 3 #number of points in blob required to activate maxBlobAverageGapSizeSqrd check
+maxBlobSingleGapSqrd = 0.1**2 #if the distance between the new datapoint and the last blob-point is larger than this, don't append, (make a new blob)
+blobOverlapThreshSqrd = 0.1**2 #if the distance between any of the points of any 2 blobs are less than this, consider it overlapping and delete the older one
 blobTimeout = 1.5 #time after which any blob is deleted/moved
 
 import time
