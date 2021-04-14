@@ -27,6 +27,7 @@ other:
 - pressing C clears the car position history line, C+CTRL clears everything
 - pressing A toggles auto-driving (only has effect if pathPlanning(Temp).py is present)
 - pressing +/- increases/decreases auto-driving target speed
+- pressing S saves the map to a file (filename auto generated)
 - pressing Q toggles drawing qubic splines (only has effect if pathPlanning(Temp).py is present)
 - pressing T toggles whether the cone-lines that determined the targets are drawn (only has effect if pathFinding.py is present)
 - pressing [/] (left and right square bracket) increases the rate at which maps are transmitted (ONLY IN remote viewers (remoteMapViewer.py))
@@ -40,4 +41,4 @@ meaning of the colors and other visual aspects: <br/>
 - holding F (finish button) makes your cursor into a racing-finish flag (fun, right)
 - if there are 2 valid finish cones, a red (finish) line will be drawn between them
 - the car is drawn as a car sprite, or (if loading that failed) a green box with a red arrow
-- the frames per second are displayed in the topright as average \n minimum \n maxximum \n median
+- the frames per second are displayed in the topright as: average \n minimum \n maxximum \n median
