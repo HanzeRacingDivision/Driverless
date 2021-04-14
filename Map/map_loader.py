@@ -84,8 +84,7 @@ class mapLoader:
         map_file.to_excel(filename)
         return(filename)
     
-    def load_map_file(self, map_file, whereToLoad=None):
-        print("typematch:", type(map_file) is pd.core.frame.DataFrame)
+    def load_map_file(self, map_file: pd.core.frame.DataFrame, whereToLoad=None):
         #print(map_file)
         returnMap = self.mapFileToObject(map_file)
         if(whereToLoad is not None):
