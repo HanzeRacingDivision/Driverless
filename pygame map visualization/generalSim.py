@@ -20,11 +20,7 @@ import sys #used for importing files (map_loader) from commandline (DOS run argu
 class pygamesimLocal(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
     def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
-        immediateFile = None
-        if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
-            print("found sys.argv[1], attempting to import:", sys.argv[1])
-            immediateFile = sys.argv[1]
-        ML.mapLoader.__init__(self, immediateFile, self) #import a file (if it was specified)
+        ML.mapLoader.__init__(self)
         
         #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal  #DEPRICATED
         #self.clock = your custom clock function here
@@ -56,6 +52,10 @@ resolution = [1200, 600]
 
 DD.pygameInit(resolution)
 sim1 = pygamesimLocal(DD.window, resolution)
+
+if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
+    print("found sys.argv[1], attempting to import:", sys.argv[1])
+    sim1.load_map(sys.argv[1], sim1)
 
 timeSinceLastUpdate = sim1.clock()
 #mapSaveTimer = sim1.clock()
