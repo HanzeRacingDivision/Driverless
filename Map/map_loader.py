@@ -101,7 +101,7 @@ class mapLoader:
         return(returnMap)
     
     
-    def load(self, filename: str, whereToLoad=None):
+    def load_map(self, filename: str, whereToLoad=None):
         """load an excel (pandas) file and return/import it
             provide filename, fileExt will be added if it's not present"""
         if(not filename.endswith(self.fileExt)):
