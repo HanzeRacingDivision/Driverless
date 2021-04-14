@@ -82,7 +82,7 @@ class mapLoader:
         #print(map_file)
         map_file = self.mapObjectToFile(mapToSave)
         map_file.to_excel(filename)
-        return(filename)
+        return(filename, map_file)
     
     def load_map_file(self, map_file: pd.core.frame.DataFrame, whereToLoad=None):
         #print(map_file)
