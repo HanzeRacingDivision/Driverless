@@ -8,6 +8,8 @@ import generalFunctions as GF
 
 
 class mapLoader:
+    """a class for saving/loading/importing pandas excel files
+        (currently!) only saves cone states (positions, connections, etc)"""
     fileExt = ".xlsx" #static
     def __init__(self, immediateFile=None, immediateLoadTarget=None):
         self.defaultFilename = "map_"
@@ -26,6 +28,7 @@ class mapLoader:
             self.laod_map(immediateFile, immediateLoadTarget)
     
     def mapObjectToFile(self, mapToSave):
+        """convert Map object to pandas dataframe"""
         combinedConeList = mapToSave.left_cone_list + mapToSave.right_cone_list
         map_file = pd.DataFrame({'Cone_Type' : [('RIGHT' if cone.LorR else 'LEFT') for cone in combinedConeList],
                                  'Cone_X' : [cone.position[0] for cone in combinedConeList],
@@ -36,6 +39,7 @@ class mapLoader:
         return(map_file)
     
     def mapFileToObject(self, map_file):
+        """convert pandas dataframe (map_file) to Map object"""
         mapObj = Map()
         for row in range(len(map_file)):
             coneToCovert = map_file.iloc[row] #load the row (the cone)
@@ -64,9 +68,12 @@ class mapLoader:
         return(mapObj)
     
     def generateFilename(self):
+        """generate a unique filename using self.defaultFilename and datetime"""
         return(self.defaultFilename + datetime.datetime.now().strftime("%Y-%m-%d_%H;%M;%S") + self.fileExt)
     
     def save_map(self, mapToSave: Map, filename=None):
+        """save map to excel file
+            if no filename is provided, one with be automatically generated using self.generateFilename()"""
         if(filename is None): #automatic file naming
             filename = self.generateFilename()
         elif(not filename.endswith(self.fileExt)):
@@ -77,15 +84,8 @@ class mapLoader:
         map_file.to_excel(filename)
         return(filename)
     
-    def laod_map(self, filename, whereToLoad=None):
-        if(not filename.endswith(self.fileExt)):
-            filename += self.fileExt
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        map_path = filename #init var
-        if(not filename.startswith(current_dir)):
-             map_path = os.path.join(current_dir, filename)
-        map_file = pd.read_excel(map_path, index_col=0) #'index_col=0' lets the parser know that the indices are in the first column (and so the value in header row is unimportant)
-        print("loading map file:", map_path)
+    def load_map_file(self, map_file, whereToLoad=None):
+        print("typematch:", type(map_file) is pd.core.frame.DataFrame)
         #print(map_file)
         returnMap = self.mapFileToObject(map_file)
         if(whereToLoad is not None):
@@ -100,6 +100,21 @@ class mapLoader:
             except Exception as excep:
                 print("couldn't makeBoundrySplines after loading map into", whereToLoad, ", exception:", excep)
         return(returnMap)
+    
+    
+    def laod_map(self, filename: str, whereToLoad=None):
+        """load an excel (pandas) file and return/import it
+            provide filename, fileExt will be added if it's not present"""
+        if(not filename.endswith(self.fileExt)):
+            filename += self.fileExt
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        map_path = filename #init var
+        if(not filename.startswith(current_dir)):
+             map_path = os.path.join(current_dir, filename)
+        print("loading map file:", map_path)
+        map_file = pd.read_excel(map_path, index_col=0) #'index_col=0' lets the parser know that the indices are in the first column (and so the value in header row is unimportant)
+        return(self.load_map_file(map_file, whereToLoad)) #this is just to avoid having the same code twice
+    
 
 
 # if __name__ == '__main__':
