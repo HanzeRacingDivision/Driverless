@@ -11,7 +11,7 @@ class mapLoader:
     """a class for saving/loading/importing pandas excel files
         (currently!) only saves cone states (positions, connections, etc)"""
     fileExt = ".xlsx" #static
-    def __init__(self, immediateFile=None, immediateLoadTarget=None):
+    def __init__(self):
         self.defaultFilename = "map_"
         
         ##these should probably be centralized in Map.py, but they are used here, so frick it. Initialize to False, and set to True in child class (instance that combines the component and Map classes)
@@ -20,12 +20,12 @@ class mapLoader:
         self.pathPlanningPresent = False
         self.SLAMPresent = False
         
-        if(immediateFile is not None):
-            print("loading map at startup:", immediateFile)
-            if(immediateLoadTarget is None):
-                print("loading startup map into self")
-                immediateLoadTarget = self
-            self.laod_map(immediateFile, immediateLoadTarget)
+        # if(immediateFile is not None):
+        #     print("loading map at startup:", immediateFile)
+        #     if(immediateLoadTarget is None):
+        #         print("loading startup map into self")
+        #         immediateLoadTarget = self
+        #     self.load_map(immediateFile, immediateLoadTarget)
     
     def mapObjectToFile(self, mapToSave):
         """convert Map object to pandas dataframe"""
@@ -101,7 +101,7 @@ class mapLoader:
         return(returnMap)
     
     
-    def laod_map(self, filename: str, whereToLoad=None):
+    def load(self, filename: str, whereToLoad=None):
         """load an excel (pandas) file and return/import it
             provide filename, fileExt will be added if it's not present"""
         if(not filename.endswith(self.fileExt)):
@@ -128,5 +128,5 @@ class mapLoader:
 #     aMap.right_cone_list.append(Map.Cone(6, [2, 0.123456789], True, False)); aMap.right_cone_list[-1].connections.append(aMap.right_cone_list[-2]);  aMap.right_cone_list[-2].connections.append(aMap.right_cone_list[-1])
 #     aMap.right_cone_list.append(Map.Cone(7, [3, 0.123456789], True, False))
 #     loader.save_map(aMap, "test")
-#     returnedMap = loader.laod_map("test")
+#     returnedMap = loader.load_map("test")
 #     loader.save_map(returnedMap, "reTest")
