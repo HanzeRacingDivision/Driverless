@@ -1,4 +1,5 @@
 from Map import Map
+#import map_loader as ML #not needed(?)
 import coneConnecting as CC #used for UI cone placement
 import pathPlanningTemp as PP #used for rendering splines
 import drawDriverless as DD
@@ -74,10 +75,10 @@ try:
         if((rightNow-timeSinceLastUpdate) < 0.015): #60FPS limiter
             time.sleep(0.0155-(rightNow-timeSinceLastUpdate))
 
-except KeyboardInterrupt:
-    print("main thread keyboard interrupt")
-except Exception as excep:
-    print("main thread exception:", excep, excep.args)
+# except KeyboardInterrupt:
+#     print("main thread keyboard interrupt")
+# except Exception as excep:
+#     print("main thread exception:", excep, excep.args)
 finally:
     try:
         sim1.threadKeepRunning[0] = False #signal the Thread function to stop its while() loop(s) (the list is just a manual boolean pointer (hack))
@@ -85,8 +86,4 @@ finally:
         print("thread still alive?:", sim1.mapSockThread.is_alive())
     except Exception as excep:
         print("couldn't stop thread?:", excep)
-    try:
-        sim1.manualClose()
-    except:
-        print("couldn't manualClose()")
     DD.pygameEnd() #correctly shut down pygame window

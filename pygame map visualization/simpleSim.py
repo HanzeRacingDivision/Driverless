@@ -1,4 +1,5 @@
 from Map import Map
+import map_loader as ML
 import coneConnecting as CC
 import pathFinding    as PF
 import pathPlanningTemp as PP
@@ -15,10 +16,16 @@ discreteClockStep = 0.05
 def simClock(clockStart):
     return(discreteClock)
 
+import sys #used for importing files (map_loader) from commandline (DOS run argument)
 
 class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
     def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
+        immediateFile = None
+        if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
+            print("found sys.argv[1], attempting to import:", sys.argv[1])
+            immediateFile = sys.argv[1]
+        ML.mapLoader.__init__(self, immediateFile, self) #import a file (if it was specified)
         
         #self.clockSet(simClock) #an altered clock, only for simulations where the speed is faster/slower than normal  #DEPRICATED
         #self.clock = simClock #must be a function with no required parameters!

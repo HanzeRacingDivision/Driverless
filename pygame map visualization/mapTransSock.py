@@ -145,7 +145,7 @@ class mapTransmitterSocket:
         if(self.objectWithMap is None):
             print("(UIreceiver) objectWithMap is None, can't parse UI")
             return(False)
-        print("parsing:", instruction)
+        print("parsing:", instruction[0])
         if(instruction[0] == 'PLACE'):
             if(len(instruction) < 3): #if the 'immediateConnect' argument was not provided (for whatever silly reason...) assume it's False
                 instruction.append(False)
@@ -237,6 +237,11 @@ class mapTransmitterSocket:
         elif(instruction[0] == 'FPSADJ'):
             print("ajustding mapsPerSecond to:", instruction[1])
             self.mapSendInterval = min(max(1.0/float(instruction[1]), 0.03), 2.0)
+        elif(instruction[0] == 'MAPFIL'):
+            try:
+                self.objectWithMap.load_map_file(instruction[1], self.objectWithMap)
+            except Exception as excep:
+                print("failed to perform 'MAPFIL' instruction, exception:", excep)
         else:
             print("can't parse unknown instruction:", instruction[0])
             return(False)

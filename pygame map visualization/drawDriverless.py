@@ -437,7 +437,10 @@ def remoteAdjustMapSendInterval(socketToSendFrom, newMapSendInterval):
     #print("remoteAdjustMapSendInterval")
     remoteInstructionSend(socketToSendFrom, ['FPSADJ', int(newMapSendInterval)])
 
-#def remoteWholeMapLoad(socketToSendFrom, mapToLoad): #for debugging/testing, when you need to load an entire map object over the network
+def remoteWholeMapFileLoad(socketToSendFrom, map_file): #for debugging/testing, when you need to load an entire map object over the network
+    """send & load a (pandas) excel file to remote instance"""
+    #print("remoteWholeMapFileLoad")
+    remoteInstructionSend(socketToSendFrom, ['MAPFIL', map_file])
 
 #cursor in the shape of a flag
 flagCurs = ("ooo         ooooooooo   ",
@@ -767,13 +770,18 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
         oldWindowSize = window.get_size() #update size (get_size() returns tuple of (width, height))
     
     elif(eventToHandle.type == pygame.DROPFILE): #drag and drop files to import them
-        if((pygame.mouse.get_pos()[0] == 0) and (pygame.mouse.get_pos()[1] == 0) and (len(pygamesimInputList) > 1)):
-            print("skipping file import, please make sure to select the pygame window beforehand or something")
-        else:
-            print("attempting to load drag-dropped file:", eventToHandle.file)
+        pygamesimInput = currentPygamesimInput(pygamesimInputList, None, False)
+        print("attempting to load drag-dropped file:", eventToHandle.file)
+        if(pygamesimInput.isRemote):
             try:
-                whereToLoad = currentPygamesimInput(pygamesimInputList, None, False)
-                whereToLoad.laod_map(eventToHandle.file, whereToLoad) #note: drag and drop functionality is a little iffy for multisim applications
+                import pandas as pd
+                print("sending map_file to remote client...")
+                remoteWholeMapFileLoad(pygamesimInput.remoteUIsender, pd.read_excel(eventToHandle.file, index_col=0)) #send pandas-dataframe to remote instance
+            except Exception as excep:
+                print("failed to send map_file to remote instance, exception:", excep)
+        else:
+            try:
+                pygamesimInput.laod_map(eventToHandle.file, pygamesimInput) #note: drag and drop functionality is a little iffy for multisim applications
                 print("loaded file successfully")
             except Exception as excep:
                 print("failed to load drag-dropped file, exception:", excep)

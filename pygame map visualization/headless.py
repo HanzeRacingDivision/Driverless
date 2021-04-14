@@ -1,4 +1,5 @@
 from Map import Map
+import map_loader as ML
 import coneConnecting as CC
 import pathFinding    as PF
 import pathPlanningTemp as PP
@@ -11,11 +12,18 @@ import time
 
 import threading as thr
 
+import sys #used for importing files (map_loader) from commandline (DOS run argument)
+
 ## copyExtractMap() is moved to mapTransSock, you can still call it with MS.copyExtractMap()
 
 class pygamesimHeadless(CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
     def __init__(self):
         Map.__init__(self) #init map class
+        immediateFile = None
+        if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
+            print("found sys.argv[1], attempting to import:", sys.argv[1])
+            immediateFile = sys.argv[1]
+        ML.mapLoader.__init__(self, immediateFile, self) #import a file (if it was specified)
         
         #self.clockSet(SC.simClockExample) #an altered clock, only for simulations where the speed is faster/slower than normal  #DEPRICATED
         #self.clock = your custom clock function here

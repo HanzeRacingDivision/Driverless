@@ -339,7 +339,7 @@ class mapReceiverSocket:
                             if(type(receivedObj) is Map):
                                 rightNow = time.time()
                                 if((rightNow-lastMapImportTime)>0):
-                                    print("PPS:", round(1/(rightNow-lastMapImportTime), 1))
+                                    print("PPS:", round(1/(rightNow-lastMapImportTime), 1), len(pickle.dumps(receivedObj)))
                                 lastMapImportTime = rightNow
                                 copyImportMap(self.objectWithMap, receivedObj)
                             elif(((type(receivedObj[0]) is str) if (len(receivedObj) >= 2) else False) if (type(receivedObj) is list) else False):
