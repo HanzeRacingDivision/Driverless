@@ -208,9 +208,9 @@ class mapTransmitterSocket:
         elif(instruction[0] == 'PATH'):
             if(self.objectWithMap.pathFinderPresent):
                 if(instruction[1] < 1): #if instructed to path-find as far as possible
-                    doesNothing = 0 # a variable to keep python happy
-                    while(self.objectWithMap.makePath()): #stops when path can no longer be advanced
-                        doesNothing += 1  # "python is so versitile, you can do anything" :) haha good joke
+                    limitCounter = 0
+                    while(self.objectWithMap.makePath() and (limitCounter<25)): #stops when path can no longer be advanced
+                        limitCounter += 1
                 else: #if instructed to (attempt to) find a certian number of path points
                     for i in range(instruction[1]): #try to make this many path points
                         self.objectWithMap.makePath()
@@ -438,7 +438,7 @@ class mapTransmitterSocket:
                         
                         while(len(self.manualSendBuffer) > 0):
                             bytesToSend = pickle.dumps(self.manualSendBuffer[0])
-                            print("sending", len(bytesToSend), "bytes from self.manualSendBuffer")
+                            #print("sending", len(bytesToSend), "bytes from self.manualSendBuffer")
                             if(self.usePacketSizeHeader):
                                 if(len(bytesToSend) > 999999):
                                     print("self.manualSendBuffer entry too large:", len(bytesToSend))
