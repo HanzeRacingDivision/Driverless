@@ -16,7 +16,7 @@ import sys #used for importing files (map_loader) from commandline (DOS run argu
 
 ## copyExtractMap() is moved to mapTransSock, you can still call it with MS.copyExtractMap()
 
-class pygamesimHeadless(CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
+class pygamesimHeadless(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
     def __init__(self):
         Map.__init__(self) #init map class
         immediateFile = None

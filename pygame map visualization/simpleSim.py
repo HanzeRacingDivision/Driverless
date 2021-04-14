@@ -18,7 +18,7 @@ def simClock(clockStart):
 
 import sys #used for importing files (map_loader) from commandline (DOS run argument)
 
-class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
+class pygamesimLocal(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
     def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
         immediateFile = None
@@ -36,9 +36,9 @@ class pygamesimLocal(CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameD
         PP.pathPlanner.__init__(self)
         DD.pygameDrawer.__init__(self, self, window, drawSize, drawOffset, carCamOrient, sizeScale, startWithCarCam, invertYaxis)
         #tell the drawing class which parts are present
-        self.coneConnecterPresent = False
-        self.pathFinderPresent = False
-        self.pathPlanningPresent = False
+        self.coneConnecterPresent = True
+        self.pathFinderPresent = True
+        self.pathPlanningPresent = True
         self.SLAMPresent = False
         
         self.isRemote = False #tell the drawing class to apply UI elements locally
