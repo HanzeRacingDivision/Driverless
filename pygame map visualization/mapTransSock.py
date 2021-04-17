@@ -149,21 +149,19 @@ class mapTransmitterSocket:
         if(instruction[0] == 'PLACE'):
             if(len(instruction) < 3): #if the 'immediateConnect' argument was not provided (for whatever silly reason...) assume it's False
                 instruction.append(False)
-            aNewCone = instruction[1]
-            overlaps, overlappingCone = self.objectWithMap.overlapConeCheck(aNewCone.position) #check if there isn't already a cone there
-            if(overlaps):
-                print("can't enact 'PLACE' instruction, it overlaps with existing cone:", overlappingCone.ID)
+            if(type(instruction[1]) is Map.Cone):
+                conePlaceSuccess, coneInList = self.objectWithMap.addConeObj(instruction[1])
+            elif(type(instruction[1]) is tuple):
+                conePlaceSuccess, coneInList = self.objectWithMap.addCone(*instruction[1])
+            else:
+                print("can't enact 'PLACE' instruction, instuction format wrong:", instruction[1])
                 return(False)
-            coneListToAppend = (self.objectWithMap.right_cone_list if aNewCone.LorR else self.objectWithMap.left_cone_list)
-            coneListToAppend.append(aNewCone)
-            if(aNewCone.isFinish):
-                if((len(self.objectWithMap.finish_line_cones)<2) and ((self.objectWithMap.finish_line_cones[0].LorR != aNewCone.LorR) if (len(self.objectWithMap.finish_line_cones)>0) else True)):
-                    self.objectWithMap.finish_line_cones.append(aNewCone)
-                else:
-                    print("couldn't set instructed cone as finish line cone (but did place it)!")
+            if(not conePlaceSuccess):
+                print("can't enact 'PLACE' instruction, it overlaps with existing cone:", coneInList.ID)
+                return(False)
             if(instruction[2]):
                 if(self.objectWithMap.coneConnecterPresent):
-                    self.objectWithMap.connectCone(aNewCone)
+                    self.objectWithMap.connectCone(coneInList)
                 else:
                     print("couldn't connect newly instructed cone, because self.objectWithMap.coneConnecterPresent == False")
             if(self.objectWithMap.pathPlanningPresent):

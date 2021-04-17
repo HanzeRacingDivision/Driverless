@@ -402,7 +402,7 @@ def remoteInstructionSend(socketToSendFrom, instruction):
             print("remoteInstructionSend manualSend exception:", excep)
 
 ##these functions could probably be removed later (just put their contents in place of the function call)
-def remoteConePlace(socketToSendFrom, coneToPlace, immediateConnect=False):
+def remoteConePlace(socketToSendFrom, coneToPlace, immediateConnect=False): #note: coneToPlace can either be a cone object or a tuple with arguments for Map.addCone()
     """instruct remote instance to place a cone"""
     #print("remoteConePlace")
     remoteInstructionSend(socketToSendFrom, ['PLACE', coneToPlace, immediateConnect])
@@ -583,18 +583,16 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                         else:
                             pygamesimInput.mapToDraw.connectCone(overlappingCone)
                 else:
-                    newConeID = GF.findMaxAttrIndex((pygamesimInput.mapToDraw.right_cone_list + pygamesimInput.mapToDraw.left_cone_list), 'ID')[1]
-                    aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, bool(pygame.key.get_pressed()[pygame.K_f]))
+                    # newConeID = GF.findMaxAttrIndex((pygamesimInput.mapToDraw.right_cone_list + pygamesimInput.mapToDraw.left_cone_list), 'ID')[1]
+                    # aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, bool(pygame.key.get_pressed()[pygame.K_f]))
                     if(((pygamesimInput.mapToDraw.finish_line_cones[0].LorR != leftOrRight) if (len(pygamesimInput.mapToDraw.finish_line_cones) > 0) else True) if pygame.key.get_pressed()[pygame.K_f] else True):
                         if(pygamesimInput.isRemote):
-                            remoteConePlace(pygamesimInput.remoteUIsender, aNewCone, pygame.key.get_pressed()[pygame.K_LSHIFT])
+                            #remoteConePlace(pygamesimInput.remoteUIsender, aNewCone, pygame.key.get_pressed()[pygame.K_LSHIFT])
+                            remoteConePlace(pygamesimInput.remoteUIsender, (posToPlace, leftOrRight, bool(pygame.key.get_pressed()[pygame.K_f])), pygame.key.get_pressed()[pygame.K_LSHIFT])
                         else:
-                            coneListToAppend = (pygamesimInput.mapToDraw.right_cone_list if leftOrRight else pygamesimInput.mapToDraw.left_cone_list)
-                            coneListToAppend.append(aNewCone)
-                            if(pygame.key.get_pressed()[pygame.K_f]):
-                                pygamesimInput.mapToDraw.finish_line_cones.append(aNewCone)
+                            conePlaceSuccess, coneInList = pygamesimInput.mapToDraw.addCone(posToPlace, leftOrRight, bool(pygame.key.get_pressed()[pygame.K_f]))
                             if(pygame.key.get_pressed()[pygame.K_LSHIFT] and pygamesimInput.coneConnecterPresent):
-                                pygamesimInput.mapToDraw.connectCone(aNewCone)
+                                pygamesimInput.mapToDraw.connectCone(coneInList)
                 if(pygamesimInput.pathPlanningPresent):
                     pygamesimInput.makeBoundrySplines()
         if(pygame.key.get_pressed()[pygame.K_f]): #flag cursor stuff
@@ -794,7 +792,7 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
                 print("failed to send map_file to remote instance, exception:", excep)
         else:
             try:
-                pygamesimInput.laod_map(eventToHandle.file, pygamesimInput) #note: drag and drop functionality is a little iffy for multisim applications
+                pygamesimInput.load_map(eventToHandle.file, pygamesimInput) #note: drag and drop functionality is a little iffy for multisim applications
                 print("loaded file successfully")
             except Exception as excep:
                 print("failed to load drag-dropped file, exception:", excep)
