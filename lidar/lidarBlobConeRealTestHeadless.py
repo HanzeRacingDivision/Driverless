@@ -87,13 +87,11 @@ def makeCone(blob):
             blob.extraData = overlappingCone
     else:
         ## SLAM code could replace this
-        newConeID = GF.findMaxAttrIndex((sim1.right_cone_list + sim1.left_cone_list), 'ID')[1]
         leftOrRight = (GF.get_norm_angle_between(sim1.car.position, conePos, sim1.car.angle) < 0.0) #if the angle relative to car is negative (CW), it's a right-side cone
-        aNewCone = Map.Cone(newConeID+1, conePos, leftOrRight, False)
-        aNewCone.slamData = [[conePos, sim1.clock(), [v for v in sim1.car.position], sim1.car.velocity, 1]]
-        coneListToAppend = (sim1.right_cone_list if leftOrRight else sim1.left_cone_list)
-        coneListToAppend.append(aNewCone)
-        blob.extraData = aNewCone
+        conePlaceSuccess, coneInList = Map.addCone(conePos, leftOrRight, False)
+        #if(conePlaceSuccess) # overlap check already done earlier
+        coneInList.slamData = [[conePos, sim1.clock(), [v for v in sim1.car.position], sim1.car.velocity, 1]]
+        blob.extraData = coneInList
     #blob.uponDeletion = delCone
     #blob.uponExist = None #this is just to mark that the function has been called (alternatively, check extraData)
 
