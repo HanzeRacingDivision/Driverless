@@ -1,81 +1,129 @@
+from numba import njit, prange #njit is for compilation (same as @jit(nopython=True)), prange is for parallel forloops
 import numpy as np
 
 
-
+@njit
 def get_angle_between(obj_1, obj_2, obj_2_angle): #get angle between 2 positions, with respect to the angle of obj_2_angle in the global coordinate system
-    """get angle between 2 positions (2-sized arrays/lists), shifted by another angle (like car.angle)"""
+    """get angle between 2 positions (2-sized arrays/lists), shifted by another angle (like car.angle)
+        numba compiled!"""
     return(np.arctan2(obj_2[1]-obj_1[1], obj_2[0]-obj_1[0])-obj_2_angle)
 
 
 # Array Scalar Multiplication and Addition (numpy probably also has these, but whatever)
 global ASM, ASA
-ASM = lambda scalar, inputArray : [scalar * entry for entry in inputArray]
-ASA = lambda scalar, inputArray : [scalar + entry for entry in inputArray]
-intBoolInv = lambda inputInt : (0 if (inputInt>0) else 1)
+ASM = lambda scalar, inputArray : [scalar * entry for entry in inputArray] #numpy does this by default, but python lists don't
+ASA = lambda scalar, inputArray : [scalar + entry for entry in inputArray] #numpy does this by default, but python lists don't
+#intBoolInv = lambda inputInt : (0 if (inputInt>0) else 1) #treat an int like a bool and invert it
 
-#angle rollover functions (for 2d positioning systems, given that arctan2 outputs between (-pi, pi))
-degRollTwo = lambda angle : ((angle % -360) if (angle < 0) else (angle % 360))
-degRollOne = lambda angle : ((angle % -180) if (angle > 180) else ((angle % 180) if (angle < -180) else angle))
-degRoll = lambda angle : degRollOne(degRollTwo(angle))
+## angle rollover functions (for 2d positioning systems, given that arctan2 outputs between (-pi, pi))
+@njit
+def degRoll(angle):
+    """return the angle (degrees) considering (-180, 180) rollover
+        numba compiled!"""
+    tempAngle = ((angle % -360.0) if (angle < 0) else (angle % 360.0))
+    return((tempAngle % -180.0) if (tempAngle > 180.0) else ((tempAngle % 180.0) if (tempAngle < -180.0) else tempAngle))
 
-radRollTwo = lambda angle : ((angle % (-2*np.pi)) if (angle < 0) else (angle % (2*np.pi)))
-radRollOne = lambda angle : ((angle % -np.pi) if (angle > np.pi) else ((angle % np.pi) if (angle < -np.pi) else angle))
-radRoll = lambda angle : radRollOne(radRollTwo(angle))
+@njit
+def radRoll(angle):
+    """return the angle (radians) considering (-pi, pi) rollover
+        numba compiled!"""
+    tempAngle = ((angle % (-2*np.pi)) if (angle < 0) else (angle % (2*np.pi)))
+    return((tempAngle % -np.pi) if (tempAngle > np.pi) else ((tempAngle % np.pi) if (tempAngle < -np.pi) else tempAngle))
 
-#angle math funcitons, that incorporate rollover
-degDiff = lambda angleOne, angleTwo : degRoll(angleTwo-angleOne)  #recommend using abs(degDiff()), but currently, it returns the value required to get from angleOne to angleTwo, so (90, -45) = -135
-degMiddOne = lambda lowBound, upBound : (degRoll(lowBound) + (degDiff(lowBound, upBound)/2) + (180 if (degDiff(lowBound, upBound) < 0) else 0))
-degMidd = lambda lowBound, upBound : degRoll(degMiddOne(lowBound, upBound))
+## angle math functions (that incorporate rollover)
+@njit
+def degDiff(angleOne, angleTwo):
+    """get (rollover safe) difference between 2 angles in degrees.
+        recommend using abs(radDiff()), but currently, 
+         it returns the value required to get from angleOne to angleTwo, 
+         so (90, -45) = -135
+        numba compiled!"""
+    return(degRoll(angleTwo-angleOne))
 
-radDiff = lambda angleOne, angleTwo : radRoll(angleTwo-angleOne)  #recommend using abs(radDiff()), but currently, it returns the value required to get from angleOne to angleTwo, so (pi/2, -pi/4) = -3pi/4
-radMiddOne = lambda lowBound, upBound : (radRoll(lowBound) + (radDiff(lowBound, upBound)/2) + (np.pi if (radDiff(lowBound, upBound) < 0) else 0))
-radMidd = lambda lowBound, upBound : radRoll(radMiddOne(lowBound, upBound))
+@njit
+def degMidd(lowBound, upBound):
+    """get the angle in the middle of (the shortest angle between) two angles (degrees)
+        numba compiled!"""
+    return(degRoll(degRoll(lowBound) + (degDiff(lowBound, upBound)/2) + (180.0 if (degDiff(lowBound, upBound) < 0) else 0)))
 
-simpleRange = lambda angle, lowBound, upBound : ((lowBound <= angle) and (angle <= upBound))
+@njit
+def radDiff(angleOne, angleTwo):
+    """get (rollover safe) difference between 2 angles in radians.
+        recommend using abs(radDiff()), but currently, 
+         it returns the value required to get from angleOne to angleTwo, 
+         so (pi/2, -pi/4) = -3pi/4
+        numba compiled!"""
+    return(radRoll(angleTwo-angleOne))
 
-degRangeOne = lambda angle, lowBound, upBound, offset : simpleRange(degRoll(angle-offset), degRoll(lowBound-offset), degRoll(upBound-offset)) #offset values to make lowBound a negative number between (-180, 0) and upBound between (0, 180) and offset input angle the same, to make the check simple
-degRange = lambda angle, lowBound, upBound : degRangeOne(degRoll(angle), degRoll(lowBound), degRoll(upBound), degMiddOne(lowBound, upBound))
-degInv = lambda angle : degRoll(angle + 180)
+@njit
+def radMidd(lowBound, upBound):
+    """get the angle in the middle of (the shortest angle between) two angles (radians)
+        numba compiled!"""
+    return(radRoll(radRoll(lowBound) + (radDiff(lowBound, upBound)/2) + (np.pi if (radDiff(lowBound, upBound) < 0) else 0)))
+    
+@njit
+def simpleRange(angle, lowBound, upBound):
+    return((lowBound <= angle) and (angle <= upBound))
 
-radRangeOne = lambda angle, lowBound, upBound, offset : simpleRange(radRoll(angle-offset), radRoll(lowBound-offset), radRoll(upBound-offset)) #offset values to make lowBound a negative number between (-pi, 0) and upBound between (0, pi) and offset input angle the same, to make the check simple
-radRange = lambda angle, lowBound, upBound : radRangeOne(radRoll(angle), radRoll(lowBound), radRoll(upBound), radMiddOne(lowBound, upBound))
-radInv = lambda angle : radRoll(angle + np.pi)
+@njit
+def degRange(angle, lowBound, upBound):
+    offset = (degRoll(lowBound) + (degDiff(lowBound, upBound)/2) + (180.0 if (degDiff(lowBound, upBound) < 0) else 0))
+    return(simpleRange(degRoll(angle-offset), degRoll(lowBound-offset), degRoll(upBound-offset)))
 
+@njit
+def degInv(angle):
+    return(radRoll(angle + 180.0))
 
+@njit
+def radRange(angle, lowBound, upBound):
+    offset = (radRoll(lowBound) + (radDiff(lowBound, upBound)/2) + (np.pi if (radDiff(lowBound, upBound) < 0) else 0))
+    return(simpleRange(radRoll(angle-offset), radRoll(lowBound-offset), radRoll(upBound-offset)))
+
+@njit
+def radInv(angle):
+    return(radRoll(angle + np.pi))
+
+@njit
 def get_norm_angle_between(obj_1, obj_2, obj_2_angle): #same as get_angle_between but rollover safe (you should probably still use radDiff when comparing angles, though)
-    """get angle between 2 positions (2-sized arrays/lists), shifted by another angle (like car.angle), output is normalized to between -pi and pi"""
+    """get angle between 2 positions (2-sized arrays/lists), shifted by another angle (like car.angle), output is normalized to between -pi and pi
+        numba compiled!"""
     return(radRoll(np.arctan2(obj_2[1]-obj_1[1], obj_2[0]-obj_1[0])-obj_2_angle))
 
 #note: distAngleBetwPos(obj_1, obj_2)[1]-obj_2_angle  =  get_angle_between(obj_1, obj_2, obj_2_angle)
 
-def distAngleBetwPos(posOne, posTwo): #returns distance and angle between 2 positions
-    """get distance and angle between 2 positions (2-sized arrays/lists)"""
-    funcPosDelta = [posTwo[0]-posOne[0], posTwo[1]-posOne[1]]
-    funcDistance = 0 #var init
-    funcAngle = np.arctan2(funcPosDelta[1], funcPosDelta[0]) 
+@njit
+def distAngleBetwPos(posOne: np.ndarray, posTwo: np.ndarray): #returns distance and angle between 2 positions
+    """get distance and angle between 2 positions (2-sized arrays/lists)
+        numba compiled!"""
+    funcPosDelta = posTwo-posOne #IMPORTANT: only works on np.arrays
+    returnData = np.zeros(2)
+    returnData[1] = np.arctan2(funcPosDelta[1], funcPosDelta[0])
     if(abs(funcPosDelta[0]) < 0.0001): #sin(angle) can be 0, which results in divide by 0 errors.
-        funcDistance = abs(funcPosDelta[1])
+        returnData[0] = abs(funcPosDelta[1])
     elif(abs(funcPosDelta[1]) < 0.0001): #floating point error, alternatively you could check the angle
-        funcDistance = abs(funcPosDelta[0])
+        returnData[0] = abs(funcPosDelta[0])
     else:
-        funcDistance = funcPosDelta[1]/np.sin(funcAngle)  #soh
-        #funcDistance = funcPosDelta[0]/np.cos(funcAngle)  #cah
-    return(funcDistance, funcAngle)
+        returnData[0] = funcPosDelta[1]/np.sin(returnData[1])  #soh
+        #funcDistance = funcPosDelta[0]/np.cos(returnData[1])  #cah
+    return(returnData)
 
+@njit
 def distSqrdBetwPos(posOne, posTwo): #returns distance^2 between 2 positions (useful for efficient distance thresholding)
-    """get distance squared between 2 positions (2-sized arrays/lists), useful for efficient distance thresholding (compare to threshold squared)"""
+    """get distance squared between 2 positions (2-sized arrays/lists), useful for efficient distance thresholding (compare to threshold squared)
+        numba compiled!"""
     return((posTwo[0]-posOne[0])**2 + (posTwo[1]-posOne[1])**2)  #A^2 + B^2 = C^2
+    #return(np.sum((posTwo-posOne)**2)) #slower
 
-def distPowBetwPos(posOne, posTwo): #returns distance between 2 positions (using ** operator specifically)
-    """get distance and angle between 2 positions (2-sized arrays/lists), uses square-root, inefficient!"""
-    return(distSqrdBetwPos(posOne, posTwo)**0.5) #just square root of the squared-distance (C instead of C^2 in A^2+B^2=C^2)
-
+@njit
 def distAnglePosToPos(funcRadius, funcAngle, funcPos): #returns a new pos given an angle, distance and starting pos
-    """get position that is the entered distance and angle away from the entered position"""
-    return([funcPos[0] + funcRadius * np.cos(funcAngle), funcPos[1] + funcRadius * np.sin(funcAngle)])
+    """get position that is the entered distance and angle away from the entered position
+        numba compiled!"""
+    return(np.array([funcPos[0] + funcRadius * np.cos(funcAngle), funcPos[1] + funcRadius * np.sin(funcAngle)]))
 
+@njit
 def vectorProjectDist(posOne, posTwo, angleToProjectOnto): #returns the x and y distance after rotating by angleToProjectOnto from posOne
-    """get x and y distance between two positions in a coordinate system that is rotated by the entered angle"""
+    """get x and y distance between two positions in a coordinate system that is rotated by the entered angle
+        numba compiled!"""
     #approach (loosely) derived from vector math (not my (thijs) area of maximum expertise)
     posDeltas = [posTwo[0] - posOne[0], posTwo[1] - posOne[1]]
     cosAndSin = [np.cos(angleToProjectOnto), np.sin(angleToProjectOnto)]
@@ -94,15 +142,17 @@ def findIndexBy2DEntry(listToSearch, indexToCompare, valueToFind): #finds matchi
             return(i)
     return(-1) #not found
 
-def findIndexBy3DEntry(listToSearch, firstIndexToCompare, secondIndexToCompare, valueToFind): #finds matching entry in 3D lists and returns index
-    """find the index (of the outer-most list) that has an entry at the entered indexes (of the 2nd and 3rd dimension lists) equal to the entered value (basically, finding entries in 3D lists)"""
-    for i in range(len(listToSearch)):
-        if(listToSearch[i][firstIndexToCompare][secondIndexToCompare] == valueToFind):
-            return(i)
-    return(-1) #not found
+# def findIndexBy3DEntry(listToSearch: np.ndarray, firstIndexToCompare, secondIndexToCompare, valueToFind): #finds matching entry in 3D lists and returns index
+#     """find the index (of the outer-most list) that has an entry at the entered indexes (of the 2nd and 3rd dimension lists) equal to the entered value (basically, finding entries in 3D lists)"""
+#     for i in range(len(listToSearch)):
+#         if(listToSearch[i][firstIndexToCompare][secondIndexToCompare] == valueToFind):
+#             return(i)
+#     return(-1) #not found
 
-def findMinIndex(inputList): #finds smallest value in 1D list and returns index
-    """find the index that holds the minimum value, as well as that value (builtin min() only returns value, not index)"""
+@njit
+def findMinIndex(inputList: np.ndarray): #finds smallest value in 1D list and returns index
+    """find the index that holds the minimum value, as well as that value (builtin min() only returns value, not index)
+        numba compiled!"""
     if(len(inputList) > 0):
         returnIndex = 0
         minVal = inputList[0]
@@ -114,8 +164,10 @@ def findMinIndex(inputList): #finds smallest value in 1D list and returns index
     else:
         return(-1, 0)
 
-def findMaxIndex(inputList): #finds biggest value in 1D list and returns index
-    """find the index that holds the maximum value, as well as that value (builtin max() only returns value, not index)"""
+@njit
+def findMaxIndex(inputList: np.ndarray): #finds biggest value in 1D list and returns index
+    """find the index that holds the maximum value, as well as that value (builtin max() only returns value, not index)
+        numba compiled!"""
     if(len(inputList) > 0):
         returnIndex = 0
         maxVal = inputList[0]
@@ -127,6 +179,7 @@ def findMaxIndex(inputList): #finds biggest value in 1D list and returns index
     else:
         return(-1, 0)
 
+
 #finding things in lists of classes
 def findIndexByClassAttr(listToSearch, attrName: str, valueToFind): #finds matching attribute in lists of class objects and returns index
     """find the index (in a list of class objects) where the attribute with the entered name equals the entered value"""
@@ -135,8 +188,7 @@ def findIndexByClassAttr(listToSearch, attrName: str, valueToFind): #finds match
             return(i)
     return(-1) #not found
 
-
-def findMinAttrIndex(inputList, attrName): #finds smallest attribute in 1D list of classes and returns index
+def findMinAttrIndex(inputList: np.ndarray, attrName: str): #finds smallest attribute in 1D list of classes and returns index
     """find the index that holds the minimum (attribute) value, as well as that value"""
     if(len(inputList) > 0):
         returnIndex = 0
@@ -150,7 +202,7 @@ def findMinAttrIndex(inputList, attrName): #finds smallest attribute in 1D list 
     else:
         return(-1, 0)
 
-def findMaxAttrIndex(inputList, attrName): #finds biggest attribute in 1D list of classes and returns index
+def findMaxAttrIndex(inputList, attrName: str): #finds biggest attribute in 1D list of classes and returns index
     """find the index that holds the maximum (attribute) value, as well as that value"""
     if(len(inputList) > 0):
         returnIndex = 0
@@ -164,10 +216,14 @@ def findMaxAttrIndex(inputList, attrName): #finds biggest attribute in 1D list o
     else:
         return(-1, 0)
 
-def average(listOfValues):
-    """get average value of list (empty list returns 0)"""
+
+#note: numpy as has an average function, but (strangely enough) it's slower (and returns NaN when len()==0)
+@njit
+def average(listOfValues: np.ndarray):
+    """get average value of list (empty list returns 0)
+        numba compiled!"""
     if(len(listOfValues) > 0): #avoid divide by 0
-        return(sum(listOfValues)/len(listOfValues))
+        return(np.sum(listOfValues)/len(listOfValues))
     else:
         #print("averaging 0 values!?")
         return(0)
@@ -203,3 +259,32 @@ def average(listOfValues):
 #                 setattr(returnObject, attrName, deepCopy(getattr(source, attrName))) #copy attribute
 #         return(returnObject)
 
+
+
+## precompile things (by running them once)
+print("precompiling generalFunctions...")
+import time
+compileStartTime = time.time()
+
+get_angle_between(np.array([0.5, 2.5]), np.array([2.5, 0.5]), 0.78)
+degRoll(721.0)
+radRoll(np.pi*4.125)
+degDiff(35.0, 135.0)
+degMidd(35.0, 135.0)
+radDiff(np.pi/5, np.pi-0.1)
+radMidd(np.pi/5, np.pi-0.1)
+simpleRange(5.0, 1.0, 9.0); simpleRange(170.0, -80, 14)
+degRange(405.0, 331.0, 480.0); degRange(-112.0, 331.0, -361.0)
+degInv(-741.0)
+radRange(2.1*np.pi, np.pi*1.9, 2.9*np.pi); radRange(-0.8*np.pi, 1.9*np.pi, -2*np.pi)
+radInv(3.1*np.pi)
+get_norm_angle_between(np.array([0.5, 2.5]), np.array([2.5, 0.5]), 0.78)
+distAngleBetwPos(np.array([0.5, 2.5]), np.array([2.5, 0.5]))
+distSqrdBetwPos(np.array([0.5, 2.5]), np.array([2.5, 0.5]))
+distAnglePosToPos(14.01, np.pi/5.2, np.array([0.5, 2.5]))
+vectorProjectDist(np.array([0.5, 2.5]), np.array([2.5, 0.5]), -np.pi/2.2)
+findMinIndex(np.random.rand(100))
+findMaxIndex(np.random.rand(100))
+average(np.random.rand(100))
+
+print("compilation done! (took", round(time.time()-compileStartTime,1), "seconds)")
