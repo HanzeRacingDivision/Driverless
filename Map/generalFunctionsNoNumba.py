@@ -79,7 +79,7 @@ def vectorProjectDist(posOne, posTwo, angleToProjectOnto): #returns the x and y 
     #approach (loosely) derived from vector math (not my (thijs) area of maximum expertise)
     posDeltas = [posTwo[0] - posOne[0], posTwo[1] - posOne[1]]
     cosAndSin = [np.cos(angleToProjectOnto), np.sin(angleToProjectOnto)]
-    return(np.array(posDeltas[0]*cosAndSin[0] + posDeltas[1]*cosAndSin[1], posDeltas[1]*cosAndSin[0] - posDeltas[0]*cosAndSin[1]))
+    return(np.array([posDeltas[0]*cosAndSin[0] + posDeltas[1]*cosAndSin[1], posDeltas[1]*cosAndSin[0] - posDeltas[0]*cosAndSin[1]]))
     # # system shifting approach
     # hypotenuse, oldAngle = distAngleBetwPos(posOne, posTwo)
     # return(np.cos(oldAngle-angleToProjectOnto)*hypotenuse, np.sin(oldAngle-angleToProjectOnto)*hypotenuse)
