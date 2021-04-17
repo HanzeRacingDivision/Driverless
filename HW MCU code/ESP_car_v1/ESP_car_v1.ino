@@ -77,13 +77,11 @@ uint32_t servoLogTimer;
 //const float encoHoles = 1.0/6.0; //6 light-pulse-triggering holes in the encoder disc
 const float encoHoles = 1.0/12.0; //12 light-pulse-triggering holes in the encoder disc
 const float encoGearRatio = 20.0/37.0; //37T gear on wheel side, 22T gear on encoder disc side
-const float encoCountPerRev = encoHoles * encoGearRatio; //counts * this = wheel revolutions
+const float encoRevPerCount = encoHoles * encoGearRatio; //counts * this = wheel revolutions
 //the previous values are absolute and precise, the wheel circumference is measured/calibrated and can vary a bit
 const float encoWheelCirc = PI * 62.4; //2*pi*r = pi*d
-const float encoCountPerMM = encoCountPerRev * encoWheelCirc; //counts * this = mm traveled (does not consider direction, assumes always forward)
-const float encoCountPerCM = encoCountPerMM / 10.0; //(only intended for serialFeedback, as float rounding error is not as significant there)
-const float encoCountPerDM = encoCountPerMM / 100.0; //(only intended for serialFeedback, as float rounding error is not as significant there)
-const float encoCountPerM = encoCountPerMM / 1000.0; //(only intended for serialFeedback, as float rounding error is not as significant there)
+const float encoMMperCount = encoRevPerCount * encoWheelCirc; //counts * this = mm traveled (does not consider direction, assumes always forward)
+const float encoMperCount = encoMMperCount / 1000.0; //(mostly for debugging purpouses)
 
 volatile uint32_t encoCount = 0;
 uint32_t encoCountLast;
@@ -244,11 +242,39 @@ const float serialInputAngleMax = 25.1; //maximum allowed angle input
 //1.23 0.89 15.0
 //units: speed in m/s, 2 decimals  ;  distance in meters, 2 decimals  ;  angle in degrees, 1 decimal
 uint32_t serialFeedbackTimer;
-const uint32_t serialFeedbackInterval = 100; //time between serial feedback messages (in millis)
-const uint8_t serialFeedbackAvgSpeedDepth = 2; //number of points to consider when calculating average speed (MUST BE <= speedLogFIFOsize)
+const uint32_t serialFeedbackInterval = 25; //time between serial feedback messages (in millis)
 const uint8_t serialFeedbackAvgSteerDepth = 2; //number of points to consider when calculating average speed (MUST BE <= servoLogFIFOsize)
-const char serialFeedbackSeperator = ' '; //seperator between data
-uint32_t serialFeedbackEncoCountLast; //holds encoder count from last time timer was triggered
+const uint8_t serialFeedbackStartSyncBytes[2] = {255,255};
+const uint8_t serialFeedbackEndSyncBytes[2] = {'\r','\n'}; // these can be any bytes, but these seem extra appropriate
+const float angleIntifyMult = 500.0;
+
+void sendSerialFeedback(uint32_t encoDif, int16_t servoAngle, uint32_t timestamp) {
+  theSerial.write(serialFeedbackStartSyncBytes, 2);
+  /*
+//  theSerial.write(encoDif); theSerial.write(encoDif>>8); theSerial.write(encoDif>>16); theSerial.write(encoDif>>24);
+//  theSerial.write(servoAngle); theSerial.write(servoAngle>>8);
+//  theSerial.write(timestamp); theSerial.write(timestamp>>8); theSerial.write(timestamp>>16); theSerial.write(timestamp>>24);
+  // forloop approach (slower(?))
+  for(uint8_t i=0; i<sizeof(encoDif); i++,j++) { theSerial.write(encoDif>>(i*8)); }
+  for(uint8_t i=0; i<sizeof(servoAngle); i++,j++) { theSerial.write(servoAngle>>(i*8)); }
+  for(uint8_t i=0; i<sizeof(timestamp); i++,j++) { theSerial.write(timestamp>>(i*8)); }
+  */
+  
+  //i think serial writing has some overhead, which may be lessened by writing from a buffer, instead of 1-byte-at-a-time
+  uint8_t writeBuf[sizeof(encoDif)+sizeof(servoAngle)+sizeof(timestamp)]; // math should be precompiled
+  writeBuf[0] = encoDif;     writeBuf[1] = encoDif>>8;    writeBuf[2] = encoDif>>16;    writeBuf[3] = encoDif>>24;
+  writeBuf[4] = servoAngle;  writeBuf[5] = servoAngle>>8;
+  writeBuf[6] = timestamp;   writeBuf[7] = timestamp>>8;  writeBuf[8] = timestamp>>16;  writeBuf[9] = timestamp>>24;
+  /* // forloop approach (slower(?))
+  uint8_t j=0;
+  for(uint8_t i=0; i<sizeof(encoDif); i++,j++) { writeBuf[j] = encoDif>>(i*8); }
+  for(uint8_t i=0; i<sizeof(servoAngle); i++,j++) { writeBuf[j] = servoAngle>>(i*8); }
+  for(uint8_t i=0; i<sizeof(timestamp); i++,j++) { writeBuf[j] = servoAngle>>(i*8); }
+  */
+  theSerial.write(writeBuf, sizeof(encoDif)+sizeof(servoAngle)+sizeof(timestamp)); // math should be precompiled
+  
+  theSerial.write(serialFeedbackEndSyncBytes, 2);
+}
 
 
 void setup() {
@@ -331,6 +357,7 @@ void loop() {
       float serialInputAngle = angleString.toFloat();
       if((serialInputAngle > serialInputAngleMin) && (serialInputAngle < serialInputAngleMax)) {
         servoTarget = degreesToServoPWM(serialInputAngle);
+        ledcWrite(servoPWMChan, servoTarget); //might as well set this right away (instead of waiting for the next motor control loop
       } //else { Serial.println("bad message, couldn't parse angle"); }
       #ifdef usePWM
         if(!serialControlOverride) {
@@ -364,7 +391,7 @@ void loop() {
   if(millis() >= motorControlTimer) {
     motorControlTimer = millis() + motorControlInterval;
     
-    float mmDif = (encoCount - encoCountLast) * encoCountPerMM; //compare with data from last time and calculate millimeters travelled
+    float mmDif = (encoCount - encoCountLast) * encoMMperCount; //compare with data from last time and calculate millimeters travelled
     float mesSpeed = mmDif / (millis() - encoTimer); //millimeters / milliseconds = meters/second
     encoCountLast = encoCount;  encoTimer = millis(); //save data for next time (immedietly after reading it, because it is updated through interrupts)
     
@@ -400,11 +427,13 @@ void loop() {
   if(millis() >= serialFeedbackTimer) {
     serialFeedbackTimer = millis() + serialFeedbackInterval;
     
-    float steeringAngle = ADCvalToDegrees(avgServo(serialFeedbackAvgSteerDepth));
-    float serialFeedbackDrvnDist = (encoCount - serialFeedbackEncoCountLast) * encoCountPerM; //determine distance driven since last feedback
-    serialFeedbackEncoCountLast = encoCount; //do this immedietly after, becuase encoCount is incremented via interrupts, so making/sending the string first could lead to skipped counts
+    float steeringDegrees = ADCvalToDegrees(avgServo(serialFeedbackAvgSteerDepth));
+    int16_t intifiedSteeringDegrees = (steeringDegrees * angleIntifyMult); //NOTE: if the value (in degrees) exceeds (-32.768, 32.767), it will rollover and come out all wrong)
+//    if(((steeringDegrees < 0.0) && (intifiedSteeringDegrees > 0)) || ((steeringDegrees > 0.0) && (intifiedSteeringDegrees < 0))) {
+//      // the simple scalar multiplication should not have altered the sign (+ or -) of the value, so an inverted sign is indicative of rollover
+//      Serial.print("intify rollover:"); Serial.println(steeringDegrees,1);
+//    }
     
-    String dataString = String(avgSpeed(serialFeedbackAvgSpeedDepth), 2) + serialFeedbackSeperator + String(serialFeedbackDrvnDist, 2) + serialFeedbackSeperator + String(steeringAngle, 1);
-    theSerial.println(dataString); //you could save 1 line of code by skipping the string init, but arduino doesn't want stuff in println()
+    sendSerialFeedback(encoCount, intifiedSteeringDegrees, millis());
   }
 }
