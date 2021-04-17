@@ -108,37 +108,37 @@ class pygameDrawer():
         if(self.carCam):
             dist = 0; angle = 0; #init var
             if(self.invertYaxis):
-                dist, angle = GF.distAngleBetwPos([self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2], [pixelPos[0], self.drawOffset[1]+(self.drawOffset[1]+self.drawSize[1])-pixelPos[1]]) #get distance to, and angle with respect to, center of the screen (car)
+                dist, angle = GF.distAngleBetwPos(np.array([self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2]), np.array([pixelPos[0], self.drawOffset[1]+(self.drawOffset[1]+self.drawSize[1])-pixelPos[1]])) #get distance to, and angle with respect to, center of the screen (car)
             else:
-                dist, angle = GF.distAngleBetwPos([self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2], pixelPos) #get distance to, and angle with respect to, center of the screen (car)
+                dist, angle = GF.distAngleBetwPos(np.array([self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2]), np.array(pixelPos)) #get distance to, and angle with respect to, center of the screen (car)
             return(GF.distAnglePosToPos(dist/self.sizeScale, angle+self.mapToDraw.car.angle-self.carCamOrient, self.mapToDraw.car.position)) #use converted dist, correctly offset angle & the real car pos to get a new real point
         else:
             if(self.invertYaxis):
-                return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((self.drawSize[1]-pixelPos[1]+self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
+                return (np.array([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((self.drawSize[1]-pixelPos[1]+self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]]))
             else:
-                return([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((pixelPos[1]-self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]])
+                return (np.array([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((pixelPos[1]-self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]]))
     
-    def realToPixelPos(self, realPos):
+    def realToPixelPos(self, realPos: np.ndarray):
         """return the pixel-position (for pygame) for a given (real) position"""
         if(self.carCam):
-            dist, angle = GF.distAngleBetwPos(self.mapToDraw.car.position, realPos) #get distance to, and angle with respect to, car
-            shiftedPixelPos = GF.distAnglePosToPos(dist*self.sizeScale, angle-self.mapToDraw.car.angle+self.carCamOrient, (self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2)) #calculate new (pixel) pos from the car pos, at the same distance, and the angle, plus the angle that the entire scene is shifted
+            dist, angle = GF.distAngleBetwPos(self.mapToDraw.car.position, np.array(realPos)) #get distance to, and angle with respect to, car
+            shiftedPixelPos = GF.distAnglePosToPos(dist*self.sizeScale, angle-self.mapToDraw.car.angle+self.carCamOrient, np.array([self.drawOffset[0]+self.drawSize[0]/2, self.drawOffset[1]+self.drawSize[1]/2])) #calculate new (pixel) pos from the car pos, at the same distance, and the angle, plus the angle that the entire scene is shifted
             if(self.invertYaxis):
-                return([shiftedPixelPos[0], self.drawOffset[1]+((self.drawOffset[1]+self.drawSize[1])-shiftedPixelPos[1])]) #invert Y-axis for normal (0,0) at bottomleft display
+                return(np.array([shiftedPixelPos[0], self.drawOffset[1]+((self.drawOffset[1]+self.drawSize[1])-shiftedPixelPos[1])])) #invert Y-axis for normal (0,0) at bottomleft display
             else:
                 return(shiftedPixelPos)
         else:
             if(self.invertYaxis):
-                return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], self.drawSize[1]-((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]]) #invert Y-axis for normal (0,0) at bottomleft display
+                return(np.array([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], self.drawSize[1]-((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]])) #invert Y-axis for normal (0,0) at bottomleft display
             else:
-                return([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], ((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]])
+                return(np.array([((realPos[0]+self.viewOffset[0])*self.sizeScale)+self.drawOffset[0], ((realPos[1]+self.viewOffset[1])*self.sizeScale)+self.drawOffset[1]]))
     
     #check if things need to be drawn at all
     def isInsideWindowPixels(self, pixelPos):
         """whether or not a pixel-position is inside the window"""
         return((pixelPos[0] < (self.drawSize[0] + self.drawOffset[0])) and (pixelPos[0] > self.drawOffset[0]) and (pixelPos[1] < (self.drawSize[1] + self.drawOffset[1])) and (pixelPos[1] > self.drawOffset[1]))
     
-    def isInsideWindowReal(self, realPos):
+    def isInsideWindowReal(self, realPos: np.ndarray):
         """whether or not a (real) position is inside the window (note: not computationally efficient)"""
         return(self.isInsideWindowPixels(self.realToPixelPos(realPos))) #not very efficient, but simple
     
@@ -157,12 +157,12 @@ class pygameDrawer():
             self.FPSdisplayTimer = newTime
             FPSstrings = []
             if(len(self.FPSdata)>0):
-                FPSstrings.append(str(round(GF.average(self.FPSdata), 1))) #average FPS
+                FPSstrings.append(str(round(GF.average(np.array(self.FPSdata)), 1))) #average FPS
                 FPSstrings.append(str(min(self.FPSdata)))                  #minimum FPS
                 FPSstrings.append(str(max(self.FPSdata)))                  #maximum FPS
                 self.FPSdata.sort()
                 FPSstrings.append(str(self.FPSdata[int((len(self.FPSdata)-1)/2)])) #median FPS
-                #print("FPS:", round(GF.average(self.FPSdata), 1), min(self.FPSdata), max(self.FPSdata), self.FPSdata[int((len(self.FPSdata)-1)/2)])
+                #print("FPS:", round(GF.average(np.array(self.FPSdata)), 1), min(self.FPSdata), max(self.FPSdata), self.FPSdata[int((len(self.FPSdata)-1)/2)])
             else:
                 FPSstrings = ["inf"]
                 #print("FPS: inf")
@@ -296,7 +296,7 @@ class pygameDrawer():
         if((self.mapToDraw.clock() - self.carHistTimer) > self.carHistTimeStep):
             self.carHistTimer = self.mapToDraw.clock()
             rearAxlePos = carToDraw.getRearAxlePos()
-            if((GF.distSqrdBetwPos(self.carHistPoints[-1][0], rearAxlePos) > self.carHistMinSquaredDistThresh) if (len(self.carHistPoints) > 1) else True):
+            if((GF.distSqrdBetwPos(np.array(self.carHistPoints[-1][0]), rearAxlePos) > self.carHistMinSquaredDistThresh) if (len(self.carHistPoints) > 1) else True):
                 self.carHistPoints.append([rearAxlePos]) #you can add any number of points to store, as long as the first one is rearAxlePos
                 if(len(self.carHistPoints) > self.carHistMaxLen):
                     self.carHistPoints.pop(0)
@@ -437,10 +437,16 @@ def remoteAdjustMapSendInterval(socketToSendFrom, newMapSendInterval):
     #print("remoteAdjustMapSendInterval")
     remoteInstructionSend(socketToSendFrom, ['FPSADJ', int(newMapSendInterval)])
 
+def remoteSaveMap(socketToSendFrom, filename=None):
+    """instruct remote instance to save a (pandas) excel file
+        the remote instance should respond with the file it saved (and the filename)"""
+    #print("remoteSaveMap")
+    remoteInstructionSend(socketToSendFrom, ['MAPSAV', filename])
+
 def remoteWholeMapFileLoad(socketToSendFrom, map_file): #for debugging/testing, when you need to load an entire map object over the network
     """send & load a (pandas) excel file to remote instance"""
     #print("remoteWholeMapFileLoad")
-    remoteInstructionSend(socketToSendFrom, ['MAPFIL', map_file])
+    remoteInstructionSend(socketToSendFrom, ['MAPLOD', map_file])
 
 #cursor in the shape of a flag
 flagCurs = ("ooo         ooooooooo   ",
@@ -641,7 +647,7 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
                     #pygamesimInput.mapToDraw.makePath() #find a single path point
                     limitCounter = 0
                     while(pygamesimInput.mapToDraw.makePath() and (limitCounter<25)): #stops when path can no longer be advanced
-                        limitCounter += 1  # "python is so versitile, you can do anything" :) haha good joke
+                        limitCounter += 1
             if(pygamesimInput.pathPlanningPresent):
                 pygamesimInput.makePathSpline()
         elif((key==pygame.K_a) or ((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)) or (key==pygame.K_MINUS)):
@@ -707,18 +713,25 @@ def handleKeyPress(pygamesimInput, keyDown, key, eventToHandle):
                 pygamesimInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
                 pygamesimInput.movingViewOffset = False
         elif(key==pygame.K_RIGHTBRACKET):
-            pygamesimInput.remoteFPS += 1
-            remoteAdjustMapSendInterval(pygamesimInput.remoteUIsender, int(pygamesimInput.remoteFPS))
+            if(pygamesimInput.isRemote):
+                pygamesimInput.remoteFPS += 1
+                remoteAdjustMapSendInterval(pygamesimInput.remoteUIsender, int(pygamesimInput.remoteFPS))
         elif(key==pygame.K_LEFTBRACKET):
-            pygamesimInput.remoteFPS -= 1
-            if(pygamesimInput.remoteFPS <= 0):
-                pygamesimInput.remoteFPS = 1
-            remoteAdjustMapSendInterval(pygamesimInput.remoteUIsender, int(pygamesimInput.remoteFPS))
-        elif(key==pygame.K_s):
-            try:
-                pygamesimInput.save_map(pygamesimInput.mapToDraw) #currently, file name is auto-generated, because requesting UI text field input is a lot of effort, and python input() is blocking
-            except Exception as excep:
-                print("failed to save file, exception:", excep)
+            if(pygamesimInput.isRemote):
+                pygamesimInput.remoteFPS -= 1
+                if(pygamesimInput.remoteFPS <= 0):
+                    pygamesimInput.remoteFPS = 1
+                remoteAdjustMapSendInterval(pygamesimInput.remoteUIsender, int(pygamesimInput.remoteFPS))
+        elif(key==pygame.K_s): # s
+            if(pygamesimInput.isRemote):
+                remoteSaveMap(pygamesimInput.remoteUIsender)
+            else:
+                try:
+                    saveStartTime = time.time()
+                    pygamesimInput.save_map(pygamesimInput.mapToDraw) #currently, file name is auto-generated, because requesting UI text field input is a lot of effort, and python input() is blocking
+                    print("save_map took", round(time.time()-saveStartTime, 2), "seconds")
+                except Exception as excep:
+                    print("failed to save file, exception:", excep)
 
 def currentPygamesimInput(pygamesimInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
     """(UI element) return the pygameDrawer that the mouse is hovering over, or the one you interacted with last"""

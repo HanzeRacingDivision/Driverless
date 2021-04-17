@@ -351,6 +351,21 @@ class mapReceiverSocket:
                                         print("received FPS UI report:", self.objectWithMap.remoteFPS)
                                     except Exception as excep:
                                         print("'FPSREP' UI report failed:", excep)
+                                elif(receivedObj[0] == 'SAVREP'):
+                                    print("SAVREP:", receivedObj[1])
+                                    with open("temp.pkl", 'wb') as writeFile:
+                                        writeFile.write(receivedObj[2]) #save the pickled data as a file, because pandas.read_pickle() only supports files, not bytearrays
+                                    try:
+                                        import pandas as pd
+                                        unpickledDataframe = pd.read_pickle("temp.pkl") #pandas needs this to unpickle correctly
+                                        # if(type(unpickledDataframe) is not pd.core.frame.DataFrame):
+                                        #     print("SAVREP map_file is not pandas dataframe??")
+                                        unpickledDataframe.to_excel(receivedObj[1])
+                                        print("saved remote mapfile as:", receivedObj[1])
+                                        import os
+                                        os.remove("temp.pkl")
+                                    except Exception as excep:
+                                        print("'SAVREP' UI report failed:", excep)
                                 else:
                                     print("UI report unknown:", receivedObj)
                             else:
