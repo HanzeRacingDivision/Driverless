@@ -312,10 +312,40 @@ class Map:
                 coneListPointer = cone
         return(boolAnswer, coneListPointer) #coneListPointer is None if it doesnt overlap
     
-    # def addCone(self, pos, leftOrRight=False, isFinish=False):
-    #     if((len(self.finish_line_cones) >= 2) and isFinish):
-    #         print("cant set finish cone, there's already 2 of them")
-    #         isFinish = False
-    #     (self.right_cone_list if leftOrRight else self.left_cone_list).append(self.Cone(self.newConeID, pos, leftOrRight, isFinish))
-    #     self.newConeID += 1
+    def maxConeID(self):
+        return(GF.findMaxAttrIndex((self.right_cone_list + self.left_cone_list), 'ID')[1])
+    
+    def addCone(self, pos, leftOrRight: bool, isFinish=False):
+        """add a new cone to the map"""
+        overlaps, overlappingCone = self.overlapConeCheck(pos)
+        if(overlaps):
+            print("cant addConeObj(), there's already a cone there with ID:", overlappingCone.ID)
+            return(False, overlappingCone)
+        if((len(self.finish_line_cones) >= 2) and isFinish):
+            print("addCone warning: there's already 2 finish cones. adding as non-finish cone...")
+            isFinish = False
+        aNewCone = self.Cone(self.maxConeID()+1, pos, leftOrRight, bool(isFinish)) #bool is just to make sure it's not a 0/1 int
+        (self.right_cone_list if leftOrRight else self.left_cone_list).append(aNewCone)
+        if(isFinish):
+            self.finish_line_cones.append(aNewCone)
+        return(True, aNewCone)
+    
+    def addConeObj(self, coneObj: Cone):
+        """add a new cone (object) to the map"""
+        overlaps, overlappingCone = self.overlapConeCheck(coneObj.position)
+        if(overlaps):
+            print("cant addConeObj(), there's already a cone there with ID:", overlappingCone.ID)
+            return(False, overlappingCone)
+        maxConeID = self.maxConeID()
+        if(coneObj.ID <= maxConeID):
+            print("addConeObj warning, ID (", coneObj.ID ,") too low! changing it to:", maxConeID+1)
+            coneObj.ID = maxConeID+1
+        if(coneObj.isFinish and ((len(self.finish_line_cones)>=2) or ((self.finish_line_cones[0].LorR == coneObj.LorR) if (len(self.finish_line_cones)==1) else False))):
+            print("addConeObj warning: there's already 2 finish cones. adding as non-finish cone...")
+            coneObj.isFinish = False
+        (self.right_cone_list if coneObj.LorR else self.left_cone_list).append(coneObj)
+        if(coneObj.isFinish):
+            self.finish_line_cones.append(coneObj)
+        return(True, coneObj)
+            
 
