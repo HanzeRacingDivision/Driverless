@@ -26,7 +26,7 @@ class pygameDrawer():
         self.mapToDraw = mapToDraw
         
         self.bgColor = [50,50,50] #grey
-        self.fontSize = 30
+        self.fontSize = 25
         self.pygameFont = pygame.font.Font(None, self.fontSize)
         
         self.finishLineColor = [255,40,0]
@@ -93,6 +93,10 @@ class pygameDrawer():
         self.FPSdisplayInterval = 0.25
         self.FPSdisplayTimer = time.time()
         self.FPSrenderedFonts = []
+        
+        self.statDisplayTimer = time.time()
+        self.statDisplayInterval = 0.1
+        self.statRenderedFonts = []
         
         self.carKeyboardControlTimer = time.time() #ONLY USED FOR KEYBOARD DRIVING (commented out)
         
@@ -171,7 +175,7 @@ class pygameDrawer():
             for FPSstr in FPSstrings:
                 self.FPSrenderedFonts.append(self.pygameFont.render(FPSstr, False, [255-self.bgColor[0], 255-self.bgColor[1], 255-self.bgColor[2]], self.bgColor)) #render string (only 1 line per render allowed), no antialiasing, text color opposite of bgColor, background = bgColor
         for i in range(len(self.FPSrenderedFonts)):
-            self.window.blit(self.FPSrenderedFonts[i], [self.drawOffset[0]+ self.drawSize[0]-5-self.FPSrenderedFonts[i].get_width(),self.drawOffset[1]+ 5+(i*self.fontSize)])
+            self.window.blit(self.FPSrenderedFonts[i], [self.drawOffset[0]+ self.drawSize[0]-5-self.FPSrenderedFonts[i].get_width(),self.drawOffset[1]+5+(i*self.fontSize)])
     
     def drawCones(self, drawLines=True):
         """draw the cones and their connections
@@ -306,6 +310,23 @@ class pygameDrawer():
                 for j in range(len(self.carHistPoints[i])):
                     pygame.draw.line(self.window, [200, 200, 200], self.realToPixelPos(self.carHistPoints[i-1][j]), self.realToPixelPos(self.carHistPoints[i][j]), 1)
     
+    def drawStatText(self):
+        newTime = time.time()
+        if((newTime - self.statDisplayTimer)>self.statDisplayInterval):
+            self.statDisplayTimer = newTime
+            statsToShow = [] # a list of strings
+            carToDraw = self.mapToDraw.car
+            statsToShow.append(str(round(carToDraw.position[0], 2))+" , "+str(round(carToDraw.position[1], 2)))
+            statsToShow.append(str(round(carToDraw.velocity, 2))+"   "+str(round(carToDraw.steering, 2)))
+            statsToShow.append(str(round(carToDraw.desired_velocity, 2))+"   "+str(round(carToDraw.desired_steering, 2)))
+            if(self.pathPlanningPresent and (carToDraw.pathFolData is not None)):
+                statsToShow.append(str(carToDraw.pathFolData.auto)+"   "+str(carToDraw.pathFolData.laps))
+            self.statRenderedFonts = [] # a list of rendered fonts (images)
+            for textStr in statsToShow:
+                self.statRenderedFonts.append(self.pygameFont.render(textStr, False, [255-self.bgColor[0], 255-self.bgColor[1], 255-self.bgColor[2]], self.bgColor))
+        for i in range(len(self.statRenderedFonts)):
+            self.window.blit(self.statRenderedFonts[i], [self.drawOffset[0]+5,self.drawOffset[1]+5+(i*self.fontSize)])
+    
     ## UI and debug
     def drawMouseCone(self, drawPossibleConnections=True, drawConnectionThresholdCircle=False):
         """(UI element) show where you're about to place a cone and/or show the avaiable connections to new/hovered-over cone"""
@@ -373,6 +394,7 @@ class pygameDrawer():
         self.drawPathLines(True, self.drawTargetConeLines) #boolean parameters are whether to draw the lines between cones (not the line the car follows) and whether to draw circles (conesized ellipses) on the center points of path lines respectively
         self.drawFinishLine()
         self.drawCar()
+        self.drawStatText()
         #debug and UI
         self.drawMouseCone(True, False)
         self.drawDebugLines()

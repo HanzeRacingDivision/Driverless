@@ -72,6 +72,9 @@ try:
         
         if((sim1.car.pathFolData.auto) if (sim1.pathPlanningPresent and (sim1.car.pathFolData is not None)) else False):
             sim1.calcAutoDriving()
+            # if(sim1.car.pathFolData.laps >= 1): #stop after a set number of laps
+            #     sim1.car.pathFolData.targetVelocity = 0.0;  sim1.car.desired_velocity = 0.0;  #sim1.car.pathFolData.auto = False
+            #     sim1.car.pathFolData.laps = 0 #reset counter, to allow the car to start driving again (by upping targetVelocity)
             sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
         sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
         sim1.car.update(dt)
