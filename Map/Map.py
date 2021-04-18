@@ -337,7 +337,7 @@ class Map:
             print("cant addConeObj(), there's already a cone there with ID:", overlappingCone.ID)
             return(False, overlappingCone)
         maxConeID = self.maxConeID()
-        if(coneObj.ID <= maxConeID):
+        if((coneObj.ID <= maxConeID) and ((len(self.left_cone_list)+len(self.right_cone_list))>0)):
             print("addConeObj warning, ID (", coneObj.ID ,") too low! changing it to:", maxConeID+1)
             coneObj.ID = maxConeID+1
         if(coneObj.isFinish and ((len(self.finish_line_cones)>=2) or ((self.finish_line_cones[0].LorR == coneObj.LorR) if (len(self.finish_line_cones)==1) else False))):

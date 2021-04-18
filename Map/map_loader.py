@@ -43,11 +43,7 @@ class mapLoader:
         mapObj = Map()
         for row in range(len(map_file)):
             coneToCovert = map_file.iloc[row] #load the row (the cone)
-            mapCone = Map.Cone(row, [coneToCovert['Cone_X'], coneToCovert['Cone_Y']], (coneToCovert['Cone_Type'] == 'RIGHT'), coneToCovert['Finish'])
-            listToAppend = (mapObj.right_cone_list if mapCone.LorR else mapObj.left_cone_list)
-            listToAppend.append(mapCone)
-            if(coneToCovert['Finish']):
-                mapObj.finish_line_cones.append(mapCone)
+            mapObj.addConeObj(Map.Cone(row, [coneToCovert['Cone_X'], coneToCovert['Cone_Y']], (coneToCovert['Cone_Type'] == 'RIGHT'), coneToCovert['Finish'])) #manually add cone object to make sure that the ID matched the row index
         ## now that all the cones are imported, their connections can be established
         combinedConeList = mapObj.left_cone_list + mapObj.right_cone_list #this list is (or at least really really should) be the mapObj equivalent of the map_file, with the same order of items.
         for row in range(len(map_file)):  ## this work because: (combinedConeList[row].ID == row) is true
