@@ -8,13 +8,16 @@ from Map import Map
 import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
-class pathPlannerData: #a class to go in Map.Cone.coneConData or Map.Cone.pathFolData, if Alex approves
+class pathPlannerData: #a class to go in Map.Car.coneConData or Map.Car.pathFolData, if Alex approves
     """some data to go in .pathFolData of the car"""
     def __init__(self):
         self.auto = False
         self.nextTarget = None
         
+        self.laps = 0
+        
         self.targetVelocity = 1.0
+        
 
 
 class pathPlanner(Map):
@@ -49,7 +52,7 @@ class pathPlanner(Map):
                 if(i<(len(self.target_list)-1)):
                     return(self.target_list[i+1])
                 elif(self.targets_full_circle):
-                    print("target rollover")
+                    #print("target rollover")
                     return(self.target_list[0])
                 else:
                     print("PANIC, ran out of targets")
@@ -58,8 +61,7 @@ class pathPlanner(Map):
     def targetUpdate(self, currentTarget, distToTarget, angleToTarget, velocity):
         """returns the next target if the current one is reached/passed/missed, returns the current target if the car is still on track to reach it"""
         if(currentTarget is None): #if the first target hasn't been selected yet
-            print("selecting totally new target")
-            print("TBD")
+            print("selecting totally new target (TBD!)")
             if(len(self.target_list) > 0):
                 return(self.target_list[0])
             else:
@@ -89,7 +91,7 @@ class pathPlanner(Map):
         if(len(self.target_list) == 0):
             print("can't autodrive, there are no targets")
             self.car.pathFolData.auto = False
-            return(0.0, 0.0)
+            return(0.0, 0.0, None)
         if((self.car.pathFolData.nextTarget is None) and saveOutput):
             self.car.pathFolData.nextTarget = self.targetUpdate(None, 0, 0, 0)
         if(self.car.pathFolData.nextTarget is not None): #if saveOutput hasn't prevented the first target from being set
@@ -108,6 +110,9 @@ class pathPlanner(Map):
                 self.car.pathFolData.nextTarget = nextTarget
                 self.car.desired_steering = desired_steering
                 self.car.desired_velocity = desired_velocity
+                if((prevTarget != nextTarget) and (nextTarget == self.target_list[0])):
+                    self.car.pathFolData.laps += 1
+                    print("target rollover, laps done:", self.car.pathFolData.laps)
             return(desired_velocity, desired_steering, nextTarget)
         else: #if no first target was selected (saveOutput=False)
             return(0.0, 0.0, self.targetUpdate(None, 0, 0, 0))
