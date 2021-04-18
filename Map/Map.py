@@ -347,5 +347,44 @@ class Map:
         if(coneObj.isFinish):
             self.finish_line_cones.append(coneObj)
         return(True, coneObj)
-            
+    
+    def removeCone(self, ID: int, LorRhint=None): #LorRhint is either a boolean (indicating which conelist to search) or None, at which point both lists will be searched
+        """remove a cone, given the cone's ID"""
+        listToSearch = []; coneIndexInList=-1 #init vars (not needed, but it's clean)
+        if((LorRhint is not None) and (type(LorRhint) is bool)):
+            listToSearch = (self.right_cone_list if LorRhint else self.left_cone_list)
+        else:
+            listToSearch = (self.left_cone_list + self.right_cone_list)
+        coneIndexInList = GF.findIndexByClassAttr(listToSearch,'ID', ID)
+        if(coneIndexInList < 0):
+            print("removeCone failed, couldn't find ID in list (", (("right_cone_list" if LorRhint else "left_cone_list") if ((LorRhint is not None) and (type(LorRhint) is bool)) else "both"),")")
+            return(False)
+        coneToDelete = listToSearch[coneIndexInList]
+        if((LorRhint != coneToDelete.LorR) if ((LorRhint is not None) and (type(LorRhint) is bool)) else ((coneIndexInList >= len(self.left_cone_list)) != coneToDelete.LorR)): #if the cone.LorR value doesnt match the list in which it was found, something went very wrong earlier!
+            print("removeCone WARNING: LorR list mismatch:", coneToDelete.LorR)
+        
+        if(not ((LorRhint is not None) and (type(LorRhint) is bool))): #if both lists were searched, select the list (to delete from)
+            listToSearch = (self.right_cone_list if (coneIndexInList >= len(self.left_cone_list)) else self.left_cone_list)
+            coneIndexInList = ((coneIndexInList-len(self.left_cone_list)) if (coneIndexInList >= len(self.left_cone_list)) else coneIndexInList)
+        ##first, cleanly sever all ties to other things in the system
+        if(coneToDelete.isFinish):
+            finishConeIndex = GF.findIndexByClassAttr(self.finish_line_cones,'ID', ID) #(safely) try to find the cone in the finish_line_cones
+            if(finishConeIndex < 0): #if the cone thinks it's a finish cone, but it's not in the finish_line_cones, something went very wrong earlier!
+                print("removeCone WARNING: cone isFinish flag set, but not found in finish_line_cones!")
+            else:
+                self.finish_line_cones.pop(finishConeIndex)
+        for connectedCone in coneToDelete.connections:
+            if(len(connectedCone.coneConData) > 0): #it's always a list, but an empty one if coneConnecter is not used
+                connectedCone.coneConData.pop((0 if (connectedCone.connections[0].ID == coneToDelete.ID) else 1))
+            connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == coneToDelete.ID) else 1)) #this only works because .connections holds pointers, not copies
+        ## TBD: delete anything else?, pathFolData?, slamData?
+        listToSearch.pop(coneIndexInList) #finally, delete the cone
+        return(True)
+    
+    def removeConeObj(self, coneObj: Cone):
+        """remove a cone, given that cone object
+            note: this just calls removeCone(ID), for simplicity"""
+        # overlaps, overlappingCone = self.overlapConeCheck(coneObj.position)
+        # if(overlaps):
+        return(self.removeCone(coneObj.ID, coneObj.LorR))
 
