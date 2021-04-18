@@ -547,7 +547,7 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
             if(overlaps):
                 deleting = True
                 for target in pygamesimInput.mapToDraw.target_list: #look through the entire list of targets (you could also just look at self.mapToDraw.target_list[-2])
-                    if(overlappingCone.ID == target.coneConData.cones[overlappingCone.LorR].ID): #if the only connected cone is ALSO (already) in the target_list, then you cant make any more path
+                    if((overlappingCone.ID == target.coneConData.cones[overlappingCone.LorR].ID) if (target.coneConData is not None) else False): #if the only connected cone is ALSO (already) in the target_list, then you cant make any more path
                         print("can't delete cone, it's in pathList") #just a lot easier, not impossible
                         deleting = False
                 if(deleting):
@@ -555,12 +555,7 @@ def handleMousePress(pygamesimInput, buttonDown, button, pos, eventToHandle):
                     if(pygamesimInput.isRemote):
                         remoteConeDelete(pygamesimInput.remoteUIsender, overlappingCone)
                     else:
-                        for connectedCone in overlappingCone.connections:
-                            if(len(connectedCone.coneConData) > 0): #it's always a list, but an empty one if coneConnecter is not used
-                                connectedCone.coneConData.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
-                            connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == overlappingCone.ID) else 1))
-                        listToRemoveFrom = (pygamesimInput.mapToDraw.right_cone_list if overlappingCone.LorR else pygamesimInput.mapToDraw.left_cone_list)
-                        listToRemoveFrom.pop(GF.findIndexByClassAttr(listToRemoveFrom, 'ID', overlappingCone.ID))
+                        pygamesimInput.mapToDraw.removeConeObj(overlappingCone)
             if(pygamesimInput.pathPlanningPresent):
                 pygamesimInput.makeBoundrySplines()
         else:

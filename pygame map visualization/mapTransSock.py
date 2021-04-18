@@ -192,12 +192,7 @@ class mapTransmitterSocket:
         elif(instruction[0] == 'DELET'):
             overlaps, coneToDelete = self.objectWithMap.overlapConeCheck(instruction[1].position) #this is needed to retrieve the LOCAL cone object, not the transmitted one
             if(overlaps and (coneToDelete.ID == instruction[1].ID)):
-                for connectedCone in coneToDelete.connections:
-                    if(len(connectedCone.coneConData) > 0): #it's always a list, but an empty one if coneConnecter is not used
-                        connectedCone.coneConData.pop((0 if (connectedCone.connections[0].ID == coneToDelete.ID) else 1))
-                    connectedCone.connections.pop((0 if (connectedCone.connections[0].ID == coneToDelete.ID) else 1))
-                listToRemoveFrom = (self.objectWithMap.right_cone_list if coneToDelete.LorR else self.objectWithMap.left_cone_list)
-                listToRemoveFrom.pop(GF.findIndexByClassAttr(listToRemoveFrom, 'ID', coneToDelete.ID))
+                self.objectWithMap.removeConeObj(coneToDelete)
                 if(self.objectWithMap.pathPlanningPresent):
                     self.objectWithMap.makeBoundrySplines()
             else:
