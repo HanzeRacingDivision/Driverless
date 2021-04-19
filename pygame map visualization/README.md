@@ -1,6 +1,6 @@
 python requirements:
 - pygame 2.0.1 (if a newer version doesnt work let Thijs know)
-- (only for map file loading) pandas
+- (only for map file loading) pandas (version doesnt matter, but it must be the same on both if using remote visualization)
 - (only for remote visualisation) socket (python builtin)
 - (only for real-life model car control) pyserial (only in carMCUclass.py)
 
