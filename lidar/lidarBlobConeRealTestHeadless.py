@@ -51,6 +51,7 @@ def makeCone(blob):
     if(len(blob.origins) != len(blob.points)):
         print("less origins than points!:", len(blob.origins), len(blob.points))
     coneCenterPos = [[],[]]
+    #coneCenterPos = np.empty((2,len(blob._lines))) #TBD
     if(len(blob._lines)>0):
         perpAdd = np.pi/2 # you could assume (or calculate only once) the direction of the perpendicular angle, by knowing the rotation direction of the lidar
         #sim1.debugLines = []
@@ -74,7 +75,7 @@ def makeCone(blob):
             print("1 point, no origin")
             conePos = blob.points[0]
         coneCenterPos[0].append(conePos[0]);   coneCenterPos[1].append(conePos[1])
-    conePos = [GF.average(coneCenterPos[0]), GF.average(coneCenterPos[1])]
+    conePos = np.array([GF.average(np.array(coneCenterPos[0])), GF.average(np.array(coneCenterPos[1]))])
     overlaps, overlappingCone = sim1.overlapConeCheck(conePos)
     if(overlaps):
         ## SLAM code should replace this
@@ -82,13 +83,13 @@ def makeCone(blob):
             overlappingCone.slamData.append([conePos, sim1.clock(), [v for v in sim1.car.position], sim1.car.velocity, overlappingCone.slamData[-1][-1]]) #cone position, timestamp, car position, car velocity, totalSpotCount
             if(len(overlappingCone.slamData)>10): #limit number of sightings to remember
                 overlappingCone.slamData.pop(0) #delete oldest data
-            overlappingCone.position[0] = GF.average([item[0][0] for item in overlappingCone.slamData])
-            overlappingCone.position[1] = GF.average([item[0][1] for item in overlappingCone.slamData])
+            overlappingCone.position[0] = GF.average(np.array([item[0][0] for item in overlappingCone.slamData]))
+            overlappingCone.position[1] = GF.average(np.array([item[0][1] for item in overlappingCone.slamData]))
             blob.extraData = overlappingCone
     else:
         ## SLAM code could replace this
         leftOrRight = (GF.get_norm_angle_between(sim1.car.position, conePos, sim1.car.angle) < 0.0) #if the angle relative to car is negative (CW), it's a right-side cone
-        conePlaceSuccess, coneInList = Map.addCone(conePos, leftOrRight, False)
+        conePlaceSuccess, coneInList = sim1.addCone(conePos, leftOrRight, False)
         #if(conePlaceSuccess) # overlap check already done earlier
         coneInList.slamData = [[conePos, sim1.clock(), [v for v in sim1.car.position], sim1.car.velocity, 1]]
         blob.extraData = coneInList
@@ -110,6 +111,8 @@ def callbackFunc(lidarSelf, newPacket, pointsAdded):
                 correctedLidarAngle = (-1)*GF.radInv(np.deg2rad(angle)) + lidarAngleError #NOTE: radRoll is done in radInv, if you remove this please use degRoll or radRoll instead
                 carPos = sim1.car.getRearAxlePos()
                 pointPos = GF.distAnglePosToPos(newPacket.measurements[i]/1000, sim1.car.angle + correctedLidarAngle, carPos) #get map position from relative position (asuming lidar is mounter on car)
+                if((type(pointPos) is not np.ndarray) or (type(carPos) is not np.ndarray)):
+                    print("not np array:", type(pointPos), type(carPos))
                 isNewBlob, newBlob = LB.blobify(pointPos, carPos, sim1.clock)
                 if(isNewBlob):
                     #newBlob.uponExist = lambda blobObj : print("exist:", len(blobObj.points), len(blobObj._lines))  #example
@@ -155,6 +158,9 @@ try:
         lidar.run() #needs to be ran more than 300 times per second, otherwise the serial buffer will fill up
         if((sim1.car.pathFolData.auto) if (sim1.pathPlanningPresent and (sim1.car.pathFolData is not None)) else False):
             sim1.calcAutoDriving()
+            if(sim1.car.pathFolData.laps >= 1): #stop after a set number of laps
+                sim1.car.pathFolData.targetVelocity = 0.0;  sim1.car.desired_velocity = 0.0;  #sim1.car.pathFolData.auto = False
+                sim1.car.pathFolData.laps = 0 #reset counter, to allow the car to start driving again (by upping targetVelocity)
             sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
         sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
         sim1.car.update(dt)

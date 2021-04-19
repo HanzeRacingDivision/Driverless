@@ -1,4 +1,5 @@
 import generalFunctions as GF
+import numpy as np
 
 global blobList
 blobList = [] #list of blob class objects
@@ -29,10 +30,10 @@ class blob:
         blobs are deleted whenever they overlap, when they're too old,
         or when there is a new blob ABOUT TO BE placed there"""
     def __init__(self, point, origin=None, clockFunc=time.time):
-        self.points = [point] #datapoints, locations that the lidar detected
+        self.points = [np.array(point)] #datapoints, locations that the lidar detected
         self.origins = [] #optional parameter, location(s) that the LIDAR itself had when it measured the points
         if(origin is not None): #only if parameter was filled in
-            self.origins.append(origin)
+            self.origins.append(np.array(origin))
         self._lines = [] #lines between the points, consists of [[distSqrd,angle,dist], ...] where angle and dist are optional, the length of this list is len(points)-1. use lineData(index) to retrieve data
         self.timestamp = clockFunc()
         self.exists = False #(bad name), set to True when appending fails (same time as oponExist is run (if callable()))
@@ -46,11 +47,11 @@ class blob:
         """attempt to append a datapoint to the blob, return whether successful
             if it fails to append, the current blob is considered to exist"""
         gapSizeSqrd = GF.distSqrdBetwPos(point, self.points[-1])
-        if((gapSizeSqrd < maxBlobSingleGapSqrd) and ((GF.average([entry[0] for entry in self._lines]+[gapSizeSqrd]) < maxBlobAverageGapSizeSqrd) if (len(self.points)>=maxBlobAverageGapPoints) else True) and (len(self.points) < maxBlobPointCount) and (not self.exists)):
+        if((gapSizeSqrd < maxBlobSingleGapSqrd) and ((GF.average(np.array([entry[0] for entry in self._lines]+[gapSizeSqrd])) < maxBlobAverageGapSizeSqrd) if (len(self.points)>=maxBlobAverageGapPoints) else True) and (len(self.points) < maxBlobPointCount) and (not self.exists)):
             self.appendTimestamp = clockFunc()
-            self.points.append(point)
+            self.points.append(np.array(point))
             if(origin is not None): # and (len(self.origins)>0)):
-                self.origins.append(origin)
+                self.origins.append(np.array(origin))
             self._lines.append([gapSizeSqrd, None, None]) #don't calculate angle and (non-sqrd) dist only once they're required
             #alternatively, you could set the average value to -1, and calculate it the next time it's needed by some function
             #that would save time here, and cost time later, but it might save time if many points are added quickly
@@ -91,7 +92,7 @@ def checkBlobOverlap(): #check if existing blobs overlap (and if they do, delete
                 if((i != j) and keepList[i] and keepList[j]):
                     for Ipoint in blobList[i].points:     #this is what makes this function so inefficient,
                         for Jpoint in blobList[j].points: #running it for every point in every blob means doing lots and lots of loops
-                            if(GF.distPowBetwPos(Ipoint, Jpoint) < blobOverlapThreshSqrd): #if any 2 points are close enough to satisfy the overlap threshold
+                            if(GF.distSqrdBetwPos(Ipoint, Jpoint) < blobOverlapThreshSqrd): #if any 2 points are close enough to satisfy the overlap threshold
                                 if(blobList[i].timestamp < blobList[j].timestamp): #whichever one is older
                                     keepList[i] = False
                                 else:
