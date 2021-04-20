@@ -9,7 +9,7 @@ import generalFunctions as GF #(homemade) some useful functions for everyday eas
 
 
 
-class pathFinderData: #a class to go in Map.Cone.coneConData or Map.Cone.pathFolData, if Alex approves
+class pathFinderData: #a class to go in Map.Target.coneConData or Map.Target.pathFolData, if Alex approves
     """some data to go in .coneConData of Map.Target objects (TBD: put in .pathFolData?)"""
     def __init__(self, heading=0, track_width=0, cones=[None, None], strength=0):
         #self.position = np.array([pos[0], pos[1]])
@@ -127,7 +127,8 @@ class pathFinder(Map):
             pathWidth, lineAngle = GF.distAngleBetwPos(firstCones[0].position, firstCones[1].position)
             carAngle = GF.radRoll(lineAngle + (np.pi/2)) # angle is from left cone to right, so 90deg (pi/2 rad) CCW rotation is where the car should go
             centerPoint = [firstCones[1].position[0] + (firstCones[0].position[0]-firstCones[1].position[0])/2, firstCones[1].position[1] + (firstCones[0].position[1]-firstCones[1].position[1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
-            newTarget = Map.Target(centerPoint, (firstCones[0].isFinish or firstCones[1].isFinish))
+            #newTarget = Map.Target(centerPoint, (firstCones[0].isFinish or firstCones[1].isFinish))
+            newTarget = Map.Target(centerPoint)
             newTarget.coneConData = pathFinderData(carAngle, pathWidth, [firstCones[0], firstCones[1]], max(strengths))
             self.target_list.append(newTarget)
         else: #if len(target_list) > 0
@@ -237,7 +238,8 @@ class pathFinder(Map):
                 return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
             else:
                 centerPoint = [winningCones[1].position[0] + (winningCones[0].position[0]-winningCones[1].position[0])/2, winningCones[1].position[1] + (winningCones[0].position[1]-winningCones[1].position[1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
-                newTarget = Map.Target(centerPoint, (winningCones[0].isFinish or winningCones[1].isFinish))
+                #newTarget = Map.Target(centerPoint, (winningCones[0].isFinish or winningCones[1].isFinish))
+                newTarget = Map.Target(centerPoint)
                 newTarget.coneConData = pathFinderData(pathAngles[maxStrengthIndex], pathWidths[maxStrengthIndex], [winningCones[0], winningCones[1]], maxStrengthVal)
                 self.target_list.append(newTarget)
         return(True)
