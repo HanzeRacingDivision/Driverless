@@ -110,9 +110,11 @@ class pathPlanner(Map):
                 self.car.pathFolData.nextTarget = nextTarget
                 self.car.desired_steering = desired_steering
                 self.car.desired_velocity = desired_velocity
-                if((prevTarget != nextTarget) and (nextTarget == self.target_list[0])):
-                    self.car.pathFolData.laps += 1
-                    print("target rollover, laps done:", self.car.pathFolData.laps)
+                if(prevTarget != nextTarget):
+                    prevTarget.passed += 1
+                    if(nextTarget == self.target_list[0]):
+                        self.car.pathFolData.laps += 1
+                        print("target rollover, laps done:", self.car.pathFolData.laps)
             return(desired_velocity, desired_steering, nextTarget)
         else: #if no first target was selected (saveOutput=False)
             return(0.0, 0.0, self.targetUpdate(None, 0, 0, 0))
