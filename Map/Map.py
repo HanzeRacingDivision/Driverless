@@ -20,12 +20,14 @@ class Map:
         self.targets_full_circle = False #if the target list loops around
         
         #self.newConeID = 0 #add 1 after adding a cone #TO BE REPLACED BY PANDAS INDEXING
-        
+    
+    def __repr__(self): #print map objects in a legible fashion
+        return("Map(typ="+(self.__class__.__name__)+",LEFT:"+str(len(self.left_cone_list))+",RIGHT:"+str(len(self.right_cone_list))+",FINISH:"+str(len(self.finish_line_cones))+",TARGETS:"+str(len(self.target_list))+(",TARG_FULL_CIRC,"if self.targets_full_circle else ",")+str(self.car)+")")
     
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
         def __init__(self, clockFunc):
-            self.position = np.array([0.0, 0.0])
+            self.position = np.array([0.0, 0.0], dtype=np.float32)
             self.angle = 0.0 #car orientation in radians
             self.velocity = 0.0 #measured and filtered car 'forward' (wheel) speed in meters/second (used to update position)
             self.steering = 0.0 #measured and filtered steering angle in radians (used to update position)
@@ -58,6 +60,9 @@ class Map:
             self.coneConData = None #extra data specifically for cone-connection
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
+        
+        def __repr__(self): #print car objects in a legible fashion
+            return("Car(typ="+(self.__class__.__name__)+",pos=["+str(round(self.position[0],2))+','+str(round(self.position[1],2))+"],angle="+str(round(np.rad2deg(self.angle),1))+")")
         
         def getRearAxlePos(self):
             return(GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position))
@@ -137,7 +142,7 @@ class Map:
         coneDiam = 0.14 #cone diameter in meters (constant)
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
-            self.position = np.array([pos[0], pos[1]])
+            self.position = np.array([pos[0], pos[1]], dtype=np.float32)
             self.LorR = leftOrRight #boolean to indicate which side of the track (which color) the code is. True=right, False=left
             self.isFinish = isFinish
             
@@ -146,19 +151,25 @@ class Map:
             self.coneConData = [] #extra data specifically for cone-connection
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
+        
+        def __repr__(self): #print cone objects in a legible fashion
+            return("Cone(ID="+str(self.ID)+","+("RIGHT" if self.LorR else "LEFT")+",pos=["+str(round(self.position[0],2))+','+str(round(self.position[1],2))+"]"+(",FINISH)" if self.isFinish else ")"))
 
     class Target:
         """ a single point in the path of the car (a target to aim for) """
-        def __init__(self, pos=[0,0], isFinish=False):
+        def __init__(self, pos=[0,0]):
             #the targets should probably be just be ordered in the list to match their order in the track (shouldnt take much/any shuffling to get done), but if not: use pandas indexing?
-            self.position = np.array([pos[0], pos[1]])
-            self.isFinish = isFinish
+            self.position = np.array([pos[0], pos[1]], dtype=np.float32)
+            #self.isFinish = isFinish #i added this in a previous version, but never actually made use of it (since the 0th target in the list is usually also the finish), but this might be reinstated later on
             
-            #self.passed = 0 #counts the number of times it's been passed (from path-planning)
+            self.passed = 0 #counts the number of times it's been passed (from path-planning)
             
             self.coneConData = None #extra data specifically for cone-connection
             self.pathFolData = None #extra data specifically for path-planning
             self.slamData = None    #extra data specifically for SLAM
+        
+        def __repr__(self): #print target objects in a legible fashion
+            return("Target(pos=["+str(round(self.position[0],2))+','+str(round(self.position[1],2))+"],passed="+str(self.passed)+")")
     
     def internalClock(self): #a function that is passed to Map.clock by default
         return(time.time() - self.clockStart)
