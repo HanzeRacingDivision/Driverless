@@ -10,20 +10,20 @@ import coneConnecting as CC
 import pathFinding    as PF
 import pathPlanningTemp as PP
 import carMCUclass as RC
-#import simulatedCar   as SC
+import simulatedCar   as SC
 import drawDriverless as DD
 
 import sys #used for importing files (map_loader) from commandline (DOS run argument)
 
-class pygamesimLocal(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
+class pygamesimLocal(Map, ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
     def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
         ML.mapLoader.__init__(self)
         
         # self.clockSet(simClock) #an altered clock, only for simulations where the speed is faster/slower than normal
-        # self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
+        self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         
-        self.car = RC.realCar(self.clock, comPort='/dev/ttyUSB1')
+        # self.car = RC.realCar(self.clock, comPort='/dev/ttyUSB1')
         
         CC.coneConnecter.__init__(self)
         PF.pathFinder.__init__(self)
@@ -101,26 +101,26 @@ def makeCone(blob):
     #blob.uponExist = None #this is just to mark that the function has been called (alternatively, check extraData)
 
 def callbackFunc(lidarSelf, newPacket, pointsAdded):
-    if((newPacket is not None) and (pointsAdded > 0)):
-        startAngle = newPacket.startAngle/CX.DEG_DIV
-        angleDif = GF.degDiff(newPacket.startAngle/CX.DEG_DIV, newPacket.endAngle/CX.DEG_DIV) #(rollover proof) IMPORTANT: packet angles are still integers, divide by 64 to get degrees (0 to 360)
-        angleStep = angleDif/7 #note: there are actually 8 datapointes per packet, but i'm assuming the endAngle is AT the 8th datapoint (and the startAngle is AT the first)
-        global debugThresh, sim1
-        #LB.checkBlobAge(sim1.clock)
-        for i in range(len(newPacket.measurements)-pointsAdded, len(newPacket.measurements)): #if it's not a new packet, but an existing one with new points, this will skip the old ones
-            if((newPacket.measurements[i] < debugThresh) and (newPacket.measurements[i] != CX.NO_MEASUREMENT)):
-                angle = startAngle+angleStep*i
-                ## correctedLidarAngle:  get 'middle' angle, convert to (-180,180) with derRoll, convert to radians, set 0-angle at car-rear (instead of front) with radInv and *-1 because lidar degrees are CW and Map rotation is CCW
-                lidarAngleError = np.deg2rad(-15) #TBD save this somewhere else, maybe in camsense_X1
-                correctedLidarAngle = (-1)*GF.radInv(np.deg2rad(angle)) + lidarAngleError #NOTE: radRoll is done in radInv, if you remove this please use degRoll or radRoll instead
-                carPos = sim1.car.getRearAxlePos()
-                pointPos = GF.distAnglePosToPos(newPacket.measurements[i]/1000, sim1.car.angle + correctedLidarAngle, carPos) #get map position from relative position (asuming lidar is mounter on car)
-                isNewBlob, newBlob = LB.blobify(pointPos, carPos, sim1.clock)
-                if(isNewBlob):
-                    #newBlob.uponExist = lambda blobObj : print("exist:", len(blobObj.points), len(blobObj._lines))  #example
-                    #newBlob.uponDeletion = lambda blobObj, reason : print("delete:", len(blobObj.points), len(blobObj._lines), blobObj.exists, reason)  #example
-                    newBlob.uponExist = makeCone
-                    newBlob.uponExistAppendTimeout = (60.0/lidarSelf.RPM())*0.5 #IMPORTANT: (seconds per rotation) * half(?), this timout also makes sure blobs are not appended to on subsequent rotations
+    #if((newPacket is not None) and (pointsAdded > 0)):
+    startAngle = newPacket['startAngle']/CX.DEG_DIV
+    angleDif = GF.degDiff(newPacket['startAngle']/CX.DEG_DIV, newPacket['endAngle']/CX.DEG_DIV) #(rollover proof) IMPORTANT: packet angles are still integers, divide by 64 to get degrees (0 to 360)
+    angleStep = angleDif/7 #note: there are actually 8 datapointes per packet, but i'm assuming the endAngle is AT the 8th datapoint (and the startAngle is AT the first)
+    global debugThresh, sim1
+    #LB.checkBlobAge(sim1.clock)
+    for i in range(newPacket['dataFilled']-pointsAdded, newPacket['dataFilled']): #if it's not a new packet, but an existing one with new points, this will skip the old ones
+        if((newPacket['measurements'][i] < debugThresh) and (newPacket['measurements'][i] != CX.NO_MEASUREMENT)):
+            angle = startAngle+angleStep*i
+            ## correctedLidarAngle:  get 'middle' angle, convert to (-180,180) with derRoll, convert to radians, set 0-angle at car-rear (instead of front) with radInv and *-1 because lidar degrees are CW and Map rotation is CCW
+            lidarAngleError = np.deg2rad(-15) #TBD save this somewhere else, maybe in camsense_X1
+            correctedLidarAngle = (-1)*GF.radInv(np.deg2rad(angle)) + lidarAngleError #NOTE: radRoll is done in radInv, if you remove this please use degRoll or radRoll instead
+            carPos = sim1.car.getRearAxlePos()
+            pointPos = GF.distAnglePosToPos(newPacket['measurements'][i]/1000, sim1.car.angle + correctedLidarAngle, carPos) #get map position from relative position (asuming lidar is mounter on car)
+            isNewBlob, newBlob = LB.blobify(pointPos, carPos, sim1.clock)
+            if(isNewBlob):
+                #newBlob.uponExist = lambda blobObj : print("exist:", len(blobObj.points), len(blobObj._lines))  #example
+                #newBlob.uponDeletion = lambda blobObj, reason : print("delete:", len(blobObj.points), len(blobObj._lines), blobObj.exists, reason)  #example
+                newBlob.uponExist = makeCone
+                newBlob.uponExistAppendTimeout = (60.0/lidarSelf.RPM())*0.5 #IMPORTANT: (seconds per rotation) * half(?), this timout also makes sure blobs are not appended to on subsequent rotations
 
 
 
@@ -142,7 +142,7 @@ print("done printing ports.")
 print()
 
 try:
-    lidar = CX.camsense_X1('/dev/ttyUSB0')
+    lidar = CX.camsense_X1('COM7')
     lidar.postParseCallback = callbackFunc
     
     while DD.windowKeepRunning:

@@ -17,7 +17,7 @@ import threading as thr
 
 import sys #used for importing files (map_loader) from commandline (DOS run argument)
 
-class pygamesimLocal(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
+class pygamesimLocal(Map, ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
     def __init__(self):
         Map.__init__(self) #init map class
         ML.mapLoader.__init__(self)
@@ -97,28 +97,26 @@ def makeCone(blob):
     #blob.uponExist = None #this is just to mark that the function has been called (alternatively, check extraData)
 
 def callbackFunc(lidarSelf, newPacket, pointsAdded):
-    if((newPacket is not None) and (pointsAdded > 0)):
-        startAngle = newPacket.startAngle/CX.DEG_DIV
-        angleDif = GF.degDiff(newPacket.startAngle/CX.DEG_DIV, newPacket.endAngle/CX.DEG_DIV) #(rollover proof) IMPORTANT: packet angles are still integers, divide by 64 to get degrees (0 to 360)
-        angleStep = angleDif/7 #note: there are actually 8 datapointes per packet, but i'm assuming the endAngle is AT the 8th datapoint (and the startAngle is AT the first)
-        global debugThresh, sim1
-        #LB.checkBlobAge(sim1.clock)
-        for i in range(len(newPacket.measurements)-pointsAdded, len(newPacket.measurements)): #if it's not a new packet, but an existing one with new points, this will skip the old ones
-            if((newPacket.measurements[i] < debugThresh) and (newPacket.measurements[i] != CX.NO_MEASUREMENT)):
-                angle = startAngle+angleStep*i
-                ## correctedLidarAngle:  get 'middle' angle, convert to (-180,180) with derRoll, convert to radians, set 0-angle at car-rear (instead of front) with radInv and *-1 because lidar degrees are CW and Map rotation is CCW
-                lidarAngleError = np.deg2rad(-15) #TBD save this somewhere else, maybe in camsense_X1
-                correctedLidarAngle = (-1)*GF.radInv(np.deg2rad(angle)) + lidarAngleError #NOTE: radRoll is done in radInv, if you remove this please use degRoll or radRoll instead
-                carPos = sim1.car.getRearAxlePos()
-                pointPos = GF.distAnglePosToPos(newPacket.measurements[i]/1000, sim1.car.angle + correctedLidarAngle, carPos) #get map position from relative position (asuming lidar is mounter on car)
-                if((type(pointPos) is not np.ndarray) or (type(carPos) is not np.ndarray)):
-                    print("not np array:", type(pointPos), type(carPos))
-                isNewBlob, newBlob = LB.blobify(pointPos, carPos, sim1.clock)
-                if(isNewBlob):
-                    #newBlob.uponExist = lambda blobObj : print("exist:", len(blobObj.points), len(blobObj._lines))  #example
-                    #newBlob.uponDeletion = lambda blobObj, reason : print("delete:", len(blobObj.points), len(blobObj._lines), blobObj.exists, reason)  #example
-                    newBlob.uponExist = makeCone
-                    newBlob.uponExistAppendTimeout = (60.0/lidarSelf.RPM())*0.5 #IMPORTANT: (seconds per rotation) * half(?), this timout also makes sure blobs are not appended to on subsequent rotations
+    #if((newPacket is not None) and (pointsAdded > 0)):
+    startAngle = newPacket['startAngle']/CX.DEG_DIV
+    angleDif = GF.degDiff(newPacket['startAngle']/CX.DEG_DIV, newPacket['endAngle']/CX.DEG_DIV) #(rollover proof) IMPORTANT: packet angles are still integers, divide by 64 to get degrees (0 to 360)
+    angleStep = angleDif/7 #note: there are actually 8 datapointes per packet, but i'm assuming the endAngle is AT the 8th datapoint (and the startAngle is AT the first)
+    global debugThresh, sim1
+    #LB.checkBlobAge(sim1.clock)
+    for i in range(newPacket['dataFilled']-pointsAdded, newPacket['dataFilled']): #if it's not a new packet, but an existing one with new points, this will skip the old ones
+        if((newPacket['measurements'][i] < debugThresh) and (newPacket['measurements'][i] != CX.NO_MEASUREMENT)):
+            angle = startAngle+angleStep*i
+            ## correctedLidarAngle:  get 'middle' angle, convert to (-180,180) with derRoll, convert to radians, set 0-angle at car-rear (instead of front) with radInv and *-1 because lidar degrees are CW and Map rotation is CCW
+            lidarAngleError = np.deg2rad(-15) #TBD save this somewhere else, maybe in camsense_X1
+            correctedLidarAngle = (-1)*GF.radInv(np.deg2rad(angle)) + lidarAngleError #NOTE: radRoll is done in radInv, if you remove this please use degRoll or radRoll instead
+            carPos = sim1.car.getRearAxlePos()
+            pointPos = GF.distAnglePosToPos(newPacket['measurements'][i]/1000, sim1.car.angle + correctedLidarAngle, carPos) #get map position from relative position (asuming lidar is mounter on car)
+            isNewBlob, newBlob = LB.blobify(pointPos, carPos, sim1.clock)
+            if(isNewBlob):
+                #newBlob.uponExist = lambda blobObj : print("exist:", len(blobObj.points), len(blobObj._lines))  #example
+                #newBlob.uponDeletion = lambda blobObj, reason : print("delete:", len(blobObj.points), len(blobObj._lines), blobObj.exists, reason)  #example
+                newBlob.uponExist = makeCone
+                newBlob.uponExistAppendTimeout = (60.0/lidarSelf.RPM())*0.5 #IMPORTANT: (seconds per rotation) * half(?), this timout also makes sure blobs are not appended to on subsequent rotations
 
 
 
