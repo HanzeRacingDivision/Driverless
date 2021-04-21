@@ -19,7 +19,7 @@ class pathFinderData: #a class to go in Map.Target.coneConData or Map.Target.pat
         self.strength = strength #path-finding strength (highest strength option was used)
 
 
-class pathFinder(Map):
+class pathFinder():
     """some functions (& constants) to find Target points (target_list) using (track boundry) cones 
         (should not be copied along with Map objects)"""
     def __init__(self):

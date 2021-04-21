@@ -6,7 +6,7 @@
 
 import numpy as np  #general math library
 
-from Map import Map
+#from Map import Map
 import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
@@ -20,7 +20,7 @@ class coneConnection: #a class to go in Map.Cone.coneConData. This carries some 
 
 
 
-class coneConnecter(Map):
+class coneConnecter():
     """some functions (& constants) to connect cones to form a track boundry 
         (should not be copied along with Map objects)"""
     def __init__(self):

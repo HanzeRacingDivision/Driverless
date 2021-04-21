@@ -20,7 +20,7 @@ class pathPlannerData: #a class to go in Map.Car.coneConData or Map.Car.pathFolD
         
 
 
-class pathPlanner(Map):
+class pathPlanner():
     """some functions (& constants) to follow (steer towards- and select next) Targets.
         (could potentially be copied along with Map objects (but does not HAVE to be))"""
     def __init__(self):
