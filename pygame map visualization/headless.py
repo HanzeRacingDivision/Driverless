@@ -14,9 +14,8 @@ import threading as thr
 
 import sys #used for importing files (map_loader) from commandline (DOS run argument)
 
-## copyExtractMap() is moved to mapTransSock, you can still call it with MS.copyExtractMap()
 
-class pygamesimHeadless(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
+class pygamesimHeadless(Map, ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner):
     def __init__(self):
         Map.__init__(self) #init map class
         ML.mapLoader.__init__(self)
@@ -38,8 +37,6 @@ class pygamesimHeadless(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPl
         
         if(self.pathPlanningPresent):
             self.car.pathFolData = PP.pathPlannerData()
-        
-        #self.mapList = [copyExtractMap(self)]
 
 
 
@@ -50,7 +47,6 @@ if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if 
     sim1.load_map(sys.argv[1], sim1)
 
 timeSinceLastUpdate = sim1.clock()
-mapSaveTimer = sim1.clock()
 print("printing serial ports:")
 [print(entry.name) for entry in RC.serial.tools.list_ports.comports()]
 print("done printing ports.")
@@ -78,13 +74,6 @@ try:
             sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
         sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
         sim1.car.update(dt)
-        
-        # if((rightNow-mapSaveTimer)>0.25):
-        #     sim1.mapList.append(copyExtractMap(sim1))
-        #     if(len(sim1.mapList) > 40):
-        #         sim1.mapList.pop(0)
-        #     #print((sim1.clock()-mapSaveTimer)*1000)
-        #     mapSaveTimer = rightNow
         
         timeSinceLastUpdate = rightNow #save time (from start of loop) to be used next time
         

@@ -18,7 +18,7 @@ def simClock(clockStart):
 
 import sys #used for importing files (map_loader) from commandline (DOS run argument)
 
-class pygamesimLocal(ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
+class pygamesimLocal(Map, ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.pathPlanner, DD.pygameDrawer):
     def __init__(self, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self) #init map class
         ML.mapLoader.__init__(self)
