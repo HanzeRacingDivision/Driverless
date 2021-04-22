@@ -6,7 +6,6 @@ import time
 #         print(newPacket.startAngle) #do note: this code will be run about 50packets/Rotation * 5rotations/sec = 250 times per second, so try to make this as quick as possible (like an interrupt function)
 
 printTimer = time.time()
-speedTimer = []
 try:
     lidar = camsense_X1('COM7')
     #lidar.postParseCallback = callbackFunc

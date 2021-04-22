@@ -6,14 +6,12 @@ import serial
 import time
 import numpy as np
 import multiprocessing as MP #used for Semaphores
+from multiprocessing import shared_memory
 
 #note: lidar stops working correctly below 4.7V (400mA)
 #at (norminal) 5V, it uses 400-420mA (fluctuation is the result of the PID loop on the motor speed control)
 
 from numba import njit
-
-import numba.types as Ctyp
-from numba.experimental import jitclass
 
 
 CAMSENSE_X1_SYNC_BYTES = (85, 170, 3, 8) #constants
@@ -27,6 +25,10 @@ DATA_LEN = 2 + 2 + 2 + 8*2 + 8*1 + 2
 PACKET_LEN = len(CAMSENSE_X1_SYNC_BYTES) + DATA_LEN
 
 MAX_PACKET_LIST_SIZE = 100
+
+EXAMPLE_SERIAL_DATA = [b'U\xaa\x03\x08\xcfM\xe3\xb7Z\x089c\x086g\x08:\x00\x80\x00F\x07\x06\x00\x80\x00\x00\x80\x00f\x07\x02s\xb9pZ',
+                       b'U\xaa\x03\x08\xcfM\xac\xb9\x9e\x08\x1c\xa2\x08/\xab\x08&R\x08\x1c\xfe\x07%\xb3\x07 \xa4\x07=\xa2\x07`=\xbb\xbc\x05',
+                       b'U\xaa\x03\x08\xcfMv\xbb\xad\x07]~\x076@\x07?\x02\x07I\xc8\x06X\x97\x06Mf\x06\\;\x06a\x07\xbd3a']
 
 
 lidarPacket = np.dtype([('RPM', np.uint16),
@@ -184,12 +186,16 @@ def _updatePacketList(newPacket, packetList, dynamicListSize, volatileIndex, rot
 
 print("procompiling camsense_X1 functions...")
 compileStartTime = time.time()
-tempList = np.zeros(3, dtype=lidarPacket);  tempListLen = np.array([1], dtype=np.uint8)
-fullBufferToPacket(bytearray([i*7 for i in range(DATA_LEN)]), tempList[0], time.time())
-extractPackets(bytes(CAMSENSE_X1_SYNC_BYTES+tuple([i*7 for i in range(DATA_LEN)])), np.zeros(DATA_LEN, dtype=np.uint8), np.array([0], dtype=np.uint8), time.time())
-shiftList(tempList, 1, 0, tempListLen, False, True)
-_updatePacketList(tempList[0], tempList, tempListLen, np.array([0], dtype=np.uint8), np.array([0], dtype=np.uint8), np.array([0,0], dtype=lidarPacket['startAngle']))
-del(tempList); del(tempListLen)
+## important!: when precompiling liek this, remember to make sure to use EXACTLY the same types (it's easy to miss a uint16/uint32 difference for example)
+tempList = np.zeros(3, dtype=lidarPacket);  tempListLen = np.array([1], dtype=np.uint16)
+fullBufferToPacket(EXAMPLE_SERIAL_DATA[0][4::], tempList[0], time.time())
+tempPacket = extractPackets(EXAMPLE_SERIAL_DATA[1], np.zeros(DATA_LEN, dtype=np.uint8), np.array([0], dtype=np.uint8), time.time())[0][0]
+shiftList(tempList, 1, 0, tempListLen, False, True); shiftList(tempList, 1, 0, tempListLen, True, True)
+_updatePacketList(tempPacket, tempList, tempListLen, np.array([1], dtype=np.uint16), np.array([1], dtype=np.uint32), np.array([0,0], dtype=lidarPacket['startAngle']))
+# debugOne = open("debugOne.txt", "w")
+# _updatePacketList.inspect_types(file=debugOne)
+# debugOne.close()
+del(tempList); del(tempListLen); del(tempPacket)
 print("camsense_X1 compilation done! (took", round(time.time()-compileStartTime,1), "seconds)")
 
 class camsense_X1:
@@ -200,7 +206,7 @@ class camsense_X1:
         packets may overlap in angle-region, this is to preserve (sometimes very small) snippits of data. Just use the newer (lower index) packet's data.
         set .postParseCallback to a function you'd like to have called when new data is parsed.
         for multicore safety, please consider the .dataLock multiprocessing.Lock()"""
-    def __init__(self, comPort, clockFunc=time.time):
+    def __init__(self, comPort, clockFunc=time.time, sharedMemName=None):
         ##private variables:
         self._serialPort = serial.Serial(comPort, 115200, timeout=0.01)
         # self._serialPort.port = comPort
@@ -226,11 +232,22 @@ class camsense_X1:
         
         ##public variables:
         self.spinning = False #set to true once the first sync byte comes through
-        self.rotationCount = np.array([0], dtype=np.uint16) #(pointer hack) #mostly used as an indicator that the first rotation is done, but also usefull to know when a new set of datapoints is available
+        self.rotationCount = np.array([0], dtype=np.uint32) #(pointer hack) #mostly used as an indicator that the first rotation is done, but also usefull to know when a new set of datapoints is available
         
         self.RPMraw = 0 #divide by 64 to get RPM
         
-        self.lidarData = np.zeros(MAX_PACKET_LIST_SIZE, dtype=lidarPacket)
+        try:
+            if(sharedMemName is not None):
+                temp = shared_memory.SharedMemory(name=sharedMemName, create=False)
+                temp.close()
+                temp.unlink()
+                del(temp)
+                print("CLOSED LEFTOVER SHAREDMEM:", sharedMemName)
+        finally:
+            self.lidarDataSharedMem = shared_memory.SharedMemory(name=sharedMemName, create=True, size=np.zeros(MAX_PACKET_LIST_SIZE, dtype=lidarPacket).nbytes)
+        
+        self.lidarData = np.ndarray(MAX_PACKET_LIST_SIZE, dtype=lidarPacket, buffer=self.lidarDataSharedMem.buf)
+        self.lidarData[:] = np.zeros(MAX_PACKET_LIST_SIZE, dtype=lidarPacket)[:]
         self.lidarDataLen = np.array([0], dtype=np.uint16) #(pointer hack) #the (dynamic) length of lidarData[]. No real data can be found at- or after this index.
         self.volatileIndex = np.array([0], dtype=np.uint16) #(pointer hack) #becuase the lidar only spins one way, it makes sense to expect angles to only increase (untill rollover). This helps to limit how much of lidarData needs to be searched (to check for angle overlap)
         self.dataLock = MP.Lock() #a semaphore, for multithreading safety
@@ -287,6 +304,28 @@ class camsense_X1:
 
 
 # if __name__ == '__main__':
-#     print(lidarPacket().measurements)
-    
-    
+#     printTimer = time.time()
+#     try:
+#         lidar = camsense_X1('COM7')
+#         #lidar.postParseCallback = callbackFunc
+        
+#         lastRotCount = 0
+#         while(True):
+#             lidar.run() #needs to be ran more than 300 times per second, otherwise the serial buffer will fill up
+            
+#             rightNow = time.time()
+#             if((rightNow - printTimer) > 0.5):
+#                 with lidar.dataLock:
+#                     RPM = ((lidar.rotationCount[0] - lastRotCount) / (rightNow - printTimer))*60 #a (very inaccurate) RPM measurement, based on packet data rollover (rotationCount)
+#                     print(lidar.spinning, lidar.lidarDataLen[0], lidar.rotationCount[0], round(RPM,1), round(lidar.RPM(),1))
+#                     lastRotCount = lidar.rotationCount[0]
+#                 printTimer = rightNow
+#     finally: #required for correct serial port closing (otherwise, you need to unplug and replug device every time)
+#         try:
+#             lidar._serialPort.close()
+#             print("closed lidar serial port")
+#         except:
+#             print("coudln't close lidar serial port")
+#         debugTwo = open("debugTwo.txt", "w")
+#         _updatePacketList.inspect_types(file=debugTwo)
+#         debugTwo.close()
