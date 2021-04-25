@@ -9,7 +9,9 @@ import time
 
 import threading as thr
 
-class pygamesimRemote(CC.coneConnecter, PP.pathPlanner, MS.mapReceiverSocket, DD.pygameDrawer):
+import sys #used to pass arguments to the program when started from command line
+
+class pygamesimRemote(Map, CC.coneConnecter, PP.pathPlanner, MS.mapReceiverSocket, DD.pygameDrawer):
     def __init__(self, host, port, window, drawSize=(700,350), drawOffset=(0,0), carCamOrient=0, sizeScale=120, startWithCarCam=False, invertYaxis=True):
         Map.__init__(self)
         CC.coneConnecter.__init__(self)
@@ -50,9 +52,27 @@ class pygamesimRemote(CC.coneConnecter, PP.pathPlanner, MS.mapReceiverSocket, DD
 
 
 resolution = [1200, 600]
+host = 'pi4thijs.local'
+port = 65432
+if(len(sys.argv)>1):
+    for i, arg in enumerate(sys.argv[1::]):
+        if(i==0):
+            print("setting host to:", arg)
+            host = arg
+        elif(i==1):
+            print("setting port to: int(" + arg + ")")
+            port = int(arg)
+        elif(i==2):
+            if(arg.startswith(("[","(")) and arg.endswith(("]",")"))):
+                print("setting resolution to:", arg)
+                res = arg.strip("([])").split(",")
+                if(len(res) == 2):
+                    resolution = [int(res[0]), int(res[1])]
+                else:
+                    print('failed to set resolution, as "'+arg+'" did not split nicely:', res)
 
 DD.pygameInit(resolution)
-sim1 = pygamesimRemote('pi4thijs.local', 65432, DD.window, resolution)
+sim1 = pygamesimRemote(host, port, DD.window, resolution)
 
 try:
     timeSinceLastUpdate = time.time()

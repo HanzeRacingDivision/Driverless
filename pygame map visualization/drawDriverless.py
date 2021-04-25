@@ -118,9 +118,9 @@ class pygameDrawer():
             return(GF.distAnglePosToPos(dist/self.sizeScale, angle+self.mapToDraw.car.angle-self.carCamOrient, self.mapToDraw.car.position)) #use converted dist, correctly offset angle & the real car pos to get a new real point
         else:
             if(self.invertYaxis):
-                return (np.array([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((self.drawSize[1]-pixelPos[1]+self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]]))
+                return(np.array([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((self.drawSize[1]-pixelPos[1]+self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]]))
             else:
-                return (np.array([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((pixelPos[1]-self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]]))
+                return(np.array([((pixelPos[0]-self.drawOffset[0])/self.sizeScale)-self.viewOffset[0], ((pixelPos[1]-self.drawOffset[1])/self.sizeScale)-self.viewOffset[1]]))
     
     def realToPixelPos(self, realPos: np.ndarray):
         """return the pixel-position (for pygame) for a given (real) position"""
@@ -317,6 +317,9 @@ class pygameDrawer():
             statsToShow = [] # a list of strings
             carToDraw = self.mapToDraw.car
             statsToShow.append(str(round(carToDraw.position[0], 2))+" , "+str(round(carToDraw.position[1], 2)))
+            rearAxPos = carToDraw.getRearAxlePos()
+            statsToShow.append(str(round(rearAxPos[0], 2))+" , "+str(round(rearAxPos[1], 2)))
+            statsToShow.append(str(round(np.rad2deg(carToDraw.angle), 2)))
             statsToShow.append(str(round(carToDraw.velocity, 2))+"   "+str(round(carToDraw.steering, 2)))
             statsToShow.append(str(round(carToDraw.desired_velocity, 2))+"   "+str(round(carToDraw.desired_steering, 2)))
             if(self.pathPlanningPresent and (carToDraw.pathFolData is not None)):
