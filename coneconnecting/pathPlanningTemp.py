@@ -23,7 +23,12 @@ class pathPlannerData: #a class to go in Map.Car.coneConData or Map.Car.pathFolD
 class pathPlanner():
     """some functions (& constants) to follow (steer towards- and select next) Targets.
         (could potentially be copied along with Map objects (but does not HAVE to be))"""
-    def __init__(self):
+    def __init__(self, mapToUse=None):
+        
+        self.mapToUse = self
+        if(mapToUse is not None):
+            self.mapToUse = mapToUse
+        
         self.left_spline = [[], []]
         self.right_spline = [[], []]
         self.path_midpoints_spline = [[], []]
@@ -47,13 +52,13 @@ class pathPlanner():
         
     def nextTarget(self, currentTarget):
         """returns the next target in the target_list"""
-        for i in range(len(self.target_list)):
-            if(currentTarget == self.target_list[i]): #slightly risky pointer comparison
-                if(i<(len(self.target_list)-1)):
-                    return(self.target_list[i+1])
-                elif(self.targets_full_circle):
+        for i in range(len(self.mapToUse.target_list)):
+            if(currentTarget == self.mapToUse.target_list[i]): #slightly risky pointer comparison
+                if(i<(len(self.mapToUse.target_list)-1)):
+                    return(self.mapToUse.target_list[i+1])
+                elif(self.mapToUse.targets_full_circle):
                     #print("target rollover")
-                    return(self.target_list[0])
+                    return(self.mapToUse.target_list[0])
                 else:
                     print("PANIC, ran out of targets")
                     return(currentTarget)
@@ -62,8 +67,8 @@ class pathPlanner():
         """returns the next target if the current one is reached/passed/missed, returns the current target if the car is still on track to reach it"""
         if(currentTarget is None): #if the first target hasn't been selected yet
             print("selecting totally new target (TBD!)")
-            if(len(self.target_list) > 0):
-                return(self.target_list[0])
+            if(len(self.mapToUse.target_list) > 0):
+                return(self.mapToUse.target_list[0])
             else:
                 print("there are no targets, how am i supposed to update it >:(")
                 return(currentTarget)
@@ -86,35 +91,35 @@ class pathPlanner():
     def calcAutoDriving(self, saveOutput=True):
         """calculate the steering angle (and speed) required to reach the current target
             (default) if input parameter True the output will be saved to the Car"""
-        if(self.car.pathFolData is None):
-            self.car.pathFolData = pathPlannerData()
-        if(len(self.target_list) == 0):
+        if(self.mapToUse.car.pathFolData is None):
+            self.mapToUse.car.pathFolData = pathPlannerData()
+        if(len(self.mapToUse.target_list) == 0):
             print("can't autodrive, there are no targets")
-            self.car.pathFolData.auto = False
+            self.mapToUse.car.pathFolData.auto = False
             return(0.0, 0.0, None)
-        if((self.car.pathFolData.nextTarget is None) and saveOutput):
-            self.car.pathFolData.nextTarget = self.targetUpdate(None, 0, 0, 0)
-        if(self.car.pathFolData.nextTarget is not None): #if saveOutput hasn't prevented the first target from being set
-            prevTarget = self.car.pathFolData.nextTarget
-            dist, angle = GF.distAngleBetwPos(self.car.position, prevTarget.position)
-            angle = GF.radRoll(angle-self.car.angle)
-            nextTarget = self.targetUpdate(prevTarget, dist, angle, self.car.velocity) #check whether the target should be updated (if prevTarget reached/passed/missed), and return next/current target
+        if((self.mapToUse.car.pathFolData.nextTarget is None) and saveOutput):
+            self.mapToUse.car.pathFolData.nextTarget = self.targetUpdate(None, 0, 0, 0)
+        if(self.mapToUse.car.pathFolData.nextTarget is not None): #if saveOutput hasn't prevented the first target from being set
+            prevTarget = self.mapToUse.car.pathFolData.nextTarget
+            dist, angle = GF.distAngleBetwPos(self.mapToUse.car.position, prevTarget.position)
+            angle = GF.radRoll(angle-self.mapToUse.car.angle)
+            nextTarget = self.targetUpdate(prevTarget, dist, angle, self.mapToUse.car.velocity) #check whether the target should be updated (if prevTarget reached/passed/missed), and return next/current target
             if(prevTarget != nextTarget): #if it didnt change there's no need to spend time recalculating dist & angle
-                dist, angle = GF.distAngleBetwPos(self.car.position, nextTarget.position)
-                angle = GF.radRoll(angle-self.car.angle)
+                dist, angle = GF.distAngleBetwPos(self.mapToUse.car.position, nextTarget.position)
+                angle = GF.radRoll(angle-self.mapToUse.car.angle)
             
             #desired_steering = min(max(np.arctan(angle/(dist**self.turning_sharpness)), -25), 25)
-            desired_steering = min(max(angle,-self.car.maxSteeringAngle),self.car.maxSteeringAngle)
-            desired_velocity = self.car.pathFolData.targetVelocity
+            desired_steering = min(max(angle,-self.mapToUse.car.maxSteeringAngle),self.mapToUse.car.maxSteeringAngle)
+            desired_velocity = self.mapToUse.car.pathFolData.targetVelocity
             if(saveOutput):
-                self.car.pathFolData.nextTarget = nextTarget
-                self.car.desired_steering = desired_steering
-                self.car.desired_velocity = desired_velocity
+                self.mapToUse.car.pathFolData.nextTarget = nextTarget
+                self.mapToUse.car.desired_steering = desired_steering
+                self.mapToUse.car.desired_velocity = desired_velocity
                 if(prevTarget != nextTarget):
                     prevTarget.passed += 1
-                    if(nextTarget == self.target_list[0]):
-                        self.car.pathFolData.laps += 1
-                        print("target rollover, laps done:", self.car.pathFolData.laps)
+                    if(nextTarget == self.mapToUse.target_list[0]):
+                        self.mapToUse.car.pathFolData.laps += 1
+                        print("target rollover, laps done:", self.mapToUse.car.pathFolData.laps)
             return(desired_velocity, desired_steering, nextTarget)
         else: #if no first target was selected (saveOutput=False)
             return(0.0, 0.0, self.targetUpdate(None, 0, 0, 0))
@@ -125,8 +130,8 @@ class pathPlanner():
         returnList = [[], []]
         if(len(inputConeList) > 1):
             startingCone = inputConeList[0] #start at any random cone
-            if(len(self.finish_line_cones) > 0):
-                for finishCone in self.finish_line_cones:
+            if(len(self.mapToUse.finish_line_cones) > 0):
+                for finishCone in self.mapToUse.finish_line_cones:
                     if(inputConeList[0].LorR == finishCone.LorR):
                         startingCone = finishCone #use finish line cone as start of chain
             itt = 0
@@ -136,7 +141,7 @@ class pathPlanner():
             if(len(startingCone.connections) < 1): #check if it found a cone with connections (if not, itt == len(inputConeList))
                #print("couldn't make boundry spline, no connected cones in list")
                return([[], []])
-            chainLen, startingCone = self.getConeChainLen(startingCone, ((startingCone.connections[0]) if (len(startingCone.connections)>1) else None)) #go to the end of the cone connection chain
+            chainLen, startingCone = self.mapToUse.getConeChainLen(startingCone, ((startingCone.connections[0]) if (len(startingCone.connections)>1) else None)) #go to the end of the cone connection chain
             fullCircleLoop = False
             if(chainLen < 1): #should NEVER happen
                 print("no splines here, chainlen:", chainLen)
@@ -145,7 +150,7 @@ class pathPlanner():
                 fullCircleLoop = True
             else: #if it's NOT a full-circle (looping) cone chain
                 #the starting point has been found, now check how long the actual chain is (INEFFICIENT, but makes later forLoop easier)
-                chainLen, startingCone = self.getConeChainLen(startingCone, ((startingCone.connections[0]) if (len(startingCone.connections)>1) else None)) #go to the end of the cone connection chain
+                chainLen, startingCone = self.mapToUse.getConeChainLen(startingCone, ((startingCone.connections[0]) if (len(startingCone.connections)>1) else None)) #go to the end of the cone connection chain
             prevCone = ((startingCone.connections[0]) if (len(startingCone.connections)>1) else None)
             xValues = [];  yValues = []
             for i in range(chainLen): #you could do this with a while-loop, sequentially, or like this, and i think this is the simplest/shortest
@@ -173,19 +178,19 @@ class pathPlanner():
     
     def makeBoundrySplines(self):
         """make and store qubic splines for both left_ and right_cone_list"""
-        self.left_spline = self.makeBoundrySpline(self.left_cone_list)
-        self.right_spline = self.makeBoundrySpline(self.right_cone_list)
+        self.left_spline = self.makeBoundrySpline(self.mapToUse.left_cone_list)
+        self.right_spline = self.makeBoundrySpline(self.mapToUse.right_cone_list)
     
     def makePathSpline(self):
         """calculate and return a qubic spline for the target_list"""
         self.path_midpoints_spline = [[], []]
-        if(len(self.target_list) > 1):
-            targetPositions = [[target.position[i] for target in self.target_list] for i in range(2)]
-            if(self.targets_full_circle): #close the gap if the list goes full circle (STARTING AND ENDING SPLINE LINES DO NOT MATCH/FLOW-OVER)
-                targetPositions[0].append(self.target_list[0].position[0])
-                targetPositions[1].append(self.target_list[0].position[1])
-            tck, u = splprep(targetPositions, s=self.pathSplineSmoothing, k = (1 if (len(self.target_list)<3) else 2)) #(thijs) I DONT KNOW IF 's' SHOULD BE 0 OR 1, i dont know what it does
-            unew = np.arange(0, 1.01, self.pathSplineSamplingDividend/(len(self.target_list)**self.pathSplineSamplingPower)) #more cones  = less final var
+        if(len(self.mapToUse.target_list) > 1):
+            targetPositions = [[target.position[i] for target in self.mapToUse.target_list] for i in range(2)]
+            if(self.mapToUse.targets_full_circle): #close the gap if the list goes full circle (STARTING AND ENDING SPLINE LINES DO NOT MATCH/FLOW-OVER)
+                targetPositions[0].append(self.mapToUse.target_list[0].position[0])
+                targetPositions[1].append(self.mapToUse.target_list[0].position[1])
+            tck, u = splprep(targetPositions, s=self.pathSplineSmoothing, k = (1 if (len(self.mapToUse.target_list)<3) else 2)) #(thijs) I DONT KNOW IF 's' SHOULD BE 0 OR 1, i dont know what it does
+            unew = np.arange(0, 1.01, self.pathSplineSamplingDividend/(len(self.mapToUse.target_list)**self.pathSplineSamplingPower)) #more cones  = less final var
             self.path_midpoints_spline = splev(unew, tck)
 
 

@@ -23,8 +23,12 @@ class coneConnection: #a class to go in Map.Cone.coneConData. This carries some 
 class coneConnecter():
     """some functions (& constants) to connect cones to form a track boundry 
         (should not be copied along with Map objects)"""
-    def __init__(self):
-        #Map.__init__(self) #init map class
+    def __init__(self, mapToUse=None):
+        
+        self.mapToUse = self
+        if(mapToUse is not None):
+            self.mapToUse = mapToUse
+        
         self.coneConnectionThreshold = 1.5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
         self.coneConnectionThresholdSquared = self.coneConnectionThreshold**2
         ## self.coneConnectionLowChainLen = 3 #if the connection length of coneToConnect is higher than this, devalue the length of the pospect cone's connections #NOT IMPLEMENTED (YET?)
@@ -54,7 +58,7 @@ class coneConnecter():
             if((currentConnectionCount>0) and (len(coneToConnect.coneConData)>0)): #only 1 of the 2 checks should be needed, but just to be safe
                 currentExistingAngle = GF.radRoll(GF.radInv(coneToConnect.coneConData[0].angle))
             
-            nearbyConeList = self.distanceToCone(coneToConnect.position, self.right_cone_list if coneToConnect.LorR else self.left_cone_list, 'SORTBY_DIST', [coneToConnect.ID], self.coneConnectionThreshold, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by distance, but that's not really needed given the (CURRENT) math
+            nearbyConeList = self.mapToUse.distanceToCone(coneToConnect.position, self.mapToUse.right_cone_list if coneToConnect.LorR else self.mapToUse.left_cone_list, 'SORTBY_DIST', [coneToConnect.ID], self.coneConnectionThreshold, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by distance, but that's not really needed given the (CURRENT) math
             # nearbyConeList structure: [[cone, [dist, angle]], ]
             if(len(nearbyConeList) < 1):
                 print("nearbyConeList empty")
@@ -66,7 +70,10 @@ class coneConnecter():
                 connectionCount = len(cone.connections)
                 coneCandidateStrength = 1 #init var
                 coneCandidateStrength *= 1.5-(nearbyConeList[i][1][0]/self.coneConnectionThreshold)  #high distance, low strength. Linear. worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
-                coneCandidateStrength *= 0.5+min(self.getConeChainLen(cone)[0]/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
+                chainLenResult = self.mapToUse.getConeChainLen(cone)
+                # if(chainLenResult[1].ID == coneToConnect.ID):
+                #     print("chain potential circle:",coneToConnect,cone) #debugging
+                coneCandidateStrength *= 0.5+min(chainLenResult[0]/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
                 angleToCone = nearbyConeList[i][1][1]
                 #hard no's: if the angle difference is above the max (like 135 degrees), the prospect cone is just too damn weird, just dont connect to this one
                 #note: this can be partially achieved by using angleThreshRange in distanceToCone() to preventatively discard cones like  angleThreshRange=([currentExistingAngle - self.coneConnectionMaxAngleDelta, currentExistingAngle + self.coneConnectionMaxAngleDelta] if (currentConnectionsFilled[0] or currentConnectionsFilled[1]) else [])
@@ -97,7 +104,7 @@ class coneConnecter():
                 bestCandidateListIndex = GF.findIndexBy2DEntry(candidateList, 0, bestCandidateIndex) #this index is of candidateList, not of nearbyConeList
                 for i in range(len(candidateList)):
                     if((candidateList[i][1] > candidateList[bestCandidateListIndex][1]) if coneToConnect.LorR else (candidateList[i][1] < candidateList[bestCandidateListIndex][1])): #most restrictive angle is lowest angle
-                        print("more restrictive angle found:", candidateList[i][1], "is better than", candidateList[bestCandidateListIndex][1])
+                        print("more restrictive angle found:", candidateList[i][1], "is better than", candidateList[bestCandidateListIndex][1], "LorR:", coneToConnect.LorR)
                         #if((abs(radDiff(candidateList[i][1], candidateList[bestCandidateListIndex][1])) > self.coneConnectionRestrictiveAngleChangeThreshold) and ((candidateList[i][2]/highestStrength) > self.coneConnectionRestrictiveAngleStrengthThreshold)):
                         if(abs(GF.radDiff(candidateList[i][1], candidateList[bestCandidateListIndex][1])) > self.coneConnectionRestrictiveAngleChangeThreshold):
                             print("old highestStrength:", round(highestStrength, 2), " new highestStrength:", round(candidateList[i][2], 2), " ratio:", round(candidateList[i][2]/highestStrength, 2))
@@ -123,7 +130,7 @@ class coneConnecter():
             print("input cone already doubly connected?!:", coneToConnect.coneConData)
             return(False, None)
         else:
-            nearbyConeList = self.distanceToConeSquared(coneToConnect.position, self.right_cone_list if coneToConnect.LorR else self.left_cone_list, True, [coneToConnect.ID], self.coneConnectionThresholdSquared, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
+            nearbyConeList = self.mapToUse.distanceToConeSquared(coneToConnect.position, self.mapToUse.right_cone_list if coneToConnect.LorR else self.mapToUse.left_cone_list, True, [coneToConnect.ID], self.coneConnectionThresholdSquared, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
             if(len(nearbyConeList) < 1):
                 print("nearbyConeList empty")
                 return(False, None)
@@ -131,7 +138,7 @@ class coneConnecter():
             for i in range(len(nearbyConeList)):
                 coneCandidateStrength = 1 #init var
                 coneCandidateStrength *= 1.5-(nearbyConeList[i][1]/self.coneConnectionThresholdSquared)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
-                coneCandidateStrength *= 0.5+min(self.getConeChainLen(nearbyConeList[i][0])[0]/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
+                coneCandidateStrength *= 0.5+min(self.mapToUse.getConeChainLen(nearbyConeList[i][0])[0]/self.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
                 ## no angle math can be done, as Pythagoras's ABC is used, not sohcahtoa :)
                 if(coneCandidateStrength > highestStrength):
                     highestStrength = coneCandidateStrength

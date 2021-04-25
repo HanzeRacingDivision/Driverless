@@ -22,7 +22,12 @@ class pathFinderData: #a class to go in Map.Target.coneConData or Map.Target.pat
 class pathFinder():
     """some functions (& constants) to find Target points (target_list) using (track boundry) cones 
         (should not be copied along with Map objects)"""
-    def __init__(self):
+    def __init__(self, mapToUse=None):
+        
+        self.mapToUse = self
+        if(mapToUse is not None):
+            self.mapToUse = mapToUse
+        
         self.pathConnectionThreshold = 3 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         self.pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
         
@@ -37,40 +42,40 @@ class pathFinder():
             the first Target is placed on the finish lines (if available) or near the car"""
         # target_list content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
         # left/right-ConeList content: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]
-        if(self.targets_full_circle):
+        if(self.mapToUse.targets_full_circle):
             print("not gonna make path, already full circle")
             return(False)
-        if(len(self.target_list) == 0): #if there is no existing path to go on
-            if((len(self.right_cone_list) < 2) or (len(self.left_cone_list) < 2)): #first pathLine can only be made between 2 connected cones
+        if(len(self.mapToUse.target_list) == 0): #if there is no existing path to go on
+            if((len(self.mapToUse.right_cone_list) < 2) or (len(self.mapToUse.left_cone_list) < 2)): #first pathLine can only be made between 2 connected cones
                 print("not enough cones in one or more coneLists, cant place first pathLine")
                 return(False)
             
             #search cones here
             firstCones = [None, None]
             strengths = [0.0, 0.0]
-            if(len(self.finish_line_cones) > 0):
+            if(len(self.mapToUse.finish_line_cones) > 0):
                 print("using finish cone(s) to make first pathLine")
-                if(self.finish_line_cones[0].LorR):
-                    firstCones[1] = self.finish_line_cones[0]
+                if(self.mapToUse.finish_line_cones[0].LorR):
+                    firstCones[1] = self.mapToUse.finish_line_cones[0]
                 else:
-                    firstCones[0] = self.finish_line_cones[0]
-                if(len(self.finish_line_cones) > 1): #if both finish cones are set
-                    if(self.finish_line_cones[1].LorR):
-                        firstCones[1] = self.finish_line_cones[1]
+                    firstCones[0] = self.mapToUse.finish_line_cones[0]
+                if(len(self.mapToUse.finish_line_cones) > 1): #if both finish cones are set
+                    if(self.mapToUse.finish_line_cones[1].LorR):
+                        firstCones[1] = self.mapToUse.finish_line_cones[1]
                     else:
-                        firstCones[0] = self.finish_line_cones[1]
+                        firstCones[0] = self.mapToUse.finish_line_cones[1]
             for LorR in range(2):
                 if(firstCones[LorR] is None):
                     bestCandidateIndex = -1;   highestStrength = 0;   candidatesDiscarded = 0
-                    sideAngleRange = [self.car.angle +((-np.pi/2) if LorR else (np.pi/2)) -self.pathFirstLineCarSideAngleDelta, self.car.angle +((-np.pi/2) if LorR else (np.pi/2)) +self.pathFirstLineCarSideAngleDelta] #left side is car.angle +pi/2, right side is car.angle -pi/2
-                    firstConeCandidates = self.distanceToCone(self.car.position, self.right_cone_list if LorR else self.left_cone_list, 'SORTBY_DIST', [], self.pathFirstLinePosDist, 'EXCL_UNCONN', [], self.car.angle, sideAngleRange) #sorting is unnecessarry
+                    sideAngleRange = [self.mapToUse.car.angle +((-np.pi/2) if LorR else (np.pi/2)) -self.pathFirstLineCarSideAngleDelta, self.mapToUse.car.angle +((-np.pi/2) if LorR else (np.pi/2)) +self.pathFirstLineCarSideAngleDelta] #left side is car.angle +pi/2, right side is car.angle -pi/2
+                    firstConeCandidates = self.mapToUse.distanceToCone(self.mapToUse.car.position, self.mapToUse.right_cone_list if LorR else self.mapToUse.left_cone_list, 'SORTBY_DIST', [], self.pathFirstLinePosDist, 'EXCL_UNCONN', [], self.mapToUse.car.angle, sideAngleRange) #sorting is unnecessarry
                     for i in range(len(firstConeCandidates)):
                         cone = firstConeCandidates[i][0]
                         connectionCount = len(cone.connections) #due to the EXCL_UNCONN filtering, this value should never be 0
-                        connectionAnglesAllowed = [((abs(GF.radDiff(cone.coneConData[0].angle, self.car.angle)) < self.pathFirstLineCarAngleDeltaMax) if (connectionCount > 0) else False), ((abs(GF.radDiff(cone.coneConData[1].angle, self.car.angle)) < self.pathFirstLineCarAngleDeltaMax) if (connectionCount > 1) else False)]
+                        connectionAnglesAllowed = [((abs(GF.radDiff(cone.coneConData[0].angle, self.mapToUse.car.angle)) < self.pathFirstLineCarAngleDeltaMax) if (connectionCount > 0) else False), ((abs(GF.radDiff(cone.coneConData[1].angle, self.mapToUse.car.angle)) < self.pathFirstLineCarAngleDeltaMax) if (connectionCount > 1) else False)]
                         ## it's important to note that the distance calculated by distanceToCone() is between the center of the car and the cone, and therefore not the shortest path, or real distance to the car (a cone next to a wheel will have a higher distance than a cone next to the middle of the car, which is illogical)
                         ## this illogical distance can still be used to help filter out candidates, but for an accurate strength-rating, distanceToCar() (a function of the raceCar class) should be used
-                        coneOverlapsCar, distToCar = self.car.distanceToCar(cone.position)
+                        coneOverlapsCar, distToCar = self.mapToUse.car.distanceToCar(cone.position)
                         #print("evaluating "+("right" if (LorR==1) else "left")+" cone:", cone[0], connectionsFilled, connectionAnglesAllowed, coneOverlapsCar, distToCar)
                         if(connectionCount < 1):
                             ## somehow, an unconnected cone slipped past the filer in distanceToCone(). this should be impossible, but i wrote the filter code in a hurry, so little debugging cant hurt
@@ -90,7 +95,7 @@ class pathFinder():
                         else:
                             coneCandidateStrength = 1 #init var
                             coneCandidateStrength *= 1.5-min(distToCar/self.pathFirstLineCarDist, 1)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5
-                            coneCandidateStrength *= 1.5-abs(GF.radDiff(cone.coneConData[(0 if connectionAnglesAllowed[0] else 1)].angle, self.car.angle))/self.pathFirstLineCarAngleDeltaMax  #high angle delta, low strength. Linear. worst>0.5 best<1.5
+                            coneCandidateStrength *= 1.5-abs(GF.radDiff(cone.coneConData[(0 if connectionAnglesAllowed[0] else 1)].angle, self.mapToUse.car.angle))/self.pathFirstLineCarAngleDeltaMax  #high angle delta, low strength. Linear. worst>0.5 best<1.5
                             ## this following check makes sure the pathline is perpendicular to the car
                             coneAvgConnAngle = 0 #init var
                             if(connectionCount >= 2):
@@ -98,7 +103,7 @@ class pathFinder():
                             else:
                                 connectionToUse = (1 if (connectionCount >= 2) else 0)
                                 coneAvgConnAngle = cone.coneConData[connectionToUse].angle #see note on calculation with double connection above
-                            coneCandidateStrength *= 1.5-min(min(abs(GF.radDiff(coneAvgConnAngle, self.car.angle)), abs(GF.radDiff(GF.radInv(coneAvgConnAngle), self.car.angle)))/self.pathConnectionMaxAngleDelta, 1)
+                            coneCandidateStrength *= 1.5-min(min(abs(GF.radDiff(coneAvgConnAngle, self.mapToUse.car.angle)), abs(GF.radDiff(GF.radInv(coneAvgConnAngle), self.mapToUse.car.angle)))/self.pathConnectionMaxAngleDelta, 1)
                             ## using existing chosen firstCone, only works for the right cone (this is an unequal check, so i hate it, but it does work to make sure the first line is straight (not diagonal))
                             if(LorR == 1): #TO BE IMPROVED, but i dont know quite how yet
                                 leftFirstConeConnectionCount = len(firstCones[0].connections) #this could technically be 0, if an unconnected finish cone was used
@@ -130,9 +135,9 @@ class pathFinder():
             #newTarget = Map.Target(centerPoint, (firstCones[0].isFinish or firstCones[1].isFinish))
             newTarget = Map.Target(centerPoint)
             newTarget.coneConData = pathFinderData(carAngle, pathWidth, [firstCones[0], firstCones[1]], max(strengths))
-            self.target_list.append(newTarget)
+            self.mapToUse.target_list.append(newTarget)
         else: #if len(target_list) > 0
-            lastPathLine = self.target_list[-1] # -1 gets the last item in list, you could also use (len(target_list)-1)
+            lastPathLine = self.mapToUse.target_list[-1] # -1 gets the last item in list, you could also use (len(target_list)-1)
             lastCones = [];  lastConeAvgConnAngle = [];  prospectCones = [];
             for LorR in range(2):
                 lastCones.append(lastPathLine.coneConData.cones[LorR])
@@ -143,10 +148,10 @@ class pathFinder():
                 connectedConesProspectable = [];  prospectConnectionIndex = 0
                 for i in range(lastConnectionCount):
                     connectedConesProspectable.append(True)
-                    # if(len(self.target_list) > 1):
-                    #     if(lastCones[LorR].connections[i].ID == self.target_list[-2].coneConData.cones[LorR].ID): #only check second to last path point
+                    # if(len(self.mapToUse.target_list) > 1):
+                    #     if(lastCones[LorR].connections[i].ID == self.mapToUse.target_list[-2].coneConData.cones[LorR].ID): #only check second to last path point
                     #         connectedConesProspectable[i] = False;
-                    for target in self.target_list: #look through the entire list of targets (you could also just look at self.target_list[-2])
+                    for target in self.mapToUse.target_list: #look through the entire list of targets (you could also just look at self.mapToUse.target_list[-2])
                         if(lastCones[LorR].connections[i].ID == target.coneConData.cones[LorR].ID): #if the only connected cone is ALSO (already) in the target_list, then you cant make any more path
                             connectedConesProspectable[i] = False;
                 if((lastConnectionCount == 1) and (not connectedConesProspectable[0])):
@@ -161,8 +166,8 @@ class pathFinder():
                         angleDeltas = []
                         connectionSeqLengths = []
                         for i in range(lastConnectionCount):
-                            angleDeltas.append(abs(GF.radDiff(lastCones[LorR].coneConData[i].angle, self.car.angle)))
-                            connectionSeqLengths.append(self.getConeChainLen(lastCones[LorR].connections[i], lastCones[LorR])[0])
+                            angleDeltas.append(abs(GF.radDiff(lastCones[LorR].coneConData[i].angle, self.mapToUse.car.angle)))
+                            connectionSeqLengths.append(self.mapToUse.getConeChainLen(lastCones[LorR].connections[i], lastCones[LorR])[0])
                         for i in range(lastConnectionCount):
                             strengths.append(1.0)
                             strengths[i] *= 1.5-min(angleDeltas[i]/max(angleDeltas), 1) #lower delta = better
@@ -175,13 +180,13 @@ class pathFinder():
                         prospectConnectionIndex = 1
                     else: #both of the cones connected to lastCone are already used in pathList
                         #either something is very wrong, OR the path is about to go full-circle
-                        if(lastCones[LorR].connections[0].ID == self.target_list[0].coneConData.cones[LorR].ID): #if the 0th connection is the first Target
+                        if(lastCones[LorR].connections[0].ID == self.mapToUse.target_list[0].coneConData.cones[LorR].ID): #if the 0th connection is the first Target
                             #about to go full-circle, use connections[0] as prospectCone
                             prospectConnectionIndex = 0
-                        elif(lastCones[LorR].connections[1].ID == self.target_list[0].coneConData.cones[LorR].ID): #if the 0th connection is the first Target
+                        elif(lastCones[LorR].connections[1].ID == self.mapToUse.target_list[0].coneConData.cones[LorR].ID): #if the 0th connection is the first Target
                             #about to go full-circle, use connections[1] as prospectCone
                             prospectConnectionIndex = 1
-                        elif(lastCones[LorR].ID == self.target_list[0].coneConData.cones[LorR].ID): #the prospectcone on this side doesnt matter, it all about this lastCone
+                        elif(lastCones[LorR].ID == self.mapToUse.target_list[0].coneConData.cones[LorR].ID): #the prospectcone on this side doesnt matter, it all about this lastCone
                             print("nearing a full circle")
                         else: #something is just very wrong
                             print("both lastCones["+("right" if (LorR==1) else "left")+"].connections already in target_list, something is very wrong")
@@ -191,11 +196,11 @@ class pathFinder():
                 prospectCones.append(lastCones[LorR].connections[prospectConnectionIndex])
             
             #check if you've gone full circle
-            if(((prospectCones[0].ID == self.target_list[0].coneConData.cones[0].ID) and (prospectCones[1].ID == self.target_list[0].coneConData.cones[1].ID)) \
-                or ((lastCones[0].ID == self.target_list[0].coneConData.cones[0].ID) and (prospectCones[1].ID == self.target_list[0].coneConData.cones[1].ID)) \
-                or ((prospectCones[0].ID == self.target_list[0].coneConData.cones[0].ID) and (lastCones[1].ID == self.target_list[0].coneConData.cones[1].ID))):
+            if(((prospectCones[0].ID == self.mapToUse.target_list[0].coneConData.cones[0].ID) and (prospectCones[1].ID == self.mapToUse.target_list[0].coneConData.cones[1].ID)) \
+                or ((lastCones[0].ID == self.mapToUse.target_list[0].coneConData.cones[0].ID) and (prospectCones[1].ID == self.mapToUse.target_list[0].coneConData.cones[1].ID)) \
+                or ((prospectCones[0].ID == self.mapToUse.target_list[0].coneConData.cones[0].ID) and (lastCones[1].ID == self.mapToUse.target_list[0].coneConData.cones[1].ID))):
                 print("path full circle (by default)")
-                self.targets_full_circle = True
+                self.mapToUse.targets_full_circle = True
                 return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
             
             prospectConeAvgConnAngle = []
@@ -208,12 +213,11 @@ class pathFinder():
                 
                 prospectConeAvgConnAngle.append(((GF.radMidd(GF.radInv(prospectCones[LorR].coneConData[0].angle), prospectCones[LorR].coneConData[1].angle)) if (prospectConeConnectionCount >= 2) else (prospectCones[LorR].coneConData[0].angle)))
             
-            # self.debugLines = [] #clear debugLines
+            # self.mapToUse.debugLines = [] #clear debugLines
             # for LorR in range(2):
-            #     self.debugLines.append([1, self.realToPixelPos(lastCones[LorR].position), [4, lastConeAvgConnAngle[LorR]], 1+LorR])
-            #     self.debugLines.append([1, self.realToPixelPos(prospectCones[LorR].position), [4, prospectConeAvgConnAngle[LorR]], 1+LorR])
+            #     self.mapToUse.debugLines.append([1, self.mapToUse.realToPixelPos(lastCones[LorR].position), [4, lastConeAvgConnAngle[LorR]], 1+LorR])
+            #     self.mapToUse.debugLines.append([1, self.mapToUse.realToPixelPos(prospectCones[LorR].position), [4, prospectConeAvgConnAngle[LorR]], 1+LorR])
             
-            ## all of could really be in a forloop of some kind, but fuck it; manual it is
             strengths = [1,1,1] #4 possible path lines, one of which already exists (between lastLeftCone and lastRightCone), so calculate the strengths for the remaining three possible pathlines
             pathWidths = [0,0,0];   pathAngles = [0,0,0]
             allCones = lastCones + prospectCones  #combine lists
@@ -232,16 +236,16 @@ class pathFinder():
             
             print("path found:", maxStrengthIndex, "at strength:", round(maxStrengthVal, 2))
             #check if you've gone full circle
-            if((winningCones[0].ID == self.target_list[0].coneConData.cones[0].ID) and (winningCones[1].ID == self.target_list[0].coneConData.cones[1].ID)):
+            if((winningCones[0].ID == self.mapToUse.target_list[0].coneConData.cones[0].ID) and (winningCones[1].ID == self.mapToUse.target_list[0].coneConData.cones[1].ID)):
                 print("path full circle (from winning cones)")
-                self.targets_full_circle = True
+                self.mapToUse.targets_full_circle = True
                 return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
             else:
                 centerPoint = [winningCones[1].position[0] + (winningCones[0].position[0]-winningCones[1].position[0])/2, winningCones[1].position[1] + (winningCones[0].position[1]-winningCones[1].position[1])/2]  # [xpos + half Xdelta, yPos + half Ydelta]
                 #newTarget = Map.Target(centerPoint, (winningCones[0].isFinish or winningCones[1].isFinish))
                 newTarget = Map.Target(centerPoint)
                 newTarget.coneConData = pathFinderData(pathAngles[maxStrengthIndex], pathWidths[maxStrengthIndex], [winningCones[0], winningCones[1]], maxStrengthVal)
-                self.target_list.append(newTarget)
+                self.mapToUse.target_list.append(newTarget)
         return(True)
 
 
