@@ -1,5 +1,5 @@
-import camsense_X1 as CX
-import lidarBlobs as LB
+import lidarBlobProc as LP
+
 import time
 import numpy as np
 
@@ -20,7 +20,7 @@ class pygamesimLocal(Map, ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.path
         Map.__init__(self) #init map class
         ML.mapLoader.__init__(self)
         
-        # self.clockSet(simClock) #an altered clock, only for simulations where the speed is faster/slower than normal
+        #self.clock = your custom clock function here
         self.car = SC.simCar(self.clock) #simCar has Map.Car as a parent class, so all regular Car stuff will still work
         
         # self.car = RC.realCar(self.clock, comPort='/dev/ttyUSB1')
@@ -44,13 +44,13 @@ class pygamesimLocal(Map, ML.mapLoader, CC.coneConnecter, PF.pathFinder, PP.path
             self.car.pathFolData = PP.pathPlannerData()
 
 
-
-global debugThresh
-debugThresh = 750 #only lidar data within this radius
+MIN_BLOB_CONE_LEN = 3
 
 
 def makeCone(blob):
     adjustedConeDiam = Map.Cone.coneDiam * 0.5 #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
+    if(len(blob.points) < MIN_BLOB_CONE_LEN):
+        return()
     global sim1
     if(len(blob.origins) != len(blob.points)):
         print("less origins than points!:", len(blob.origins), len(blob.points))
@@ -89,95 +89,88 @@ def makeCone(blob):
                 overlappingCone.slamData.pop(0) #delete oldest data
             overlappingCone.position[0] = GF.average(np.array([item[0][0] for item in overlappingCone.slamData]))
             overlappingCone.position[1] = GF.average(np.array([item[0][1] for item in overlappingCone.slamData]))
-            blob.extraData = overlappingCone
     else:
         ## SLAM code could replace this
         leftOrRight = (GF.get_norm_angle_between(sim1.car.position, conePos, sim1.car.angle) < 0.0) #if the angle relative to car is negative (CW), it's a right-side cone
         conePlaceSuccess, coneInList = sim1.addCone(conePos, leftOrRight, False)
         #if(conePlaceSuccess) # overlap check already done earlier
         coneInList.slamData = [[conePos, sim1.clock(), [v for v in sim1.car.position], sim1.car.velocity, 1]]
-        blob.extraData = coneInList
     #blob.uponDeletion = delCone
-    #blob.uponExist = None #this is just to mark that the function has been called (alternatively, check extraData)
-
-def callbackFunc(lidarSelf, newPacket, pointsAdded):
-    #if((newPacket is not None) and (pointsAdded > 0)):
-    startAngle = newPacket['startAngle']/CX.DEG_DIV
-    angleDif = GF.degDiff(newPacket['startAngle']/CX.DEG_DIV, newPacket['endAngle']/CX.DEG_DIV) #(rollover proof) IMPORTANT: packet angles are still integers, divide by 64 to get degrees (0 to 360)
-    angleStep = angleDif/7 #note: there are actually 8 datapointes per packet, but i'm assuming the endAngle is AT the 8th datapoint (and the startAngle is AT the first)
-    global debugThresh, sim1
-    #LB.checkBlobAge(sim1.clock)
-    for i in range(newPacket['dataFilled']-pointsAdded, newPacket['dataFilled']): #if it's not a new packet, but an existing one with new points, this will skip the old ones
-        if((newPacket['measurements'][i] < debugThresh) and (newPacket['measurements'][i] != CX.NO_MEASUREMENT)):
-            angle = startAngle+angleStep*i
-            ## correctedLidarAngle:  get 'middle' angle, convert to (-180,180) with derRoll, convert to radians, set 0-angle at car-rear (instead of front) with radInv and *-1 because lidar degrees are CW and Map rotation is CCW
-            lidarAngleError = np.deg2rad(-15) #TBD save this somewhere else, maybe in camsense_X1
-            correctedLidarAngle = (-1)*GF.radInv(np.deg2rad(angle)) + lidarAngleError #NOTE: radRoll is done in radInv, if you remove this please use degRoll or radRoll instead
-            carPos = sim1.car.getRearAxlePos()
-            pointPos = GF.distAnglePosToPos(newPacket['measurements'][i]/1000, sim1.car.angle + correctedLidarAngle, carPos) #get map position from relative position (asuming lidar is mounter on car)
-            isNewBlob, newBlob = LB.blobify(pointPos, carPos, sim1.clock)
-            if(isNewBlob):
-                #newBlob.uponExist = lambda blobObj : print("exist:", len(blobObj.points), len(blobObj._lines))  #example
-                #newBlob.uponDeletion = lambda blobObj, reason : print("delete:", len(blobObj.points), len(blobObj._lines), blobObj.exists, reason)  #example
-                newBlob.uponExist = makeCone
-                newBlob.uponExistAppendTimeout = (60.0/lidarSelf.RPM())*0.5 #IMPORTANT: (seconds per rotation) * half(?), this timout also makes sure blobs are not appended to on subsequent rotations
+    #blob.uponExist = None #this is just to mark that the function has been called
 
 
 
-resolution = [700, 350]
-
-DD.pygameInit(resolution)
-global sim1
-sim1 = pygamesimLocal(DD.window, resolution)
-
-if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
-    print("found sys.argv[1], attempting to import:", sys.argv[1])
-    sim1.load_map(sys.argv[1], sim1)
-
-timeSinceLastUpdate = sim1.clock()
-
-print("printing serial ports:")
-[print(entry.name) for entry in RC.serial.tools.list_ports.comports()]
-print("done printing ports.")
-print()
-
-try:
-    lidar = CX.camsense_X1('COM7')
-    lidar.postParseCallback = callbackFunc
+if __name__ == '__main__': ##IMPORTANT: every multiprocessing thread will import THIS (the instigating) file, so without this check it will try to run all code twice(/infinitely)
     
-    while DD.windowKeepRunning:
-        rightNow = sim1.clock()
-        dt = rightNow - timeSinceLastUpdate
-        DD.handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
-        
-        LB.checkBlobAge(sim1.clock)
-        lidar.run() #needs to be ran more than 300 times per second, otherwise the serial buffer will fill up
-        if((sim1.car.pathFolData.auto) if (sim1.pathPlanningPresent and (sim1.car.pathFolData is not None)) else False):
-            sim1.calcAutoDriving()
-            if(sim1.car.pathFolData.laps >= 1): #stop after a set number of laps
-                sim1.car.pathFolData.targetVelocity = 0.0;  sim1.car.desired_velocity = 0.0;  #sim1.car.pathFolData.auto = False
-                sim1.car.pathFolData.laps = 0 #reset counter, to allow the car to start driving again (by upping targetVelocity)
-            sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
-        sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
-        sim1.car.update(dt)
-        
-        sim1.redraw()
-        DD.frameRefresh() #not done in redraw() to accomodate multi-sim options
-        
-        timeSinceLastUpdate = rightNow #save time (from start of loop) to be used next time
-        
-# except KeyboardInterrupt:
-#     print("main thread keyboard interrupt")
-# except Exception as excep:
-#     print("main thread exception:", excep)
-finally:
+    resolution = [700, 350]
+    
+    DD.pygameInit(resolution)
+    global sim1
+    sim1 = pygamesimLocal(DD.window, resolution)
+    
+    if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
+        print("found sys.argv[1], attempting to import:", sys.argv[1])
+        sim1.load_map(sys.argv[1], sim1)
+    
+    timeSinceLastUpdate = sim1.clock()
+    
+    print("printing serial ports:")
+    [print(entry.name) for entry in RC.serial.tools.list_ports.comports()]
+    print("done printing ports.")
+    print()
+    
     try:
-        lidar._serialPort.close()
-        print("closed lidar serial port")
-    except:
-        print("coudln't close lidar serial port")
-    try:  #alternatively:  if(type(sim1.car) is RC.realCar):
-        sim1.car.disconnect()
-    except Exception as excep:
-        print("failed to run car.disconnect():", excep)
-    DD.pygameEnd() #correctly shut down pygame window
+        lidarProcess, lidarPipe, lidarLock, lidarData, lidarMem = LP.initLidarBlobProcess(('COM7',), [sim1.car.position, sim1.car.angle])
+        ## initLidarBlobProcess() will start the lidar process and wait untill
+        
+        while DD.windowKeepRunning:
+            rightNow = sim1.clock()
+            dt = rightNow - timeSinceLastUpdate
+            DD.handleAllWindowEvents(sim1) #handle all window events like key/mouse presses, quitting and most other things
+            
+            if((sim1.car.pathFolData.auto) if (sim1.pathPlanningPresent and (sim1.car.pathFolData is not None)) else False):
+                sim1.calcAutoDriving()
+                if(sim1.car.pathFolData.laps >= 1): #stop after a set number of laps
+                    sim1.car.pathFolData.targetVelocity = 0.0;  sim1.car.desired_velocity = 0.0;  #sim1.car.pathFolData.auto = False
+                    sim1.car.pathFolData.laps = 0 #reset counter, to allow the car to start driving again (by upping targetVelocity)
+                sim1.car.sendSpeedAngle(sim1.car.desired_velocity, sim1.car.desired_steering) #(spam) send instruction (or simulate doing so)
+            sim1.car.getFeedback() #run this to parse serial data (or simulate doing so)
+            if(sim1.car.update(dt)):
+                lidarPipe.send(("posUpdate", sim1.car.getRearAxlePos(), sim1.car.angle))
+            
+            lidarProcHandleTime = time.time()
+            while(lidarPipe.poll()):
+                gottenThing = lidarPipe.recv()
+                if((((gottenThing[0] == "blob") and (len(gottenThing)==3)) if (type(gottenThing[0]) is str) else False) if (type(gottenThing) is tuple) else False):
+                    ## TBD: SLAMblobLog(gottenThing[1], gottenThing[2]) #log blob (and timestamp), note: blob also contains more accurate timestamps
+                    makeCone(gottenThing[1])
+                else:
+                    print("lidarPipe sent non-blob object!?:", gottenThing)
+            lidarProcHandleTime = time.time() - lidarProcHandleTime
+            if(lidarProcHandleTime > 0.001):
+                print("lidarProcHandleTime:", round(lidarProcHandleTime*1000, 1))
+            
+            sim1.redraw()
+            DD.frameRefresh() #not done in redraw() to accomodate multi-sim options
+            
+            timeSinceLastUpdate = rightNow #save time (from start of loop) to be used next time
+            
+            FPSrightNow = sim1.clock() #this is only for the framerate limiter (time.sleep() doesn't accept negative numbers, this solves that)
+            if((FPSrightNow-rightNow) < 0.015): #60FPS limiter (optional)
+                time.sleep(0.0155-(FPSrightNow-rightNow))
+            
+    # except KeyboardInterrupt:
+    #     print("main thread keyboard interrupt")
+    # except Exception as excep:
+    #     print("main thread exception:", excep)
+    finally:
+        try:  #alternatively:  if(type(sim1.car) is RC.realCar):
+            sim1.car.disconnect()
+        except Exception as excep:
+            print("failed to run car.disconnect():", excep)
+        DD.pygameEnd() #correctly shut down pygame window
+        try:
+            LP.stopLidarProc(lidarPipe, lidarMem, lidarProcess)
+            print("stopped lidar process")
+        except:
+            print("couldn't stop lidar process")

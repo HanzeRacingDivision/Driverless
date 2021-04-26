@@ -184,19 +184,25 @@ def _updatePacketList(newPacket, packetList, dynamicListSize, volatileIndex, rot
     #return() #nothing has to be returned
 
 
-print("procompiling camsense_X1 functions...")
-compileStartTime = time.time()
-## important!: when precompiling liek this, remember to make sure to use EXACTLY the same types (it's easy to miss a uint16/uint32 difference for example)
-tempList = np.zeros(3, dtype=lidarPacket);  tempListLen = np.array([1], dtype=np.uint16)
-fullBufferToPacket(EXAMPLE_SERIAL_DATA[0][4::], tempList[0], time.time())
-tempPacket = extractPackets(EXAMPLE_SERIAL_DATA[1], np.zeros(DATA_LEN, dtype=np.uint8), np.array([0], dtype=np.uint8), time.time())[0][0]
-shiftList(tempList, 1, 0, tempListLen, False, True); shiftList(tempList, 1, 0, tempListLen, True, True)
-_updatePacketList(tempPacket, tempList, tempListLen, np.array([1], dtype=np.uint16), np.array([1], dtype=np.uint32), np.array([0,0], dtype=lidarPacket['startAngle']))
-# debugOne = open("debugOne.txt", "w")
-# _updatePacketList.inspect_types(file=debugOne)
-# debugOne.close()
-del(tempList); del(tempListLen); del(tempPacket)
-print("camsense_X1 compilation done! (took", round(time.time()-compileStartTime,1), "seconds)")
+def precompileAll():
+    print("procompiling camsense_X1 functions...")
+    compileStartTime = time.time()
+    ## important!: when precompiling liek this, remember to make sure to use EXACTLY the same types (it's easy to miss a uint16/uint32 difference for example)
+    tempList = np.zeros(3, dtype=lidarPacket);  tempListLen = np.array([1], dtype=np.uint16)
+    fullBufferToPacket(EXAMPLE_SERIAL_DATA[0][4::], tempList[0], time.time())
+    tempPacket = extractPackets(EXAMPLE_SERIAL_DATA[1], np.zeros(DATA_LEN, dtype=np.uint8), np.array([0], dtype=np.uint8), time.time())[0][0]
+    shiftList(tempList, 1, 0, tempListLen, False, True); shiftList(tempList, 1, 0, tempListLen, True, True)
+    _updatePacketList(tempPacket, tempList, tempListLen, np.array([1], dtype=np.uint16), np.array([1], dtype=np.uint32), np.array([0,0], dtype=lidarPacket['startAngle']))
+    del(tempList); del(tempListLen); del(tempPacket)
+    print("camsense_X1 compilation done! (took", round(time.time()-compileStartTime,1), "seconds)")
+
+
+
+def sharedMemArray(sharedMemName):
+    sharedLidarMem = shared_memory.SharedMemory(sharedMemName, create=False)
+    return(np.ndarray(MAX_PACKET_LIST_SIZE, dtype=lidarPacket, buffer=sharedLidarMem.buf), sharedLidarMem)
+
+
 
 class camsense_X1:
     """a class for managing the Camsense-X1 serial communication.
@@ -206,7 +212,8 @@ class camsense_X1:
         packets may overlap in angle-region, this is to preserve (sometimes very small) snippits of data. Just use the newer (lower index) packet's data.
         set .postParseCallback to a function you'd like to have called when new data is parsed.
         for multicore safety, please consider the .dataLock multiprocessing.Lock()"""
-    def __init__(self, comPort, clockFunc=time.time, sharedMemName=None):
+    def __init__(self, comPort, clockFunc=time.time):
+        precompileAll() #if it's already compiled (for some reason), then this will not take as long
         ##private variables:
         self._serialPort = serial.Serial(comPort, 115200, timeout=0.01)
         # self._serialPort.port = comPort
@@ -236,23 +243,17 @@ class camsense_X1:
         
         self.RPMraw = 0 #divide by 64 to get RPM
         
-        try:
-            if(sharedMemName is not None):
-                temp = shared_memory.SharedMemory(name=sharedMemName, create=False)
-                temp.close()
-                temp.unlink()
-                del(temp)
-                print("CLOSED LEFTOVER SHAREDMEM:", sharedMemName)
-        finally:
-            self.lidarDataSharedMem = shared_memory.SharedMemory(name=sharedMemName, create=True, size=np.zeros(MAX_PACKET_LIST_SIZE, dtype=lidarPacket).nbytes)
-        
-        self.lidarData = np.ndarray(MAX_PACKET_LIST_SIZE, dtype=lidarPacket, buffer=self.lidarDataSharedMem.buf)
-        self.lidarData[:] = np.zeros(MAX_PACKET_LIST_SIZE, dtype=lidarPacket)[:]
+        self.lidarData = np.zeros(MAX_PACKET_LIST_SIZE, dtype=lidarPacket)
         self.lidarDataLen = np.array([0], dtype=np.uint16) #(pointer hack) #the (dynamic) length of lidarData[]. No real data can be found at- or after this index.
         self.volatileIndex = np.array([0], dtype=np.uint16) #(pointer hack) #becuase the lidar only spins one way, it makes sense to expect angles to only increase (untill rollover). This helps to limit how much of lidarData needs to be searched (to check for angle overlap)
         self.dataLock = MP.Lock() #a semaphore, for multithreading safety
+        ## the dataLock variable may be overwritten (it will be aquired when doing this of course, that's fine), so DONT copy it (copies will obcviously not get overwritten)
         
         self.postParseCallback = None #callback function (pointer), it is called (after new data is added) with args: lidarSelf (pointer to lidar class), newData (lidarPacket with new data), pointsAdded (number of new datapoints)
+        self.callbackExtraArg = None #an extra place to store data (intended for the callback function). Not passed to function, you can just call lidarSelf.callbackExtraArg (becuase this calss's "self" is passed)
+        
+        self.multiProcessReady = False
+        self.lidarDataSharedMem = None
         
     # def __del__(self): #doesn't work, i dont know why. You just have to close it manually ('try:' the whole sketch and close() port on exit ('finally:'))
     #     #print("deinitializing camsense_X1 object")
@@ -263,12 +264,58 @@ class camsense_X1:
     #     except:
     #         print("couldn't close camsense_X1 serial port from __del__")
     
+    # def __del__(self):
+    #     try:
+    #         self.lidarDataSharedMem.close()
+    #         self.lidarDataSharedMem.unlink()
+    #     except:
+    #         print("(__del__) sharedMem unlink failed! for camsense_X1")
+    
+    def __repr__(self):
+        return("lidar("+str(self._serialPort.port)+\
+               ", spin:"+str(self.spinning)+\
+               ", spun:"+str(self.rotationCount[0])+\
+               ", len:"+str(self.lidarDataLen[0])+\
+               ((", MP:"+self.lidarDataSharedMem.name) if ((self.lidarDataSharedMem is not None) and self.multiProcessReady) else (", MPerror" if ((self.lidarDataSharedMem is not None) != self.multiProcessReady) else ""))+\
+               ((", CB:"+self.postParseCallback.__name__) if callable(self.postParseCallback) else "")+")")
+    
+    
+    def startMultiProcessVars(self, sharedMemName=None, newDataLock=None):
+        if(not self.multiProcessReady):
+            with self.dataLock:
+                self.lidarDataSharedMem = shared_memory.SharedMemory(name=sharedMemName, create=True, size=np.zeros(MAX_PACKET_LIST_SIZE, dtype=lidarPacket).nbytes)
+                oldLidarData = np.zeros(MAX_PACKET_LIST_SIZE, dtype=lidarPacket);  oldLidarData[:] = self.lidarData[:] #copy old data
+                self.lidarData = np.ndarray(MAX_PACKET_LIST_SIZE, dtype=lidarPacket, buffer=self.lidarDataSharedMem.buf) #create array (more like an data structure overlay) at the sharedMem location
+                self.lidarData[:] = oldLidarData[:] #copy data back
+                if(newDataLock is not None):
+                    self.dataLock = newDataLock
+                self.multiProcessReady = True
+                return(True)
+        else:
+            print("BAD USAGE OF 'startMultiProcessVars', multiProcessReady == True already!")
+            return(False)
+    
+    def closeSharedMem(self):
+        try: #regardless of multiProcessReady, try to close it
+            self.lidarDataSharedMem.close()
+            self.lidarDataSharedMem.unlink()
+        except:
+            print("sharedMem unlink failed! for camsense_X1, multiProcessReady:", self.multiProcessReady)
+    
+    def getSharedMemName(self):
+        if(self.multiProcessReady):
+            return(self.lidarDataSharedMem.name)
+        else:
+            print("attempted 'getSharedMemName', but multiProcessReady == False!")
+            return("")
+    
     
     def _putInPacketList(self, newPacket):
         """the lidarData list is fluid (both in size and content), this function makes sure the packet ends up where it belongs
             old (irrelevant) packets are deleted (based on start&end angles)"""
         with self.dataLock:
             _updatePacketList(newPacket, self.lidarData, self.lidarDataLen, self.volatileIndex, self.rotationCount, self._lastAngles) #call numba compiled function (much faster)
+        self.spinning = True
         self.RPMraw = newPacket['RPM']
         self._packetTimeoutTimer = self.clockFunc()
     

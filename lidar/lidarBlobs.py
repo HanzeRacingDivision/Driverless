@@ -43,6 +43,14 @@ class blob:
         self.uponDeletion = None #a callback for just before the blob is deleted. arguments: (self, deletionReason)
         self.extraData = None #store any extra data in here (especially useful in the calback functions)
     
+    def __repr__(self):
+        return("blob(p:"+str(len(self.points))+\
+               ",o:"+str(len(self.points))+\
+               ",e?:"+str(self.exists)+\
+               ((",UpEx:"+self.uponExist.__name__) if callable(self.uponExist) else "")+\
+               ((",UpDel:"+self.uponDeletion.__name__) if callable(self.uponDeletion) else "")+\
+               ((",exDat:"+str(self.extraData)) if (self.extraData is not None) else "")+")")
+    
     def append(self, point, origin=None, clockFunc=time.time):
         """attempt to append a datapoint to the blob, return whether successful
             if it fails to append, the current blob is considered to exist"""
