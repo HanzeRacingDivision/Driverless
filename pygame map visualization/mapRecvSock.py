@@ -20,11 +20,10 @@ def copyImportMap(classWithMapParent, mapToImport):
 
 
 class mapReceiverSocket:
-    def __init__(self, host, port=69420, objectWithMap=None, usePacketSizeHeader=True):
+    def __init__(self, host, port=69420, objectWithMap=None):
         """a class for receiving Map objects over the network (IPV4 TCP steam) from (car) PCs to draw them on screen (to lighten processing load on car PC)"""
         self.mapSock = None
         self.initSuccess = False
-        self.usePacketSizeHeader = usePacketSizeHeader #send a (constant, predetermined length) before each sent object
         self.packetSizeHeaderLength = 6 #constant, must be same on transmitter and receiver
         
         self.host = host
@@ -111,52 +110,50 @@ class mapReceiverSocket:
             print("manualReceive failed:", excep)
             return(None)
         
-        if(self.usePacketSizeHeader):
-            receivedBytes = self.mapSock.recv(self.packetSizeHeaderLength) #get packet size
-            if(len(receivedBytes) == 6):
+        receivedBytes = self.mapSock.recv(self.packetSizeHeaderLength) #get packet size
+        if(len(receivedBytes) == 6):
+            packetSizeString = ""
+            try:
+                packetSizeString = receivedBytes.decode()
+            except:
                 packetSizeString = ""
+                print("packet header couldn't be decoded, probably out of sync")
+                receivedBytes = b''
+            if((len(packetSizeString) > 0) and (packetSizeString.isnumeric())):
+                packetSize = 0
                 try:
-                    packetSizeString = receivedBytes.decode()
+                    packetSize = int(packetSizeString)
                 except:
-                    packetSizeString = ""
-                    print("packet header couldn't be decoded, probably out of sync")
+                    print("couldn't packetSizeString to int")
                     receivedBytes = b''
-                if((len(packetSizeString) > 0) and (packetSizeString.isnumeric())):
                     packetSize = 0
-                    try:
-                        packetSize = int(packetSizeString)
-                    except:
-                        print("couldn't packetSizeString to int")
-                        receivedBytes = b''
-                        packetSize = 0
-                    if(packetSizeString == (str(packetSize).rjust(self.packetSizeHeaderLength, '0'))): #extra check
-                        #print("good packet header:", packetSize)
-                        receivedBytes = self.mapSock.recv(packetSize)
-                        if(len(receivedBytes) < packetSize):
-                            #print("received packet too small!?:", len(receivedBytes), packetSize)
-                            attemptsRemaining = self.maxPacketFixAttempts
-                            while((len(receivedBytes) < packetSize) and (attemptsRemaining>0)):
-                                attemptsRemaining -= 1
-                                remainingBytes = self.mapSock.recv(packetSize-len(receivedBytes)) #this should wait/provide delay
-                                receivedBytes += remainingBytes
-                                if((len(receivedBytes) < packetSize) and (attemptsRemaining>0)): #only if the goal hasnt been accomplised
-                                    time.sleep(0.005) #wait a tiny bit
-                            # if(len(receivedBytes) == packetSize):
-                            #     print("packet fixed in", self.maxPacketFixAttempts-attemptsRemaining, "attempts", packetSize)
-                            if(len(receivedBytes) != packetSize):
-                                print("packet NOT FIXED!:", len(receivedBytes), packetSize)
-                                receivedBytes = b'' #avoid pickle exceptions
-                    else:
-                        print("bad packet size header?:", receivedBytes, packetSizeString, packetSize, str(packetSize).rjust(self.packetSizeHeaderLength, '0'))
-                        receivedBytes = b''
+                if(packetSizeString == (str(packetSize).rjust(self.packetSizeHeaderLength, '0'))): #extra check
+                    #print("good packet header:", packetSize)
+                    receivedBytes = self.mapSock.recv(packetSize)
+                    if(len(receivedBytes) < packetSize):
+                        #print("received packet too small!?:", len(receivedBytes), packetSize)
+                        attemptsRemaining = self.maxPacketFixAttempts
+                        while((len(receivedBytes) < packetSize) and (attemptsRemaining>0)):
+                            attemptsRemaining -= 1
+                            remainingBytes = self.mapSock.recv(packetSize-len(receivedBytes)) #this should wait/provide delay
+                            receivedBytes += remainingBytes
+                            if((len(receivedBytes) < packetSize) and (attemptsRemaining>0)): #only if the goal hasnt been accomplised
+                                time.sleep(0.005) #wait a tiny bit
+                        # if(len(receivedBytes) == packetSize):
+                        #     print("packet fixed in", self.maxPacketFixAttempts-attemptsRemaining, "attempts", packetSize)
+                        if(len(receivedBytes) != packetSize):
+                            print("packet NOT FIXED!:", len(receivedBytes), packetSize)
+                            receivedBytes = b'' #avoid pickle exceptions
                 else:
-                    print("bad packet size header!:", receivedBytes, packetSizeString)
+                    print("bad packet size header?:", receivedBytes, packetSizeString, packetSize, str(packetSize).rjust(self.packetSizeHeaderLength, '0'))
                     receivedBytes = b''
             else:
-                print("no packet size header received:", receivedBytes)
-                receivedBytes = self.mapSock.recv(999999)
+                print("bad packet size header!:", receivedBytes, packetSizeString)
+                receivedBytes = b''
         else:
+            print("no packet size header received:", receivedBytes)
             receivedBytes = self.mapSock.recv(999999)
+        
         #print("len(receivedBytes):", len(receivedBytes))
         receivedObj = None
         if(len(receivedBytes) > 0):
@@ -192,14 +189,11 @@ class mapReceiverSocket:
         while(len(manualSendBuffer) > 0):
             bytesToSend = pickle.dumps(manualSendBuffer[0])
             #print("sending", len(bytesToSend), "bytes from manualSendBuffer")
-            if(self.usePacketSizeHeader):
-                if(len(bytesToSend) > 999999):
-                    print("manualSendBuffer entry too large:", len(bytesToSend))
-                else:
-                    packetSizeHeader = str(len(bytesToSend)).rjust(self.packetSizeHeaderLength, '0').encode() #6 bytes (constant length) that indicate the size of the (soon to be) sent object
-                    self.mapSock.sendall(packetSizeHeader + bytesToSend)
+            if(len(bytesToSend) > 999999):
+                print("manualSendBuffer entry too large:", len(bytesToSend))
             else:
-                self.mapSock.sendall(bytesToSend)
+                packetSizeHeader = str(len(bytesToSend)).rjust(self.packetSizeHeaderLength, '0').encode() #6 bytes (constant length) that indicate the size of the (soon to be) sent object
+                self.mapSock.sendall(packetSizeHeader + bytesToSend)
             manualSendBuffer.pop(0)
     
     def manualClose(self):
@@ -262,69 +256,66 @@ class mapReceiverSocket:
         ##if you made it here, all is well and you can start accepting clients on the socket
         while(threadKeepRunning[0]):
             try:
-                print("mapReceiverSocket.runOnThread(): connecting so server...")
+                print("mapReceiverSocket.runOnThread(): connecting to server...")
                 self.mapSock.connect((self.host, self.port))
                 with self.mapSock: #python likes this(?)
                     print("connected to:", self.mapSock.getpeername())
-                    # if(self.usePacketSizeHeader):
-                    #     firstPacket = self.mapSock.recv(999999) #receive any straddler-data
-                    #     print("first packet received:", len(firstPacket))
+                    # firstPacket = self.mapSock.recv(999999) #receive any straddler-data
+                    # print("first packet received:", len(firstPacket))
                     failureCounter = 0
                     failureCountDecrementTimer = time.time()
                     lastMapImportTime = time.time()
                     while(threadKeepRunning[0]):
-                        if(self.usePacketSizeHeader):
-                            receivedBytes = self.mapSock.recv(self.packetSizeHeaderLength) #get packet size
-                            if(len(receivedBytes) == 6):
+                        receivedBytes = self.mapSock.recv(self.packetSizeHeaderLength) #get packet size
+                        if(len(receivedBytes) == 6):
+                            packetSizeString = ""
+                            try:
+                                packetSizeString = receivedBytes.decode()
+                            except:
                                 packetSizeString = ""
+                                print("packet header couldn't be decoded, probably out of sync")
+                                #failureCounter += 1
+                                receivedBytes = b''
+                            if((len(packetSizeString) > 0) and (packetSizeString.isnumeric())):
+                                packetSize = 0
                                 try:
-                                    packetSizeString = receivedBytes.decode()
+                                    packetSize = int(packetSizeString)
                                 except:
-                                    packetSizeString = ""
-                                    print("packet header couldn't be decoded, probably out of sync")
+                                    print("couldn't packetSizeString to int")
                                     #failureCounter += 1
                                     receivedBytes = b''
-                                if((len(packetSizeString) > 0) and (packetSizeString.isnumeric())):
                                     packetSize = 0
-                                    try:
-                                        packetSize = int(packetSizeString)
-                                    except:
-                                        print("couldn't packetSizeString to int")
-                                        #failureCounter += 1
-                                        receivedBytes = b''
-                                        packetSize = 0
-                                    if(packetSizeString == (str(packetSize).rjust(self.packetSizeHeaderLength, '0'))): #extra check
-                                        #print("good packet header:", packetSize)
-                                        receivedBytes = self.mapSock.recv(packetSize)
-                                        if(len(receivedBytes) < packetSize):
-                                            #print("received packet too small!?:", len(receivedBytes), packetSize)
-                                            attemptsRemaining = self.maxPacketFixAttempts
-                                            while((len(receivedBytes) < packetSize) and (attemptsRemaining>0)):
-                                                attemptsRemaining -= 1
-                                                remainingBytes = self.mapSock.recv(packetSize-len(receivedBytes)) #this should wait/provide delay
-                                                receivedBytes += remainingBytes
-                                                if((len(receivedBytes) < packetSize) and (attemptsRemaining>0)): #only if the goal hasnt been accomplised
-                                                    time.sleep(0.005) #wait a tiny bit to let the bytes flow into the (underwater) buffer
-                                            # if(len(receivedBytes) == packetSize):
-                                            #     print("packet fixed in", self.maxPacketFixAttempts-attemptsRemaining, "attempts", packetSize)
-                                            if(len(receivedBytes) != packetSize):
-                                                print("packet NOT FIXED!:", len(receivedBytes), packetSize)
-                                                failureCounter += 1
-                                                receivedBytes = b'' #avoid pickle exceptions
-                                    else:
-                                        print("bad packet size header?:", receivedBytes, packetSizeString, packetSize, str(packetSize).rjust(self.packetSizeHeaderLength, '0'))
-                                        #failureCounter += 1
-                                        receivedBytes = b''
+                                if(packetSizeString == (str(packetSize).rjust(self.packetSizeHeaderLength, '0'))): #extra check
+                                    #print("good packet header:", packetSize)
+                                    receivedBytes = self.mapSock.recv(packetSize)
+                                    if(len(receivedBytes) < packetSize):
+                                        #print("received packet too small!?:", len(receivedBytes), packetSize)
+                                        attemptsRemaining = self.maxPacketFixAttempts
+                                        while((len(receivedBytes) < packetSize) and (attemptsRemaining>0)):
+                                            attemptsRemaining -= 1
+                                            remainingBytes = self.mapSock.recv(packetSize-len(receivedBytes)) #this should wait/provide delay
+                                            receivedBytes += remainingBytes
+                                            if((len(receivedBytes) < packetSize) and (attemptsRemaining>0)): #only if the goal hasnt been accomplised
+                                                time.sleep(0.005) #wait a tiny bit to let the bytes flow into the (underwater) buffer
+                                        # if(len(receivedBytes) == packetSize):
+                                        #     print("packet fixed in", self.maxPacketFixAttempts-attemptsRemaining, "attempts", packetSize)
+                                        if(len(receivedBytes) != packetSize):
+                                            print("packet NOT FIXED!:", len(receivedBytes), packetSize)
+                                            failureCounter += 1
+                                            receivedBytes = b'' #avoid pickle exceptions
                                 else:
-                                    print("bad packet size header!:", receivedBytes, packetSizeString)
+                                    print("bad packet size header?:", receivedBytes, packetSizeString, packetSize, str(packetSize).rjust(self.packetSizeHeaderLength, '0'))
                                     #failureCounter += 1
                                     receivedBytes = b''
                             else:
-                                print("no packet size header received:", receivedBytes)
-                                failureCounter += 1
-                                receivedBytes = self.mapSock.recv(999999)
+                                print("bad packet size header!:", receivedBytes, packetSizeString)
+                                #failureCounter += 1
+                                receivedBytes = b''
                         else:
+                            print("no packet size header received:", receivedBytes)
+                            failureCounter += 1
                             receivedBytes = self.mapSock.recv(999999)
+                        
                         #print("len(receivedBytes):", len(receivedBytes))
                         receivedObj = None
                         if(len(receivedBytes) > 0):
@@ -353,19 +344,8 @@ class mapReceiverSocket:
                                         print("'FPSREP' UI report failed:", excep)
                                 elif(receivedObj[0] == 'SAVREP'):
                                     print("SAVREP:", receivedObj[1])
-                                    with open("temp.pkl", 'wb') as writeFile:
-                                        writeFile.write(receivedObj[2]) #save the pickled data as a file, because pandas.read_pickle() only supports files, not bytearrays
-                                    try:
-                                        import pandas as pd
-                                        unpickledDataframe = pd.read_pickle("temp.pkl") #pandas needs this to unpickle correctly
-                                        # if(type(unpickledDataframe) is not pd.core.frame.DataFrame):
-                                        #     print("SAVREP map_file is not pandas dataframe??")
-                                        unpickledDataframe.to_excel(receivedObj[1])
-                                        print("saved remote mapfile as:", receivedObj[1])
-                                        import os
-                                        os.remove("temp.pkl")
-                                    except Exception as excep:
-                                        print("'SAVREP' UI report failed:", excep)
+                                    with open(receivedObj[1], 'wb') as writeFile:
+                                        writeFile.write(receivedObj[2]) #the excel file was sent over as as raw bytes, so save it like that too.
                                 else:
                                     print("UI report unknown:", receivedObj)
                             else:
@@ -392,14 +372,11 @@ class mapReceiverSocket:
                         if(len(self.manualSendBuffer) > 0):
                             bytesToSend = pickle.dumps(self.manualSendBuffer[0])
                             #print("sending", len(bytesToSend), "bytes from manualSendBuffer")
-                            if(self.usePacketSizeHeader):
-                                if(len(bytesToSend) > 999999):
-                                    print("manualSendBuffer entry too large:", len(bytesToSend))
-                                else:
-                                    packetSizeHeader = str(len(bytesToSend)).rjust(self.packetSizeHeaderLength, '0').encode() #6 bytes (constant length) that indicate the size of the (soon to be) sent object
-                                    self.mapSock.sendall(packetSizeHeader + bytesToSend)
+                            if(len(bytesToSend) > 999999):
+                                print("manualSendBuffer entry too large:", len(bytesToSend))
                             else:
-                                self.mapSock.sendall(bytesToSend)
+                                packetSizeHeader = str(len(bytesToSend)).rjust(self.packetSizeHeaderLength, '0').encode() #6 bytes (constant length) that indicate the size of the (soon to be) sent object
+                                self.mapSock.sendall(packetSizeHeader + bytesToSend)
                             self.manualSendBuffer.pop(0)
                         
             except socket.error as excep: #handleable exceptions, this will only end things on major exceptions (unexpected ones)
@@ -444,9 +421,3 @@ class mapReceiverSocket:
                     self.initSuccess = False
                     self.runningOnThread = None
                     return()
-
-
-# # testing code
-# if __name__ == '__main__':
-#     objGetter = mapReceiverSocket('127.0.0.1', 65432, None, False)
-#     objGetter.runOnThread([True]) #send some random data (and then wait for new data forever)

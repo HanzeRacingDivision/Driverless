@@ -468,10 +468,10 @@ def remoteSaveMap(socketToSendFrom, filename=None):
     #print("remoteSaveMap")
     remoteInstructionSend(socketToSendFrom, ['MAPSAV', filename])
 
-def remoteWholeMapFileLoad(socketToSendFrom, map_file): #for debugging/testing, when you need to load an entire map object over the network
+def remoteWholeMapFileLoad(socketToSendFrom, filename, rawExcelFile): #for debugging/testing, when you need to load an entire map object over the network
     """send & load a (pandas) excel file to remote instance"""
     #print("remoteWholeMapFileLoad")
-    remoteInstructionSend(socketToSendFrom, ['MAPLOD', map_file])
+    remoteInstructionSend(socketToSendFrom, ['MAPLOD', filename, rawExcelFile])
 
 #cursor in the shape of a flag
 flagCurs = ("ooo         ooooooooo   ",
@@ -805,9 +805,9 @@ def handleWindowEvent(pygamesimInputList, eventToHandle):
         print("attempting to load drag-dropped file:", eventToHandle.file)
         if(pygamesimInput.isRemote):
             try:
-                import pandas as pd
-                print("sending map_file to remote client...")
-                remoteWholeMapFileLoad(pygamesimInput.remoteUIsender, pd.read_excel(eventToHandle.file, index_col=0)) #send pandas-dataframe to remote instance
+                strippedFileName = os.path.basename(eventToHandle.file)
+                print("sending map_file to remote client:", strippedFileName)
+                remoteWholeMapFileLoad(pygamesimInput.remoteUIsender, strippedFileName, open(eventToHandle.file, "rb").read()) #send excel file to remote instance
             except Exception as excep:
                 print("failed to send map_file to remote instance, exception:", excep)
         else:

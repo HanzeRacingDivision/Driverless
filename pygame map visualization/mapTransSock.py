@@ -44,11 +44,10 @@ def shallowCopyExtractMap(classWithMapParent):
 
 
 class mapTransmitterSocket:
-    def __init__(self, host='', port=69420, objectWithMap=None, usePacketSizeHeader=True):
+    def __init__(self, host='', port=69420, objectWithMap=None):
         """a class for transmitting Map objects over the network (IPV4 TCP steam) to nearby PCs to draw them on screen (to lighten processing load on car PC)"""
         self.mapSock = None
         self.initSuccess = False
-        self.usePacketSizeHeader = usePacketSizeHeader #send a (constant, predetermined length) before each sent object
         self.packetSizeHeaderLength = 6 #constant, must be same on transmitter and receiver
         
         self.host = host
@@ -237,17 +236,16 @@ class mapTransmitterSocket:
                 ## i noticed that save_map is very very slow from here. This might be a problem with threading, like accessing resources takes long???
                 print("(remotely instructed) saving took", round(time.time()-saveStartTime, 2), "seconds")
                 if(self.runningOnThread is not None): #a little extra safety check
-                    map_file.to_pickle("temp.pkl") #pandas needs this to pickle dataframes correctly
-                    pickledDataframe = open("temp.pkl", "rb").read() #get the pickled data (pandas .to_pickle doesnt support outputting to a bytearray object right away)
-                    print("SAVREP filesize:", len(pickledDataframe))
-                    self.manualSendBuffer.append(['SAVREP', filename, pickledDataframe])
-                    import os
-                    os.remove("temp.pkl")
+                    rawExcelFile = open(filename, "rb").read() #get the pickled data (pandas .to_pickle doesnt support outputting to a bytearray object right away)
+                    print("SAVREP filesize:", len(rawExcelFile))
+                    self.manualSendBuffer.append(['SAVREP', filename, rawExcelFile])
             except Exception as excep:
                 print("failed to perform 'MAPSAV' instruction, exception:", excep)
         elif(instruction[0] == 'MAPLOD'):
             try:
-                self.objectWithMap.load_map_file(instruction[1], self.objectWithMap)
+                with open(instruction[1], 'wb') as writeFile:
+                    writeFile.write(instruction[2]) #the excel file was sent over as as raw bytes, so save it like that too.
+                self.objectWithMap.load_map(instruction[1], self.objectWithMap)
             except Exception as excep:
                 print("failed to perform 'MAPLOD' instruction, exception:", excep)
         else:
@@ -272,51 +270,48 @@ class mapTransmitterSocket:
             return(None)
         while(threadKeepRunning[0] and UIreceive[0]):
             try:
-                if(self.usePacketSizeHeader):
-                    receivedBytes = clientSocket.recv(self.packetSizeHeaderLength) #get packet size
-                    if(len(receivedBytes) == 6):
+                receivedBytes = clientSocket.recv(self.packetSizeHeaderLength) #get packet size
+                if(len(receivedBytes) == 6):
+                    packetSizeString = ""
+                    try:
+                        packetSizeString = receivedBytes.decode()
+                    except:
                         packetSizeString = ""
+                        print("UIreceiver: packet header couldn't be decoded, probably out of sync")
+                        receivedBytes = b''
+                    if((len(packetSizeString) > 0) and (packetSizeString.isnumeric())):
+                        packetSize = 0
                         try:
-                            packetSizeString = receivedBytes.decode()
+                            packetSize = int(packetSizeString)
                         except:
-                            packetSizeString = ""
-                            print("UIreceiver: packet header couldn't be decoded, probably out of sync")
+                            print("UIreceiver: couldn't packetSizeString to int")
                             receivedBytes = b''
-                        if((len(packetSizeString) > 0) and (packetSizeString.isnumeric())):
                             packetSize = 0
-                            try:
-                                packetSize = int(packetSizeString)
-                            except:
-                                print("UIreceiver: couldn't packetSizeString to int")
-                                receivedBytes = b''
-                                packetSize = 0
-                            if(packetSizeString == (str(packetSize).rjust(self.packetSizeHeaderLength, '0'))): #extra check
-                                #print("good packet header:", packetSize)
-                                receivedBytes = clientSocket.recv(packetSize)
-                                if(len(receivedBytes) < packetSize):
-                                    #print("received packet too small!?:", len(receivedBytes), packetSize)
-                                    attemptsRemaining = self.maxPacketFixAttempts
-                                    while((len(receivedBytes) < packetSize) and (attemptsRemaining>0)):
-                                        attemptsRemaining -= 1
-                                        remainingBytes = clientSocket.recv(packetSize-len(receivedBytes)) #this should wait/provide delay
-                                        receivedBytes += remainingBytes
-                                        if((len(receivedBytes) < packetSize) and (attemptsRemaining>0)): #only if the goal hasnt been accomplised
-                                            time.sleep(0.010) #wait a tiny bit to let the bytes flow into the (underwater) buffer
-                                    # if(len(receivedBytes) == packetSize):
-                                    #     print("packet fixed in", self.maxPacketFixAttempts-attemptsRemaining, "attempts", packetSize)
-                                    if(len(receivedBytes) != packetSize):
-                                        print("UIreceiver: packet NOT FIXED!:", len(receivedBytes), packetSize)
-                                        receivedBytes = b'' #avoid pickle exceptions
-                            else:
-                                print("UIreceiver: bad packet size header?:", receivedBytes, packetSizeString, packetSize, str(packetSize).rjust(self.packetSizeHeaderLength, '0'))
-                                receivedBytes = b''
+                        if(packetSizeString == (str(packetSize).rjust(self.packetSizeHeaderLength, '0'))): #extra check
+                            #print("good packet header:", packetSize)
+                            receivedBytes = clientSocket.recv(packetSize)
+                            if(len(receivedBytes) < packetSize):
+                                #print("received packet too small!?:", len(receivedBytes), packetSize)
+                                attemptsRemaining = self.maxPacketFixAttempts
+                                while((len(receivedBytes) < packetSize) and (attemptsRemaining>0)):
+                                    attemptsRemaining -= 1
+                                    remainingBytes = clientSocket.recv(packetSize-len(receivedBytes)) #this should wait/provide delay
+                                    receivedBytes += remainingBytes
+                                    if((len(receivedBytes) < packetSize) and (attemptsRemaining>0)): #only if the goal hasnt been accomplised
+                                        time.sleep(0.010) #wait a tiny bit to let the bytes flow into the (underwater) buffer
+                                # if(len(receivedBytes) == packetSize):
+                                #     print("packet fixed in", self.maxPacketFixAttempts-attemptsRemaining, "attempts", packetSize)
+                                if(len(receivedBytes) != packetSize):
+                                    print("UIreceiver: packet NOT FIXED!:", len(receivedBytes), packetSize)
+                                    receivedBytes = b'' #avoid pickle exceptions
                         else:
-                            print("UIreceiver: bad packet size header!:", receivedBytes, packetSizeString)
+                            print("UIreceiver: bad packet size header?:", receivedBytes, packetSizeString, packetSize, str(packetSize).rjust(self.packetSizeHeaderLength, '0'))
                             receivedBytes = b''
                     else:
-                        print("UIreceiver: no packet size header received:", receivedBytes)
-                        receivedBytes = clientSocket.recv(999999)
+                        print("UIreceiver: bad packet size header!:", receivedBytes, packetSizeString)
+                        receivedBytes = b''
                 else:
+                    print("UIreceiver: no packet size header received:", receivedBytes)
                     receivedBytes = clientSocket.recv(999999)
                 
                 #print("len(receivedBytes):", len(receivedBytes))
@@ -434,28 +429,22 @@ class mapTransmitterSocket:
                                 # #     print("pickle:", round(1/(pickleEnd-pickleStart), 1))
                                 
                                 #print("sending map of size:", len(bytesToSend))
-                                if(self.usePacketSizeHeader):
-                                    if(len(bytesToSend) > 999999):
-                                        print("manualSendBuffer entry too large:", len(bytesToSend))
-                                    else:
-                                        packetSizeHeader = str(len(bytesToSend)).rjust(self.packetSizeHeaderLength, '0').encode() #6 bytes (constant length) that indicate the size of the (soon to be) sent object
-                                        #print("sending map packet with header:", packetSizeHeader)
-                                        clientSocket.sendall(packetSizeHeader + bytesToSend)
+                                if(len(bytesToSend) > 999999):
+                                    print("manualSendBuffer entry too large:", len(bytesToSend))
                                 else:
-                                    clientSocket.sendall(bytesToSend)
+                                    packetSizeHeader = str(len(bytesToSend)).rjust(self.packetSizeHeaderLength, '0').encode() #6 bytes (constant length) that indicate the size of the (soon to be) sent object
+                                    #print("sending map packet with header:", packetSizeHeader)
+                                    clientSocket.sendall(packetSizeHeader + bytesToSend)
                         
                         while(len(self.manualSendBuffer) > 0):
                             bytesToSend = pickle.dumps(self.manualSendBuffer[0])
                             #print("sending", len(bytesToSend), "bytes from self.manualSendBuffer")
-                            if(self.usePacketSizeHeader):
-                                if(len(bytesToSend) > 999999):
-                                    print("self.manualSendBuffer entry too large:", len(bytesToSend))
-                                else:
-                                    packetSizeHeader = str(len(bytesToSend)).rjust(self.packetSizeHeaderLength, '0').encode() #6 bytes (constant length) that indicate the size of the (soon to be) sent object
-                                    #print("sending manual packet with header:", packetSizeHeader)
-                                    clientSocket.sendall(packetSizeHeader + bytesToSend)
+                            if(len(bytesToSend) > 999999):
+                                print("self.manualSendBuffer entry too large:", len(bytesToSend))
                             else:
-                                clientSocket.sendall(bytesToSend)
+                                packetSizeHeader = str(len(bytesToSend)).rjust(self.packetSizeHeaderLength, '0').encode() #6 bytes (constant length) that indicate the size of the (soon to be) sent object
+                                #print("sending manual packet with header:", packetSizeHeader)
+                                clientSocket.sendall(packetSizeHeader + bytesToSend)
                             self.manualSendBuffer.pop(0)
                         
                         if(not UIreceive[0]): #if something outside of this thread, want the UIthread to be shut down (For whatever reason)
@@ -541,8 +530,3 @@ class mapTransmitterSocket:
                 except:
                     print("couldn't stop UIreceiverThread(?)")
 
-
-# # testing code
-# if __name__ == '__main__':
-#     objSender = mapTransmitterSocket('', 65432, None, False)
-#     objSender.runOnThread([True], [False], [False]) #send some random data (and then wait for new data forever)
