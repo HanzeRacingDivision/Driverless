@@ -3,6 +3,7 @@ python requirements:
 - (only for map file loading) pandas (version doesnt matter, but it must be the same on both if using remote visualization)
 - (only for remote visualisation) socket (python builtin)
 - (only for real-life model car control) pyserial (only in carMCUclass.py)
+- (only for pathPlanning(temp)) scipy
 
 how to use: <br/>
 - see 'simpleSim.py' for a minimal simulation program (currently also runs as fast as PC allows, see Map.clock and how it was replaced)
