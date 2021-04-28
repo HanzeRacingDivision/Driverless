@@ -14,7 +14,8 @@ import numpy as np
 from Map import Map
 import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
-from numba import njit, prange, vectorize, int64, float64, float32
+from numba import njit, prange
+from numba import vectorize, int64, float64, float32
 
 ## constants
 START_SYNC_BYTES = np.array([255, 255], dtype=np.uint8) #can be any size/value, as long as the MCU has the same ones
@@ -40,48 +41,48 @@ ENCO_M_PER_COUNT = ENCO_MM_PER_COUNT / 1000.0
 
 
 @njit
-def parsePacket(packetBuf: np.ndarray):
+def parsePacket(_packetBuf: np.ndarray):
     """parse a serial packet (bytes). Returns an np.array with the values
         numba compiled!"""
-    return(np.array([np.int64(np.frombuffer(packetBuf[0:4], dtype=np.uint32)[0]),
-                     np.int64(np.frombuffer(packetBuf[4:6], dtype=np.int16)[0]),
-                     np.int64(np.frombuffer(packetBuf[6:10], dtype=np.uint32)[0])], dtype=np.int64))
+    return(np.array([np.int64(np.frombuffer(_packetBuf[0:4], dtype=np.uint32)[0]),
+                     np.int64(np.frombuffer(_packetBuf[4:6], dtype=np.int16)[0]),
+                     np.int64(np.frombuffer(_packetBuf[6:10], dtype=np.uint32)[0])], dtype=np.int64))
 
 @njit
-def extractPackets(serialData: bytes, packetBuf: np.ndarray, packetBufLen: int):
+def extractPackets(serialData: bytes, _packetBuf: np.ndarray, _packetBufLen):
     """handle serial data (bytes) to produce packets
         numba compiled!"""
-    maxPacketCount = int((len(serialData)+packetBufLen) / PACKET_LEN) #the max number of packets that could possibly be extracted from this data
-    parsedPackets = np.empty((maxPacketCount,3), dtype=np.int64) #instead of making an appendable list (which is allowed in @njit), make a (possibly oversized) array. (faster)
+    maxPacketCount = int((len(serialData)+_packetBufLen[0]) / PACKET_LEN) #the max number of packets that could possibly be extracted from this data
+    parsedPackets = np.empty((maxPacketCount,3), dtype=np.int64) #instead of making an appendable list (which is technically allowed in @njit), make a (possibly oversized) array. (faster)
     parsedPacketCount = 0 #if packets fail (sync issues or otherwise) then some the last (few) indices will not contain actual data. Use this instead of len(resultList)
     for i in range(len(serialData)):
-        if(packetBufLen < START_SYNC_BYTE_INDEX):
-            if(serialData[i] == START_SYNC_BYTES[packetBufLen]):
-                packetBufLen += 1
+        if(_packetBufLen[0] < START_SYNC_BYTE_INDEX):
+            if(serialData[i] == START_SYNC_BYTES[_packetBufLen[0]]):
+                _packetBufLen[0] += 1
             else:
-                print("packet start sync failed after", packetBufLen, "bytes")
-                packetBufLen = 0
-        elif(packetBufLen >= END_SYNC_BYTE_INDEX):
-            if(packetBufLen >= PACKET_LEN):
+                print("packet start sync failed after", _packetBufLen[0], "bytes")
+                _packetBufLen[0] = 0
+        elif(_packetBufLen[0] >= END_SYNC_BYTE_INDEX):
+            if(_packetBufLen[0] >= PACKET_LEN):
                 print("ERROR, packet not emptied???") #an error in base logic, that can be caused by memory errors (flipping bits), multicore trickery or really REALLY bad code
-                packetBufLen = 0
-            elif(serialData[i] == END_SYNC_BYTES[packetBufLen-END_SYNC_BYTE_INDEX]):
-                packetBufLen += 1
-                if(packetBufLen == PACKET_LEN):
-                    parsedPackets[parsedPacketCount]=parsePacket(packetBuf)
+                _packetBufLen[0] = 0
+            elif(serialData[i] == END_SYNC_BYTES[_packetBufLen[0]-END_SYNC_BYTE_INDEX]):
+                _packetBufLen[0] += 1
+                if(_packetBufLen[0] == PACKET_LEN):
+                    parsedPackets[parsedPacketCount]=parsePacket(_packetBuf)
                     parsedPacketCount += 1
-                    packetBufLen = 0
+                    _packetBufLen[0] = 0
             else:
-                print("packet end sync failed after", packetBufLen-END_SYNC_BYTE_INDEX, "bytes")
-                packetBufLen = 0
+                print("packet end sync failed after", _packetBufLen[0]-END_SYNC_BYTE_INDEX, "bytes")
+                _packetBufLen[0] = 0
         else:
-            packetBuf[packetBufLen-START_SYNC_BYTE_INDEX]=serialData[i]
-            packetBufLen += 1
-            if((packetBufLen == PACKET_LEN) and (END_SYNC_BYTE_INDEX == PACKET_LEN)): #if there are no end-sync-bytes
-                parsedPackets[parsedPacketCount]=parsePacket(packetBuf)
+            _packetBuf[_packetBufLen[0]-START_SYNC_BYTE_INDEX]=serialData[i]
+            _packetBufLen[0] += 1
+            if((_packetBufLen[0] == PACKET_LEN) and (END_SYNC_BYTE_INDEX == PACKET_LEN)): #if there are no end-sync-bytes
+                parsedPackets[parsedPacketCount]=parsePacket(_packetBuf)
                 parsedPacketCount += 1
-                packetBufLen = 0
-    return(packetBuf, packetBufLen, parsedPackets, parsedPacketCount)
+                _packetBufLen[0] = 0
+    return(parsedPackets, parsedPacketCount)
 
 ##can't be numba-fied because it uses a python list as input argument, but it's fine.
 def FIFOwrite(value, fifoList, fifoMaxLength):
@@ -98,13 +99,14 @@ def intAngleToRad(intAngle: np.int64):
 def intDistToMeters(encoCount: np.int64):
     return(encoCount * ENCO_M_PER_COUNT)
 
-print("procompiling carMCUclass functions...")
-compileStartTime = time.time()
-parsePacket(np.frombuffer(b'\x00\x00\x00\x00'+b'\x00\x00'+b'\x00\x00\x00\x00', dtype=np.uint8))
-extractPackets(b'', np.array([], dtype=np.uint8), 0)
-intAngleToRad(np.int64(-1234))
-intDistToMeters(np.int64(1234))
-print("carMCUclass compilation done! (took", round(time.time()-compileStartTime,1), "seconds)")
+def precompileAll():
+    print("procompiling carMCUclass functions...")
+    compileStartTime = time.time()
+    parsePacket(np.frombuffer(b'\x00\x00\x00\x00'+b'\x00\x00'+b'\x00\x00\x00\x00', dtype=np.uint8))
+    extractPackets(b'', np.array([], dtype=np.uint8), np.array([0], dtype=np.uint8))
+    intAngleToRad(np.int64(-1234))
+    intDistToMeters(np.int64(1234))
+    print("carMCUclass compilation done! (took", round(time.time()-compileStartTime,1), "seconds)")
 
 
 class carMCU:
@@ -114,6 +116,7 @@ class carMCU:
     defaultGetFeedbackInterval = 0.005 #used in runOnThread()
     maxFIFOlength = 20 #can safely be changed at runtime (excess FIFO entries will be removed at next write-oppertunity (once the next datapoint comes in)), MUST BE AT LEAST 2
     def __init__(self, connectAtInit=True, comPort=None, autoFind=True, clockFunc=time.time): #if no clock function is supplied, time.time is used
+        precompileAll() #if it's already compiled (for some reason), then this will not take as long    
         self.carMCUserial = serial.Serial()
         self.carMCUserial.baudrate = 115200
         self.carMCUserial.timeout = 0.01 #a 10ms timeout (should only be needed for readline(), which i don't use)
@@ -128,8 +131,12 @@ class carMCU:
         
         self.lastSendTime = self.clockFunc() #timestamp of last sendSpeedAngle() (attempt)
         
-        self.packetBuf = np.zeros(DATA_LEN, dtype=np.uint8) #used to remember partially-received packets between getFeedback() runs
-        self.packetBufLen = 0 #packetBuf is initialized at full length (For numba & speed reasons), this indicates how much of that data is current. Any data beyond this index is old (not part of the current packet)
+        self._packetBuf = np.zeros(DATA_LEN, dtype=np.uint8) #used to remember partially-received packets between getFeedback() runs
+        self._packetBufLen = np.array([0], dtype=np.uint8) #_packetBuf is initialized at full length (For numba & speed reasons), this indicates how much of that data is current. Any data beyond this index is old (not part of the current packet)
+        ##important: _packetBufLen is an array, because python doesnt allow pointers, and this is a functional replacement. _packetBufLen[0] (the only entry) stores the actual data. Pass _packetBufLen to functions, but do math with _packetBufLen[0]
+        ##also, sync bytes are also counted with _packetBufLen (so _packetBufLen[0] is NOT a valid index in _packetBuf[]), so it's probably best if you just leave _packetBufLen and _packetBuf alone :). 
+        ## if you absolutely must:  _packetBuf[min(_packetBufLen[0]-START_SYNC_BYTE_INDEX, DATA_LEN)] is the entry that is about to be overwritten with new data, so _packetBuf[0:min(_packetBufLen[0]-START_SYNC_BYTE_INDEX, DATA_LEN)] is the good data in the buffer
+        
         self.clockZeroVal = np.int64(0) #will be set to the first value reported by the MCU. This just helps to sync with clockFunc() for larger data comparisons (and checking if the connection as failed)
         self.distZeroVal = np.int64(-1) #will be set to the first value reported by the MCU.
         
@@ -260,8 +267,8 @@ class carMCU:
                         print("carMCU serial write exception (or encode() exception)")
                 else:
                     print("can't sendSpeedAngle(), carMCU is not connected")
-            else:
-                print("you're spamming sendSpeedAngle(), stop it")
+            # else:
+            #     print("you're spamming sendSpeedAngle(), stop it")
     
     def _savePacketData(self, packet: np.ndarray):
         if((self.clockZeroVal == 0) and (self.distZeroVal == -1)): #if this is the first time data is received
@@ -286,7 +293,7 @@ class carMCU:
                 except:
                     print("couldnt read", debugVar, "=", self.carMCUserial.in_waiting, "bytes from carMCU serial")
                     return(False)
-                self.packetBuf, self.packetBufLen, parsedPackets, parsedPacketCount = extractPackets(receivedBytes, self.packetBuf, self.packetBufLen) # a numba-fied function (fast) to parse (& store if leftover) serial bytes.
+                parsedPackets, parsedPacketCount = extractPackets(receivedBytes, self._packetBuf, self._packetBufLen) # a numba-fied function (fast) to parse (& store if leftover) serial bytes.
                 for i in range(parsedPacketCount):
                     #if(parsedPackets[i][0] >= self.distZeroVal): #the simplest data integrity check possible
                     self._savePacketData(parsedPackets[i])
@@ -357,7 +364,7 @@ class realCar(carMCU, Map.Car):
         self.timeSinceLastUpdate = self.clockFunc()
         self.skippedUpdateCheckVar = 0.0
     
-    def update(self, inputDt=0): #this update() overwrites the update() in Map.Car, but this doesnt use the dt argument (because timestamps from the FIFO are used). inputDT is to removed in a future version
+    def update(self, ignoredDt=0): #this update() overwrites the update() in Map.Car, but this doesnt use the dt argument (because timestamps from the FIFO are used). inputDT is to removed in a future version
         """(overwrites Map.Car.update()) update state (position, velocity, etc.) based ONLY on car sensor feedback"""
         if((self.feedbackTimestampFIFO[0] > self.timeSinceLastUpdate) if (len(self.feedbackTimestampFIFO)>1) else False): #if the newest entry ([0]) is newer than the last processed entry (and (len() > 1) because we want to have at least 2 datapoints)
             updates = 0 #ideally, you'd only be dealing with a single new datapoint
@@ -426,6 +433,8 @@ class realCar(carMCU, Map.Car):
             self.steering = self.angleFIFO[0]
             self.timeSinceLastUpdate = self.feedbackTimestampFIFO[0]
             #print([round(self.position[0], 2), round(self.position[1], 2)], round(GF.radRoll(self.angle),2), round(self.velocity,2), round(np.rad2deg(self.steering),2), round(self.distTotalFIFO[0],2))
+            return(True)
+        return(False)
     
     def runOnThread(self, threadKeepRunning, autoreconnect=False): #overwrites runOnThread() in carMCU class
         """(run this on a thread) runs getFeedback() and update() forever and handles exceptions (supports hotplugging serial devices)
