@@ -4,6 +4,7 @@ python requirements:
 - (only for remote visualisation) socket (python builtin)
 - (only for real-life model car control) pyserial (only in carMCUclass.py)
 - (only for pathPlanning(temp)) scipy
+- (only for drawing headlights) PIL
 
 how to use: <br/>
 - see 'simpleSim.py' for a minimal simulation program (currently also runs as fast as PC allows, see Map.clock and how it was replaced)
