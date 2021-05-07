@@ -289,10 +289,10 @@ void loop() {
         //you could skip this one loop(), and try again the next time, but the current code is not in that much of a hurry, so just sit and wait (doing nothing)
         uint32_t serialInMinLenStart = micros(); //normally i'd add timeout value to this value, and the use "while(micros() < this)", but that's not rollover compatible
         bool keepWaiting = true;
-        while(((micros()-serialInMinLenTimeout) < serialInMinLenTimeout) && keepWaiting) { //the ESP is fast enough that this (rollover safe!) math takes basically no time
+        while(((micros()-serialInMinLenStart) < serialInMinLenTimeout) && keepWaiting) { //the ESP is fast enough that this (rollover safe!) math takes basically no time
           keepWaiting = (theSerial.available() < minSerialInputLength); //if bytes do hit the minimum, it will stop the while-loop
         }
-        //if((micros()-serialInMinLenTimeout) >= serialInMinLenTimeout) { //this method saves a few microseconds, but wrongfully discards messages where the last byte came in at the very last microsecond
+        //if((micros()-serialInMinLenStart) >= serialInMinLenTimeout) { //this method saves a few microseconds, but wrongfully discards messages where the last byte came in at the very last microsecond
         if(theSerial.available() < minSerialInputLength) { //if at this point, there still isnt a full message in the buffer, just chuck it all out
           //theSerial.println("minLength timeout (flushing)");
           while(theSerial.available()) { //everything in buffer
