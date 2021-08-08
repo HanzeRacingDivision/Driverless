@@ -147,6 +147,9 @@ class PathPlanning:
         image_path = os.path.join(current_dir, "car_r_30.png")
         car_image = pygame.image.load(image_path)
         
+        image_path7 = os.path.join(current_dir, "explosion_image.png")
+        explosion_image = pygame.image.load(image_path7)
+        
         image_path1 = os.path.join(current_dir, "target_r_t.png")
         target_image = pygame.image.load(image_path1)
         
@@ -196,13 +199,14 @@ class PathPlanning:
         left_spline_linked = False
         fullscreen = False
         track_number = 0
-        cruising_speed = 2.5
+        cruising_speed = 2
         cone_connect_list = False
         first_right_cone_found = False
         first_left_cone_found = False
         midpoint_created = False
         track_number_changed = False
-        
+        car_crashed = False
+        start_time_set = False
         
         def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length = 10, exclude_corners = True):
 
@@ -289,6 +293,11 @@ class PathPlanning:
 
         
         while not self.exit:
+            
+            
+            if start_time_set == False:
+                time_start_sim = time.time()
+                start_time_set = True
             
             dt = self.clock.get_time() / 500
 
@@ -392,6 +401,7 @@ class PathPlanning:
                 first_right_cone_found = False
                 first_left_cone_found = False
                 track_number_changed = False
+                car_crashed = False
                 
                 
             #if 2 is pressed, increasing cruising speed
@@ -410,6 +420,7 @@ class PathPlanning:
                 if event.type == pygame.KEYUP and event.key == pygame.K_a: 
                     if car.auto == False:
                         car.auto  = True
+                        time_start_track = time.time()
                     else:
                         car.auto  = False
                         
@@ -470,11 +481,10 @@ class PathPlanning:
                 first_right_cone_found = False
                 first_left_cone_found = False
                 track_number_changed = False
+                car_crashed = False
                 
                 
                 left_cones, right_cones, mouse_pos_list = load_map(mouse_pos_list)
-
-
                 
                     
             #manual acceleration
@@ -624,8 +634,6 @@ class PathPlanning:
             
             
             #cubic splines for left track boundaries
-            
-            
             if len(visible_left_cones) > 1 and car.auto == True and new_visible_left_cone_flag == True:
               
                 if first_left_cone_found == False:
@@ -776,11 +784,7 @@ class PathPlanning:
                 else:
                     path_midpoints_spline = []
                     
-                    
-                #maybe right a function that filters the spline so that they are an appropraite distance
-                
-                #then a function that creates targets,
-                #and when passed they cant be updated
+
                 if len(path_midpoints_spline) > 0:
                     for i in range(len(path_midpoints_spline[0])):
                         new_target_loc = [path_midpoints_spline[0][i], path_midpoints_spline[1][i]]
@@ -800,21 +804,55 @@ class PathPlanning:
                                 target_locations.append(new_target_loc)
                  
                     
+            #Setting the finishing line/point
             if first_visible_left_cone != 0 and first_visible_right_cone != 0 and midpoint_created == False:     
                 start_midpoint_x = np.mean([first_visible_left_cone.position.x,first_visible_right_cone.position.x])
                 start_midpoint_y = np.mean([first_visible_left_cone.position.y,first_visible_right_cone.position.y])     
                 midpoint_created = True
                 
-            if first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu and track_number_changed == False:
+            #if the track number = 3, exit
+            if first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu and track_number_changed == False and track_number == 3:
+                print('FINISHED!', 'TIME : ', time.time() - time_start_track)
+                self.exit = True
+                track_number_changed = True    
+                
+            #if car passes finishing line, add 1 to track number
+            elif first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu and track_number_changed == False:
                 track_number += 1
+                print('TIME : ', time.time() - time_start_track)
                 track_number_changed = True
                 
+            #setting track_number_changed to false when not on finishing line
             elif first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) > 20/ppu:
                 track_number_changed = False
-                
-                  #if close to this co-ordinate, add lap to track, but only once
 
+
+
+            # Car crash mechanic
+            if len(left_cones) > 0 or len(right_cones):
+                car_crashed = False
+                
+                #checking left cones for crash
+                for i in range(len(left_cones)):
+                    if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [left_cones[i].position.x, left_cones[i].position.y]))) < 0.5:
+                        car_crashed = True
+                        break
                     
+                #crashing right cones
+                if car_crashed == False:
+                    for i in range(len(right_cones)):
+                        if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [right_cones[i].position.x, right_cones[i].position.y]))) < 0.5:
+                            car_crashed = True
+                            break
+                        
+                       
+                if car_crashed == True:
+                    print('CAR CRASHED!!')
+                    print('TIME : ', time.time() - time_start_sim)
+                    self.exit = True
+                    #change car image to explosion 
+                
+                
                     
             # Logic
             car.update(dt)
@@ -830,7 +868,7 @@ class PathPlanning:
             
 
             # Drawing
-
+        
             self.screen.fill((0, 0, 0))
             rotated = pygame.transform.rotate(car_image, car.angle)
             rect = rotated.get_rect()
@@ -918,7 +956,10 @@ class PathPlanning:
             
             # draw the car sprite
             #pygame.draw.rect(self.screen, (200,200,200), (car.position * ppu - ((rect.width / 2),(rect.height / 2)), (rect.width, rect.height))) #draws a little box around the car sprite (just for debug)
-            self.screen.blit(rotated, car.position * ppu - ((rect.width / 2),(rect.height / 2))) #draw car
+            if car_crashed == False:
+                self.screen.blit(rotated, car.position * ppu - ((rect.width / 2),(rect.height / 2))) #draw car
+            else:
+                self.screen.blit(explosion_image, car.position * ppu - ((explosion_image.get_rect().width / 2),(explosion_image.get_rect().height / 2)))
             
             # draw dotted lines between car and closest target
             if len(visible_targets) > 0 and car.auto == True:
