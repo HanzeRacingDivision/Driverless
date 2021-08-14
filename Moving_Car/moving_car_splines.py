@@ -94,7 +94,8 @@ class Target:
 class Cone:
     def __init__(self, x, y, category):
         self.position = Vector2(x, y)        
-        self.visible = False        
+        self.visible = False   
+        self.in_fov = False
         self.category = category
         
     def update(self, car, time_running, ppu, car_angle): 
@@ -103,7 +104,7 @@ class Cone:
         self.dist_car = np.linalg.norm(self.position-car.position)
         
         #calculating angle between car angle and cone
-        if np.linalg.norm(self.position-car.position) < car.fov/ppu and self.visible == False and car.auto == True:
+        if np.linalg.norm(self.position-car.position) < car.fov/ppu and car.auto == True:
             
             a_b = self.position-car.position
             a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
@@ -123,12 +124,15 @@ class Cone:
             #if cone within car fov, set to visible
             if np.abs(self.alpha) < car.fov_range:
                 self.visible = True
+                self.in_fov = True
             else:
                 pass
-                # self.visible = False #commenting this line allows cones to be remembered
+                #self.visible = False #commenting this line allows cones to be remembered
+                self.in_fov = False
         else:
             pass
-           # self.visible = False  #commenting this line allows cones to be remembered
+            #self.visible = False  #commenting this line allows cones to be remembered
+            self.in_fov = False
 
 
 class PathPlanning:
@@ -834,17 +838,32 @@ class PathPlanning:
                 
                 #checking left cones for crash
                 for i in range(len(left_cones)):
-                    if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [left_cones[i].position.x, left_cones[i].position.y]))) < 0.5:
+                    if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [left_cones[i].position.x, left_cones[i].position.y]))) < 0.4:
                         car_crashed = True
                         break
                     
                 #crashing right cones
                 if car_crashed == False:
                     for i in range(len(right_cones)):
-                        if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [right_cones[i].position.x, right_cones[i].position.y]))) < 0.5:
+                        if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [right_cones[i].position.x, right_cones[i].position.y]))) < 0.4:
                             car_crashed = True
                             break
                         
+                #checking left_spline for crash
+                if car_crashed == False and left_spline != 0:
+                    for i in range(len(left_spline[0])):
+                        if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [left_spline[0][i],left_spline[1][i]]))) < 0.25:
+                            car_crashed = True
+                            break                
+ 
+                #checking right_spline for crash
+                if car_crashed == False and right_spline != 0:
+                    for i in range(len(right_spline[0])):
+                        if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [right_spline[0][i],right_spline[1][i]]))) < 0.25:
+                            car_crashed = True
+                            break        
+
+                                            
                        
                 if car_crashed == True:
                     print('CAR CRASHED!!')
@@ -877,8 +896,8 @@ class PathPlanning:
             pos_1 = int(pos_temp.x)
             pos_2 = int(pos_temp.y)
             
-            circle = (pos_1,pos_2)
-            circles.append(circle)
+            #circle = (pos_1,pos_2)
+            #circles.append(circle)
             
             # draw headlights
             if car.headlights == True:
@@ -900,8 +919,8 @@ class PathPlanning:
                 
             
             # draw dotted line of past car locations
-            for i in range(len(circles)):
-                pygame.draw.circle(self.screen,(155,155,155), circles[i], 1, 1)
+            #for i in range(len(circles)):
+            #    pygame.draw.circle(self.screen,(155,155,155), circles[i], 1, 1)
                             
             
             # draw targets
@@ -912,22 +931,34 @@ class PathPlanning:
                         self.screen.blit(target_image, target.position * ppu - (3,3))
                     else:
                         pass
-                        self.screen.blit(target_image_g, target.position * ppu - (3,3))
+                        #self.screen.blit(target_image_g, target.position * ppu - (3,3))
                     if target.visible == True and car.auto == True:
                         pass
-                        draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , target.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
+                        #draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , target.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
               
-            
+                
             if len(left_cones) > 0:
                 for left_cone in left_cones:
                     self.screen.blit(left_cone_image, left_cone.position * ppu - (3,3))
-
+                    
 
             if len(right_cones) > 0:
                 for right_cone in right_cones:
                     self.screen.blit(right_cone_image, right_cone.position * ppu - (3,3))
                     
+            if len(visible_left_cones) > 0:
+                for left_cone in visible_left_cones:
+                    if left_cone.in_fov == True:
+                        draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , left_cone.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
+            
                     
+            if len(visible_right_cones) > 0:
+                for right_cone in visible_right_cones:
+                    if right_cone.in_fov == True:
+                        draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , right_cone.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
+            
+            
+            
             if left_spline != 0 and len(left_spline) > 0:
                 for i in range(len(left_spline[0])):
                     self.screen.blit(left_spline_image, Vector2(left_spline[0][i],left_spline[1][i]) * ppu - (3,3))
@@ -962,8 +993,8 @@ class PathPlanning:
                 self.screen.blit(explosion_image, car.position * ppu - ((explosion_image.get_rect().width / 2),(explosion_image.get_rect().height / 2)))
             
             # draw dotted lines between car and closest target
-            if len(visible_targets) > 0 and car.auto == True:
-                draw_line_dashed(self.screen, (155,255,255),(pos_1,pos_2) , closest_target.position * ppu , width = 2, dash_length = 10, exclude_corners = True)
+            #if len(visible_targets) > 0 and car.auto == True:
+               # draw_line_dashed(self.screen, (155,255,255),(pos_1,pos_2) , closest_target.position * ppu , width = 2, dash_length = 10, exclude_corners = True)
             
         
             if fullscreen == False:
