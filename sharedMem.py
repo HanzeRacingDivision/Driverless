@@ -41,6 +41,7 @@ class sharedMemWriteWrapper(shared_memory.SharedMemory):
             self.pickleLen[(self.frameCounter.value % 2)] = self.writeCursor
             with self.frameCounter.get_lock():
                 self.frameCounter.value += 1 #only once the new data is completely ready, does this counter increment
+        return(self.writeCursor - (0 if ((self.frameCounter.value % 2) == 1) else int(self.size/2))) #return how large the pickled object is
     
     def writePickled(self, pickledBytes):
         """save an object (that was already pickled) to sharedMem"""
@@ -55,6 +56,7 @@ class sharedMemWriteWrapper(shared_memory.SharedMemory):
             self.pickleLen[(self.frameCounter.value % 2)] = self.writeCursor
             with self.frameCounter.get_lock():
                 self.frameCounter.value += 1 #only once the new data is completely ready, does this counter increment
+        return(self.writeCursor - (0 if ((self.frameCounter.value % 2) == 1) else int(self.size/2))) #return how large the pickled object is
     
     @property
     def passToProcess(self):

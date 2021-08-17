@@ -23,6 +23,7 @@ simulation = True
 
 useLidar = True
 simulateLidar = False
+storeBlob = False #whether or not to save the blob object in cone.slamData (takes up extra space/pickle-time)
 
 useRemote = False
 
@@ -162,22 +163,29 @@ def makeCone(mapToUse, conePos, blob):
     if(overlaps):
         ## SLAM code should replace this
         if(type(overlappingCone.slamData) is list):
-            overlappingCone.slamData.append((conePos, mapToUse.clock(), blob, overlappingCone.slamData[-1][-1]+1)) #cone position, timestamp, car position, car velocity, totalSpotCount
+            if(storeBlob):
+                overlappingCone.slamData.append((conePos, mapToUse.clock(), blob, overlappingCone.slamData[-1][-1]+1)) #cone position, timestamp, car position, car velocity, totalSpotCount
+            else:
+                overlappingCone.slamData.append((conePos, overlappingCone.slamData[-1][-1]+1)) #cone position, timestamp, car position, car velocity, totalSpotCount
             if(len(overlappingCone.slamData)>MAX_BLOB_HISTORY): #limit number of sightings to remember
                 overlappingCone.slamData.pop(1) #delete the 2nd oldest data (keep the very first sighting (for simulateLidar))
             overlappingCone.position[0] = GF.average(np.array([item[0][0] for item in overlappingCone.slamData]))
             overlappingCone.position[1] = GF.average(np.array([item[0][1] for item in overlappingCone.slamData]))
         else: #cone was not spotted by lidar before
             print("makeCone() warning: adding 'slamData' to an existing cone")
-            #overlappingCone.slamData = [(conePos, 1)]
-            overlappingCone.slamData = [(conePos, mapToUse.clock(), blob, 1)]
+            if(storeBlob):
+                overlappingCone.slamData = [(conePos, mapToUse.clock(), blob, 1)]
+            else:
+                overlappingCone.slamData = [(conePos, 1)]
     else:
         ## SLAM code could replace this
         leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, conePos, mapToUse.car.angle) < 0.0) #if the angle relative to car is negative (CW), it's a right-side cone
         conePlaceSuccess, coneInList = mapToUse.addCone(conePos, leftOrRight, False)
         #if(conePlaceSuccess) # overlap check already done earlier
-        #coneInList.slamData = [(conePos, 1)] #less data, faster code
-        coneInList.slamData = [(conePos, mapToUse.clock(), blob, 1)]
+        if(storeBlob):
+            coneInList.slamData = [(conePos, mapToUse.clock(), blob, 1)]
+        else:
+            coneInList.slamData = [(conePos, 1)] #less data, faster code
 
 if __name__ == "__main__":
     try:
@@ -264,7 +272,8 @@ if __name__ == "__main__":
             while(connToSlaves.poll()):
                 phantomMap = connToSlaves.recv()
                 PH.mergePhantom(masterMap, phantomMap, UI.UIparser)
-            masterSharedMem.pickle(masterMap) #pickle whole map every time (because you can't really pickle only the updated parts)
+            pickleSize = masterSharedMem.pickle(masterMap) #pickle whole map every time (because you can't really pickle only the updated parts)
+            print("map pickleSize:", pickleSize)
             
             loopEnd = masterMap.clock() #this is only for the 'framerate' limiter (time.sleep() doesn't accept negative numbers, this solves that)
             if((loopEnd-loopStart) < 0.015): #60FPS limiter (optional)

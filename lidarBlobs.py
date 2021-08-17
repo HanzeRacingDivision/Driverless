@@ -86,7 +86,7 @@ def blobify(point, origin, timestamp, uponExist=None, uponExistArgs=None, uponEx
 @njit
 def blobToConePos(blob): #calculate the position the cone would have over here, to save some processing time on the main thread
     if(blob['pointCount'] < MIN_BLOB_CONE_LEN):
-        print("warning: blob too few points to make into cone")
+        #print("warning: blob too few points to make into cone")
         return(False, np.zeros(2, dtype=np.float64))
     coneCenterPos = np.empty((2,blob['pointCount']-1), dtype=np.float64) #TBD
     if(blob['pointCount'] > 1):
