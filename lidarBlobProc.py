@@ -118,6 +118,7 @@ class lidarProcess(MP.Process):
             warningPrinted = False #just a debugging variable
             
             while(self.keepalive.get_value()):
+                loopStart = time.time()
                 if(self.connToMaster.poll()):
                     lastCarUpdateTime = time.time()
                     lidar.callbackExtraArg[1] = self.connToMaster.recv() #update the lidar position data
@@ -133,6 +134,9 @@ class lidarProcess(MP.Process):
                 lidar.run() #read serial data and when/if a full packet is ready, attempt to blobify it (using the packetCallback), and once a blob is ready, send it to the master process
                 LB.checkBlobAge(initMap.clock())
                 #time.sleep(0.002) #the lidar process can't really afford to sleep
+                loopEnd = time.time()
+                if((loopEnd-loopStart)>0.2):
+                    print("lidarProcess running slow", 1/(loopEnd-loopStart))
         finally:
             try:
                 lidar._serialPort.close()

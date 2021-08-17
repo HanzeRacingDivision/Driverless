@@ -492,7 +492,7 @@ class pygameDrawer3D(pygameDrawerCommon):
         if(realPos[0] < 0.0001): #avoid divide by 0 AND only allow coordinates in front of (not behind) the camera
             print("bad use of perspectiveProjection(), realPos is behind (or perfectly next to) the camera!")
             return(np.zeros(2))
-        realPos3D = np.array([realPos[0], realPos[1], 0.0], dtype=np.float32)
+        realPos3D = np.array([realPos[0], realPos[1], 0.0], dtype=np.float64)
         if(len(realPos) < 3): #if realPos is the 2D pos, and the manual Z parameter is used
             if(z is None):
                 print("OH NO!, you forgot the 3rd axis entry in perspectiveProjection(). Assuming z=0.0")

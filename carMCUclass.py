@@ -142,6 +142,7 @@ class carMCUserialProcess(MP.Process):
                         if(not carConn.carMCUserial.is_open):
                             time.sleep(0.25) #wait a bit between connection attempts
                     while(carConn.carMCUserial.is_open and self.keepalive.get_value()):
+                        loopStart = time.time()
                         carConn.getFeedback() #run this to get the data
                         if(self.connToMaster.poll()):
                             dataToSend = self.connToMaster.recv()
@@ -149,6 +150,9 @@ class carMCUserialProcess(MP.Process):
                             carConn.sendSpeedAngle(*dataToSend)
                         # else: #this else-statement is not needed, but i figure if you've already spent time running functions, you dont also need to sleep
                         #     time.sleep(carConn.defaultGetFeedbackInterval) #wait just a little bit, as to not needlessly overload the CPU
+                        loopEnd = time.time()
+                        if((loopEnd-loopStart)>0.2):
+                            print("carMCUserial running slow", 1/(loopEnd-loopStart))
                     # if(not self.autoreconnect):   #just for debugging
                     #     print("carMCU connection on thread stopped becuase is_open:", carConn.carMCUserial.is_open)
                     #     continue

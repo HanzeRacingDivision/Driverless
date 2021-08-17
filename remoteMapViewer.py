@@ -52,6 +52,7 @@ class drawProcess(MP.Process):
             drawer.isRemote = True
             drawer3D = DD.pygameDrawer3D(initMap, DD.window, self.resolution)
             while((self.keepalive.get_value()) and DD.windowKeepRunning):
+                loopStart = time.time()
                 try:
                     if(self.asynchronous):
                         if(slaveSharedMem.poll()): #if a new map is available
@@ -80,6 +81,10 @@ class drawProcess(MP.Process):
                         slaveSharedMem.lastFrameCounter = slaveSharedMem.frameCounter.value #assume you have the latest map object
                         drawer.mapToDraw = slaveSharedMem.readNewObj(self.keepalive) #block untill a new master map is received
                         drawer3D.mapToDraw = drawer.mapToDraw
+                
+                loopEnd = time.time()
+                if((loopEnd-loopStart)>0.5):
+                    print("drawer running slow", 1/(loopEnd-loopStart))
         finally:
             print("drawProcess ending")
             try:
@@ -146,6 +151,7 @@ if __name__ == "__main__":
                     failureCountDecrementTimer = time.time()
                     lastMapImportTime = time.time()
                     while((drawer.is_alive()) and keepReceiving):     ################## main loop
+                        loopStart = time.time()
                         receivedBytes = mapReceiver.manualReceiveBytes() #get map data (blocking)
                         #print("receivedBytes:", len(receivedBytes))
                         if(len(receivedBytes) > 0):
@@ -178,6 +184,9 @@ if __name__ == "__main__":
                                 mapReceiver.mapSock.sendall(packetSizeHeader + phantomMapBytes)
                             phantomMapBytes = None
                         
+                        loopEnd = time.time()
+                        if((loopEnd-loopStart) > 0.5):
+                            print("main process running slow", 1/(loopEnd-loopStart))
             except socket.error as excep: #handleable exceptions, this will only end things on major exceptions (unexpected ones)
                 errorResolved = False
                 if(excep.args[0] == 10038): #'an operation was performed by something that is not a socket'

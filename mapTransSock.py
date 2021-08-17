@@ -68,10 +68,10 @@ class remoteProcess(MP.Process):
                             UIreceiver.start()
                         lastSendTime = time.time()
                         while(self.keepalive.get_value()):     ################## main loop
-                            rightNow = time.time()
-                            if((rightNow - lastSendTime) > mapSender.mapSendInterval): #dont spam
-                                #print("PPS:", round(1/(rightNow-lastSendTime), 1))
-                                lastSendTime = rightNow
+                            loopStart = time.time()
+                            if((loopStart - lastSendTime) > mapSender.mapSendInterval): #dont spam
+                                #print("PPS:", round(1/(loopStart-lastSendTime), 1))
+                                lastSendTime = loopStart
                                 bytesToSend = slaveSharedMem.readNewBytes(self.keepalive)
                                 
                                 #print("sending map of size:", len(bytesToSend))
@@ -112,6 +112,10 @@ class remoteProcess(MP.Process):
                                 except Exception as excep:
                                     print("UIreceiver interface error:", excep, excep.args)
                                     time.sleep(0.3)
+                            
+                            loopEnd = time.time()
+                            if((loopEnd-loopStart)>(3*mapSender.mapSendInterval)):
+                                print("remoteProcess running slow", 1/(loopEnd-loopStart))
                 except socket.error as excep: #handleable exceptions, this will only end things on major exceptions (unexpected ones)
                     print("identifying error:", excep.args[0])
                     errorResolved = False

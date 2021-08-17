@@ -42,7 +42,7 @@ class Map:
         maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept serial commands outside this range)
         
         def __init__(self):
-            self.position = np.array([0.0, 0.0], dtype=np.float32)
+            self.position = np.array([0.0, 0.0], dtype=np.float64)
             self.angle = 0.0 #car orientation in radians
             self.velocity = 0.0 #measured and filtered car 'forward' (wheel) speed in meters/second (used to update position)
             self.steering = 0.0 #measured and filtered steering angle in radians (used to update position)
@@ -73,7 +73,7 @@ class Map:
         #     return(GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position))
         
         def getChassisCenterPos(self):
-            return(GF.distAnglePosToPos((self.wheelbase/2) + self.chassis_length_offset, self.angle, self.position))
+            return(GF.distAnglePosToPos(float((self.wheelbase/2) + self.chassis_length_offset), float(self.angle), np.array(self.position)))
         
         #def update() was moved to simCar and realCar, because it should be replaced by SLAM (and/or only used as a quick update between (slower) SLAM updates
         
@@ -115,7 +115,7 @@ class Map:
         coneDiam = 0.14 #cone diameter in meters (constant)
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
-            self.position = np.array([pos[0], pos[1]], dtype=np.float32)
+            self.position = np.array([pos[0], pos[1]], dtype=np.float64)
             self.LorR = leftOrRight #boolean to indicate which side of the track (which color) the code is. True=right, False=left
             self.isFinish = isFinish
             
@@ -132,7 +132,7 @@ class Map:
         """ a single point in the path of the car (a target to aim for) """
         def __init__(self, pos=[0,0]):
             #the targets should probably be just be ordered in the list to match their order in the track (shouldnt take much/any shuffling to get done), but if not: use pandas indexing?
-            self.position = np.array([pos[0], pos[1]], dtype=np.float32)
+            self.position = np.array([pos[0], pos[1]], dtype=np.float64)
             #self.isFinish = isFinish #i added this in a previous version, but never actually made use of it (since the 0th target in the list is usually also the finish), but this might be reinstated later on
             
             self.passed = 0 #counts the number of times it's been passed (from path-planning)
