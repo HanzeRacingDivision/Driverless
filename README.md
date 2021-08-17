@@ -4,3 +4,13 @@ I (thijs) made this branch becuase of the major overhaul i did (in july 2021). T
 Python 3.8 or higher is required, because shared_memory is used.
 numba is recommended, but there are backup files in case you're having difficulty installing it (understandable on a Rpi/Jetson)
 use the "july.py" file to launch the whole thing (the rest are only components of it)
+
+requirements:
+ - python 3.8+ (must be 3.8+ for shared_memory (multiprocessing))
+ - numpy 
+ - pandas (for map_loader)
+ - pygame 2.0.1 (for map visualization)
+ - pyserial (only for real-life, not for simulations) (note: used as "import serial")
+ - scipy (for cubic splines (pathPlanning))
+ - PIL (a.k.a. Python Image Library, a.k.a. Pillow, only used for rendering headlights)
+ - numba (used to make some code faster, there are usually NoNumba versions of things though)
