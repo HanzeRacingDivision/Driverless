@@ -8,11 +8,10 @@ STD_DEV_LIDAR_ERROR = 2.0 #in mm !
 global DATAPOINTS_PER_DISTANCE_NUMERATOR
 DATAPOINTS_PER_DISTANCE_NUMERATOR = 3.6 #calibrated, not calculated, but the lidar i'm using has roughly 0.75deg measurement freq, so 
 
-global RANGE_LIMIT, MIN_BLOB_CONE_LEN
+global RANGE_LIMIT
 RANGE_LIMIT = 1000 #lidar range limit in mm (blobs that partly exceed the limit will be cut off, so be careful
-MIN_BLOB_CONE_LEN = 3 #a blob must have at least this many points to be return a cone pos
 
-import lidarBlobsNoList as LB #a little faster
+import lidarBlobs as LB
 
 from Map import Map
 import GF.generalFunctions as GF
@@ -24,41 +23,6 @@ import multiprocessing as MP
 import sharedMem       as SM  #my own shared memory manager (a double-buffered, one-way, pickle-based (single-object) sharedMemory wrapper)
 
 
-def blobToConePos(blob): #calculate the position the cone would have over here, to save some processing time on the main thread
-    global MIN_BLOB_CONE_LEN
-    adjustedConeDiam = Map.Cone.coneDiam * 0.5 #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
-    if(len(blob.points) < MIN_BLOB_CONE_LEN):
-        print("warning: blob too few points to make into cone")
-        return(False, None)
-    if(len(blob.origins) != len(blob.points)):
-        print("warning: less origins than points!:", len(blob.origins), len(blob.points))
-    coneCenterPos = [[],[]]
-    #coneCenterPos = np.empty((2,len(blob._lines))) #TBD
-    if(len(blob._lines)>0):
-        perpAdd = np.pi/2 # you could assume (or calculate only once) the direction of the perpendicular angle, by knowing the rotation direction of the lidar
-        #sim1.debugLines = []
-        if(len(blob.origins)>0): #if there is an origin point available
-            baseAngle = GF.get_norm_angle_between(blob.origins[int(len(blob.origins)/2)], blob.points[int(len(blob.points)/2)], 0.0)
-            if(abs(GF.radDiff(blob.lineData(0)[1]-perpAdd, baseAngle)) < abs(GF.radDiff(blob.lineData(0)[1]+perpAdd, baseAngle))):
-                perpAdd = -perpAdd
-                print("warning: lidar measurement not simply CW?")
-            ## alternatively, one could use the fact that the lidar always spins 1 way (CW), and therefore the points are always added in that order, so angles between them have a constant relation to the origin
-        for i in range(len(blob._lines)):
-            #perpAngle = ((blob.lineData(i)[1]+perpAdd) if (abs(GF.radDiff(blob.lineData(i)[1]+perpAdd, baseAngle)) < abs(GF.radDiff(blob.lineData(i)[1]-perpAdd, baseAngle))) else (blob.lineData(i)[1]-perpAdd))
-            superAdjustedConeRadius = np.cos(np.arcsin((blob.lineData(i)[2]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
-            perpAngle = blob.lineData(i)[1] + perpAdd
-            lineCenter = GF.distAnglePosToPos(blob.lineData(i)[2]/2, blob.lineData(i)[1], blob.points[i])
-            conePos = GF.distAnglePosToPos(superAdjustedConeRadius, perpAngle, lineCenter)
-            coneCenterPos[0].append(conePos[0]);   coneCenterPos[1].append(conePos[1]) #format it as [xpositions, ypositions] lists, to make getting average() easier
-        conePos = np.array([GF.average(np.array(coneCenterPos[0])), GF.average(np.array(coneCenterPos[1]))])
-        return(True, conePos)
-    else:
-        if(len(blob.origins)>0):
-            conePos = GF.distAnglePosToPos(adjustedConeDiam, GF.get_norm_angle_between(blob.origins[0], blob.points[0], 0.0), blob.points[0])
-            return(True, conePos)
-        else:
-            print("1 point, no origin")
-            return(False, None)
 
 class lidarProcess(MP.Process):
     """a multiprocessing lidar (serial connection and blobifier)"""
@@ -131,16 +95,16 @@ class lidarProcess(MP.Process):
                             randomMeasurementError = np.random.normal() * (STD_DEV_LIDAR_ERROR/1000) #add error in a normal distribution (you could scale with dist, but whatever)
                             pointPos = GF.distAnglePosToPos((adjustedConeDiam/2) + randomMeasurementError, dataPointAngles[j], realActualConePos)
                             if(j == 0):
-                                newBlob = LB.blob(pointPos, lidarPos, initMap.clock())
+                                newBlob = LB.blobCreate(pointPos, lidarPos, initMap.clock())
                             else:
-                                appendSuccess = newBlob.append(pointPos, lidarPos, initMap.clock())
+                                appendSuccess = LB.blobAppend(newBlob, pointPos, lidarPos, initMap.clock())
                                 if(not appendSuccess):
                                     print("(lidarBlobProcSim) bad blob append?")
                         nearbyConeList[i].append(newBlob)
                 
                 for i in range(len(nearbyConeList)):
                     if(len(nearbyConeList[i]) > 3):
-                        posIsValid, conePos = blobToConePos(nearbyConeList[i][3])
+                        posIsValid, conePos = LB.blobToConePos(nearbyConeList[i][3])
                         if(posIsValid): #only send if the pos was successfully calculated
                             self.connToMaster.send((conePos, nearbyConeList[i][3]))
                         else:

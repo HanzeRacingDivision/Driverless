@@ -22,7 +22,7 @@
 simulation = True
 
 useLidar = True
-simulateLidar = True
+simulateLidar = False
 
 useRemote = False
 
@@ -169,15 +169,15 @@ def makeCone(mapToUse, conePos, blob):
             overlappingCone.position[1] = GF.average(np.array([item[0][1] for item in overlappingCone.slamData]))
         else: #cone was not spotted by lidar before
             print("makeCone() warning: adding 'slamData' to an existing cone")
-            overlappingCone.slamData = [(conePos, 1)]
-            #overlappingCone.slamData = [(conePos, mapToUse.clock(), blob, 1)]
+            #overlappingCone.slamData = [(conePos, 1)]
+            overlappingCone.slamData = [(conePos, mapToUse.clock(), blob, 1)]
     else:
         ## SLAM code could replace this
         leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, conePos, mapToUse.car.angle) < 0.0) #if the angle relative to car is negative (CW), it's a right-side cone
         conePlaceSuccess, coneInList = mapToUse.addCone(conePos, leftOrRight, False)
         #if(conePlaceSuccess) # overlap check already done earlier
-        coneInList.slamData = [(conePos, 1)] #less data, faster code
-        #coneInList.slamData = [(conePos, mapToUse.clock(), blob, 1)]
+        #coneInList.slamData = [(conePos, 1)] #less data, faster code
+        coneInList.slamData = [(conePos, mapToUse.clock(), blob, 1)]
 
 if __name__ == "__main__":
     try:

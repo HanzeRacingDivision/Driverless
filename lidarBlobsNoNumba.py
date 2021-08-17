@@ -2,8 +2,6 @@ from Map import Map  #used to get coneDiam
 import GF.generalFunctions as GF
 import numpy as np
 
-from numba import njit
-
 
 global blobInProgress
 blobInProgress = None
@@ -23,7 +21,6 @@ MIN_BLOB_CONE_LEN = 3 #used for blobToConePos
 
 #import time
 
-## a numpy dtype is fast/efficient, but not really user-fiendly (not very python-like). Good thing i don't like legible code anyways ;)
 blobType =np.dtype([('timestamp', np.float64),
                     ('appendTimestamp', np.float64),
                     ('points', np.float64, (maxBlobPointCount,2)),
@@ -31,7 +28,6 @@ blobType =np.dtype([('timestamp', np.float64),
                     ('lines', np.float64, (maxBlobPointCount-1,2)), #stores [dist, angle]
                     ('pointCount', np.uint8)])
 
-@njit
 def blobCreate(point, origin, timestamp):
     newBlob = np.zeros(1, dtype=blobType)[0] #create a new blob object (filled with all 0's)
     newBlob['timestamp'] = timestamp
@@ -41,7 +37,6 @@ def blobCreate(point, origin, timestamp):
     newBlob['pointCount'] = 1
     return(newBlob)
 
-@njit
 def blobAppend(blob, point, origin, timestamp):
     """attempt to append a datapoint to the blob, return whether successful"""
     distAngle = GF.distAngleBetwPos(blob['points'][blob['pointCount']-1], point) #get gap size (and angle, while you're at it)
@@ -58,8 +53,10 @@ def blobAppend(blob, point, origin, timestamp):
     else:
         return(False)
 
-def checkBlobAge(timestamp, uponExist=None, uponExistArgs=None, uponExistAppendTimeout=-1):
-    """if blobs were last appended to more than 'uponExistAppendTimeout' seconds ago, call the 'uponExist' callback"""
+def checkBlobAge(timestamp, uponExist=None, uponExistArgs=None, uponExistAppendTimeout=-1): #check if any blobs are too old to still be considered real (and delete/move them) AND run uponExist, if the blob has a timeout value set for that
+    """check whether blobs are too old (and need to be deleted)
+        also checks whether blobs 'exist', if they have a timeout set
+        should be run as often as possible"""
     global blobInProgress
     if(blobInProgress is not None):
         if(((timestamp - blobInProgress['appendTimestamp'])>uponExistAppendTimeout) if (uponExistAppendTimeout > 0) else False):
@@ -67,10 +64,8 @@ def checkBlobAge(timestamp, uponExist=None, uponExistArgs=None, uponExistAppendT
                 uponExist(blobInProgress, uponExistArgs)
             blobInProgress = None
 
-def blobify(point, origin, timestamp, uponExist=None, uponExistArgs=None, uponExistAppendTimeout=-1):
-    """deletes-, appends to- or creates blobs given a lidar measurement"""
-    if(uponExistAppendTimeout > 0):
-        checkBlobAge(timestamp, uponExist, uponExistArgs, uponExistAppendTimeout)
+def blobify(point, origin, timestamp, uponExist=None, uponExistArgs=None):
+    """deletes-, appends to- or creates blobs given a lidar measurement (position, origin(optional))"""
     global blobInProgress
     #checkDeleteBlobs(point, timestamp)
     makeNewBlob = True
@@ -83,7 +78,6 @@ def blobify(point, origin, timestamp, uponExist=None, uponExistArgs=None, uponEx
         blobInProgress = blobCreate(point, origin, timestamp)
     return(makeNewBlob, blobInProgress)
 
-@njit
 def blobToConePos(blob): #calculate the position the cone would have over here, to save some processing time on the main thread
     if(blob['pointCount'] < MIN_BLOB_CONE_LEN):
         print("warning: blob too few points to make into cone")
@@ -106,41 +100,3 @@ def blobToConePos(blob): #calculate the position the cone would have over here, 
     else:
         conePos = GF.distAnglePosToPos(adjustedConeDiam, GF.get_norm_angle_between(blob['origins'][0], blob['points'][0], 0.0), blob['points'][0])
         return(True, conePos)
-
-def compileAll(verbose=False):
-    ## precompile things by running them once
-    print("precompiling njit lidarBlobs...")
-    import time
-    compileStartTime = time.time()
-    
-    aMap = Map()
-    aPoint = np.array([10.0, 10.0], dtype=np.float64)
-    #uponExistCallback = lambda blob, extraArgs : print(blobToConePos(blob), extraArgs)
-    blobify(aPoint, aMap.car.position, aMap.clock()) #runs blobCreate
-    aPoint[0] += 0.025;  aPoint[1] -= 0.045;
-    blobToConePos(blobify(aPoint, aMap.car.position, aMap.clock())[1])  #runs blobAppend and then blobToConePos
-    del(aMap);   global blobInProgress; blobInProgress = None
-    print("lidarBlobs njit compilation done! (took", round(time.time()-compileStartTime,1), "seconds)")
-    if(verbose):
-        def inspect(compiledFunction):
-            print(compiledFunction.__name__, compiledFunction.signatures, type(compiledFunction.signatures[0][0]))
-            compiledFunction.inspect_types(file)
-        ## verbose output of njit functions (to file)
-        print("verbose output of generalFunctions njit compilation:")
-        file = open("lidarBlobs njit verbose output.txt", "w+")
-        inspect(blobCreate)
-        inspect(blobAppend)
-        inspect(blobToConePos)
-        file.close()
-
-try:
-    compileAll()
-except:
-    print("precompiling njit lidarBlobs failed (is generalFunctions not compiled?)")
-    print("falling back to lidarBlobsNoNumba")
-    del(blobCreate);  del(blobAppend);  del(blobToConePos);  del(compileAll)
-    from lidarBlobsNoNumba import *
-
-
-#if __name__ == "__main__":
-    

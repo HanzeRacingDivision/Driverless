@@ -216,16 +216,18 @@ class pygameDrawer(pygameDrawerCommon):
                             continue
                         invConeColor = [255-coneColor[0], 255-coneColor[1], 255-coneColor[2]]
                         
-                        ## i (temporarily?) removed blob data from the cone.slamData
-                        # if(drawSlamData > 1):
-                        #     blob = cone.slamData[-1][2]
-                        #     adjustedConeDiam = Map.Cone.coneDiam * 0.5 #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
-                        #     for i in range(len(blob._lines)):
-                        #         superAdjustedConeRadius = np.cos(np.arcsin((blob.lineData(i)[2]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
-                        #         pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blob.points[i]), self.realToPixelPos(blob.points[i+1]), self.coneConnectionLineWidth)
-                        #         blobLineCenter = GF.distAnglePosToPos(blob.lineData(i)[2]/2, blob.lineData(i)[1], blob.points[i])
-                        #         blobLinePerpPos = GF.distAnglePosToPos(superAdjustedConeRadius, blob.lineData(i)[1]+(np.pi/2), blobLineCenter)
-                        #         pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blobLineCenter), self.realToPixelPos(blobLinePerpPos), self.coneConnectionLineWidth)
+                        try: #the blob does not HAVE to be stored in slamData (consider the extra pickling time), so if i end up removeing it, please also uncomment this
+                            if(drawSlamData > 1):
+                                blob = cone.slamData[-1][2]
+                                adjustedConeDiam = Map.Cone.coneDiam * 0.5 #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
+                                for i in range(blob['pointCount']-1):
+                                    superAdjustedConeRadius = np.cos(np.arcsin((blob['lines'][i][0]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
+                                    pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blob['points'][i]), self.realToPixelPos(blob['points'][i+1]), self.coneConnectionLineWidth)
+                                    blobLineCenter = GF.distAnglePosToPos(blob['lines'][i][0]/2, blob['lines'][i][1], blob['points'][i])
+                                    blobLinePerpPos = GF.distAnglePosToPos(superAdjustedConeRadius, blob['lines'][i][1]+(np.pi/2), blobLineCenter)
+                                    pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blobLineCenter), self.realToPixelPos(blobLinePerpPos), self.coneConnectionLineWidth)
+                        except:
+                            doNothing = 0
                         
                         textStr = str(cone.slamData[-1][-1]) #get total-spotted-count
                         renderedText = self.pygameFont.render(textStr, False, invConeColor, coneColor)

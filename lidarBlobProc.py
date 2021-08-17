@@ -5,15 +5,13 @@
 ## it should(?) be possible to run the position update function with negative time, to better account for the delays in the communication pipeline(s) (both the serial connection from the lidar, and blobifying take time)
 ## the code would look something like 'lidarPos = intermitUpdate(dTime=(time_since_last_real_update - lidarCommDelayConstant))'
 
-global RANGE_LIMIT, MIN_BLOB_CONE_LEN
-RANGE_LIMIT = 750 #lidar range limit in mm (blobs that partly exceed the limit will be cut off, so be careful
-MIN_BLOB_CONE_LEN = 3 #a blob must have at least this many points to be return a cone pos
+global RANGE_LIMIT
+RANGE_LIMIT = 10000 #lidar range limit in mm (blobs that partly exceed the limit will be cut off, so be careful
 
 import camsense_X1 as CX
-#import lidarBlobs as LB
-import lidarBlobsNoList as LB #a little faster
+import lidarBlobs as LB
 
-from Map import Map
+#from Map import Map
 import GF.generalFunctions as GF
 
 import numpy as np
@@ -23,52 +21,14 @@ import multiprocessing as MP
 import sharedMem       as SM  #my own shared memory manager (a double-buffered, one-way, pickle-based (single-object) sharedMemory wrapper)
 
 
-def uponBlobExist(blob): #a little (callback) for when blobs are finished. (stored in blob.uponExist)
-    connToMaster = blob.extraData
-    blob.extraData = None #i dont want to send these over the pipe (and they're no longer needed anyway)
-    blob.uponExist = None #remove the pointer to this callback function from the blob
-    posIsValid, conePos = blobToConePos(blob)
+def uponBlobExist(blob, uponExistArgs): #a little (callback) for when blobs are finished.
+    connToMaster = uponExistArgs
+    posIsValid, conePos = LB.blobToConePos(blob)
     if(posIsValid): #only send if the pos was successfully calculated
         connToMaster.send((conePos, blob))
 
-def blobToConePos(blob): #calculate the position the cone would have over here, to save some processing time on the main thread
-    global MIN_BLOB_CONE_LEN
-    adjustedConeDiam = Map.Cone.coneDiam * 0.5 #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
-    if(len(blob.points) < MIN_BLOB_CONE_LEN):
-        print("warning: blob too few points to make into cone")
-        return(False, None)
-    if(len(blob.origins) != len(blob.points)):
-        print("warning: less origins than points!:", len(blob.origins), len(blob.points))
-    coneCenterPos = [[],[]]
-    #coneCenterPos = np.empty((2,len(blob._lines))) #TBD
-    if(len(blob._lines)>0):
-        perpAdd = np.pi/2 # you could assume (or calculate only once) the direction of the perpendicular angle, by knowing the rotation direction of the lidar
-        #sim1.debugLines = []
-        if(len(blob.origins)>0): #if there is an origin point available
-            baseAngle = GF.get_norm_angle_between(blob.origins[int(len(blob.origins)/2)], blob.points[int(len(blob.points)/2)], 0.0)
-            if(abs(GF.radDiff(blob.lineData(0)[1]-perpAdd, baseAngle)) < abs(GF.radDiff(blob.lineData(0)[1]+perpAdd, baseAngle))):
-                perpAdd = -perpAdd
-                print("warning: lidar measurement not simply CW?")
-            ## alternatively, one could use the fact that the lidar always spins 1 way (CW), and therefore the points are always added in that order, so angles between them have a constant relation to the origin
-        for i in range(len(blob._lines)):
-            #perpAngle = ((blob.lineData(i)[1]+perpAdd) if (abs(GF.radDiff(blob.lineData(i)[1]+perpAdd, baseAngle)) < abs(GF.radDiff(blob.lineData(i)[1]-perpAdd, baseAngle))) else (blob.lineData(i)[1]-perpAdd))
-            superAdjustedConeRadius = np.cos(np.arcsin((blob.lineData(i)[2]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
-            perpAngle = blob.lineData(i)[1] + perpAdd
-            lineCenter = GF.distAnglePosToPos(blob.lineData(i)[2]/2, blob.lineData(i)[1], blob.points[i])
-            conePos = GF.distAnglePosToPos(superAdjustedConeRadius, perpAngle, lineCenter)
-            coneCenterPos[0].append(conePos[0]);   coneCenterPos[1].append(conePos[1]) #format it as [xpositions, ypositions] lists, to make getting average() easier
-        conePos = np.array([GF.average(np.array(coneCenterPos[0])), GF.average(np.array(coneCenterPos[1]))])
-        return(True, conePos)
-    else:
-        if(len(blob.origins)>0):
-            conePos = GF.distAnglePosToPos(adjustedConeDiam, GF.get_norm_angle_between(blob.origins[0], blob.points[0], 0.0), blob.points[0])
-            return(True, conePos)
-        else:
-            print("1 point, no origin")
-            return(False, None)
-    
 
-def packetCallback(lidarSelf, newPacket, pointsAdded):
+def packetCallback(newPacket, pointsAdded, callbackExtraArg):
     startAngle = newPacket['startAngle']/CX.DEG_DIV
     angleDif = GF.degDiff(newPacket['startAngle']/CX.DEG_DIV, newPacket['endAngle']/CX.DEG_DIV) #(rollover proof) IMPORTANT: packet angles are still integers, divide by 64 to get degrees (0 to 360)
     angleStep = angleDif/7 #note: there are actually 8 datapointes per packet, but i'm assuming the endAngle is AT the 8th datapoint (and the startAngle is AT the first)
@@ -80,17 +40,10 @@ def packetCallback(lidarSelf, newPacket, pointsAdded):
             lidarAngleError = np.deg2rad(-15) #TBD save this somewhere else, maybe in camsense_X1
             correctedLidarAngle = (-1)*GF.radInv(np.deg2rad(angle)) + lidarAngleError #NOTE: radRoll (or a function that calls it, like radInv) is recommended, also: the *(-1) is to fix CW/CCW issues
             
-            lidarPos = lidarSelf.callbackExtraArg[1][0] #the position of the lidar is used to get the point position. Currently, the lidar is mounted directly above the car's (rear-axle/center of rotation) position
-            lidarMountAngle = lidarSelf.callbackExtraArg[1][1]
+            lidarPos = callbackExtraArg[1][0] #the position of the lidar is used to get the point position. Currently, the lidar is mounted directly above the car's (rear-axle/center of rotation) position
+            lidarMountAngle = callbackExtraArg[1][1]
             pointPos = GF.distAnglePosToPos(newPacket['measurements'][i]/1000.0, lidarMountAngle + correctedLidarAngle, lidarPos) #get map position from relative position (asuming lidar is mounter on car)
-            isNewBlob, newBlob = LB.blobify(pointPos, lidarPos, lidarSelf.callbackExtraArg[2]())
-            
-            if(isNewBlob):
-                #newBlob.uponExist = lambda blobObj : print("exist:", len(blobObj.points), len(blobObj._lines))  #example
-                #newBlob.uponDeletion = lambda blobObj, reason : print("delete:", len(blobObj.points), len(blobObj._lines), blobObj.exists, reason)  #example
-                newBlob.uponExist = uponBlobExist
-                newBlob.uponExistAppendTimeout = (60.0/lidarSelf.RPM())*0.25 #IMPORTANT: (seconds per rotation) * quarter, this timout also makes sure blobs are not appended to on subsequent rotations
-                newBlob.extraData = lidarSelf.callbackExtraArg[0] #pass connToMaster
+            isNewBlob, newBlob = LB.blobify(pointPos, lidarPos, callbackExtraArg[2](), uponBlobExist, callbackExtraArg[0])
 
 class lidarProcess(MP.Process):
     """a multiprocessing lidar (serial connection and blobifier)"""
@@ -132,7 +85,8 @@ class lidarProcess(MP.Process):
                         lidar.callbackExtraArg[1] = (initMap.car.position, initMap.car.angle)
                 
                 lidar.run() #read serial data and when/if a full packet is ready, attempt to blobify it (using the packetCallback), and once a blob is ready, send it to the master process
-                LB.checkBlobAge(initMap.clock())
+                LB.checkBlobAge(initMap.clock(), uponBlobExist, self.connToMaster, (60.0/(lidar.RPM() if (lidar.RPM()>0.01) else 300))*0.25) #arguments are (timestamp, uponExistCallback, callbackExtraArgs, uponExistAppendTimeout)
+                ## if the time since the last blob['appendTimestamp'] exceeds uponExistAppendTimeout (which is based on lidar rotation speed), the uponExist callback will be called
                 #time.sleep(0.002) #the lidar process can't really afford to sleep
                 loopEnd = time.time()
                 if((loopEnd-loopStart)>0.2):
