@@ -35,6 +35,10 @@ def handlePygameEvents(eventToHandle):
             global linearTimeOffsets
             linearTimeOffsets = not linearTimeOffsets
             print("turned", ("on" if linearTimeOffsets else "off"), "linearTimeOffsets")
+        elif(eventToHandle.key == pygame.K_s):
+            global addSensorNoise
+            addSensorNoise = not addSensorNoise
+            print("turned", ("on" if addSensorNoise else "off"), "sensorNoise")
     elif(eventToHandle.type == pygame.MOUSEWHEEL):
         global sizeScale
         sizeScale *= 1.0+(eventToHandle.y/10.0) #10.0 is an arbetrary zoomspeed
@@ -239,8 +243,9 @@ global linearTimeOffsets
 linearTimeOffsets = True
 
 #constants
+global addSensorNoise
 addSensorNoise = True
-coneCount = 6
+coneCount = 4
 carNoiseParams = (4.0, 1.0, 0.3, 0.2, np.deg2rad(15)) #parameters: (mean distance to cones, std dev of cone distance, mean linear offset (hypotonuse), std dev of linear offset (hypotonuse), std dev of rotational offset)
 sensorNoiseParams = (0.0, 0.1) #parameters: (mean position error (hypotonuse), std dev of position error (hypotonuse))
 
