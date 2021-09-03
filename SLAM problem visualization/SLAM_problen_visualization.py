@@ -134,12 +134,9 @@ def drawSceneDescription(window, sceneIndex):
     if((sceneIndex >= 0) and (sceneIndex < len(sceneDescription))):
         textToRender = sceneDescription[sceneIndex]
         #textColor = [255-bgColor[0], 255-bgColor[1], 255-bgColor[2]]
-        textimg = pygame.font.Font(None, 21).render(textToRender, 1, debugColor, bgColor)
-        window.blit(textimg, [5, 5])
-
-
-#def 
-
+        for line in range(len(textToRender)):
+            textimg = pygame.font.Font(None, 21).render(textToRender[line], 1, debugColor, bgColor)
+            window.blit(textimg, [5, 5 + line*21])
 
 def averageAngle(angles: np.ndarray):
     # for i in range(len(angles)):
@@ -249,11 +246,11 @@ coneCount = 4
 carNoiseParams = (4.0, 1.0, 0.3, 0.2, np.deg2rad(15)) #parameters: (mean distance to cones, std dev of cone distance, mean linear offset (hypotonuse), std dev of linear offset (hypotonuse), std dev of rotational offset)
 sensorNoiseParams = (0.0, 0.1) #parameters: (mean position error (hypotonuse), std dev of position error (hypotonuse))
 
-sceneDescription = ("rotational and linear offset",
-                    "how to find linear offset",
-                    "reverse-engineering the intersect between the circles",
-                    "finding rotational offset based on calculated linear offset",
-                    "applying results")
+sceneDescription = (("rotational and linear offset (yellow cones are known, blue are 'measured')",),
+                    ("how to find linear offset (yellow line is true offset)", "(the circles are the distances to the known cones (which the blue cones would fall on, if there were no linear offset))"),
+                    ("reverse-engineering the intersect between the circles ('multilateration', blue line is the result)",),
+                    ("finding rotational offset based on calculated linear offset",),
+                    ("applying results (the yellow point+line near the center are the true offsets and the blue point+line are the calculated offsets)",))
 
 
 if __name__ == '__main__':
