@@ -22,6 +22,8 @@ class simCar(Map.Car):
         
         self.min_velocity = -1
         self.max_velocity = 3
+        
+        self.simulationVariables = None
     
     def update(self, dTime, dDist=None):
             """ update the position of the car, based on velocity, steering and time-passage """

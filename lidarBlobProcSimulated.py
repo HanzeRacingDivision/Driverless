@@ -3,13 +3,11 @@
 # instead of saving a seperate master record (which has all sorts of synchronization issues and stuff), i just keep the oldest lidar data (the first blob) forever (i keep deleting the 2nd oldest blob history)
 # see 'makeCone()' and look for a 'slamData.pop(1)' if you solved this itterative-error-addition-drift another way
 
-global STD_DEV_LIDAR_ERROR
 STD_DEV_LIDAR_ERROR = 2.0 #in mm !
-global DATAPOINTS_PER_DISTANCE_NUMERATOR
-DATAPOINTS_PER_DISTANCE_NUMERATOR = 3.6 #calibrated, not calculated, but the lidar i'm using has roughly 0.75deg measurement freq, so 
+#DATAPOINTS_PER_DISTANCE_NUMERATOR = 3.6 #calibrated, not calculated, but the lidar i'm using has roughly 0.75deg measurement freq, so 
 
-global RANGE_LIMIT
-RANGE_LIMIT = 1000 #lidar range limit in mm (blobs that partly exceed the limit will be cut off, so be careful
+
+RANGE_LIMIT = 1300 #lidar range limit in mm (blobs that partly exceed the limit will be cut off, so be careful
 
 import lidarBlobs as LB
 
@@ -22,6 +20,7 @@ import time
 import multiprocessing as MP
 import sharedMem       as SM  #my own shared memory manager (a double-buffered, one-way, pickle-based (single-object) sharedMemory wrapper)
 
+DATAPOINTS_PER_DISTANCE_NUMERATOR = 3.6 * (Map.Cone.coneLidarDiam / (Map.Cone.coneDiam/2))
 
 
 class lidarProcess(MP.Process):
@@ -59,7 +58,13 @@ class lidarProcess(MP.Process):
                     initMap = slaveSharedMem.readObj(self.keepalive) #get master map (there is no real reason to overwrite initMap, but why not right)
                 
                 lidarPos = initMap.car.position
-                global RANGE_LIMIT
+                if(hasattr(initMap.car, 'simulationVariables')):
+                    if(type(initMap.car.simulationVariables) is list):
+                        #print("found simulated real position:", initMap.car.simulationVariables)
+                        lidarPos = initMap.car.simulationVariables[0]
+                    elif(initMap.car.simulationVariables is not None): #(type(initMap.car.simulationVariables) is SC.simCar):
+                        lidarPos = initMap.car.simulationVariables.position
+                
                 nearbyConeList = initMap.distanceToCone(lidarPos, None, sortBySomething='SORTBY_ANGL', simpleThreshold=(RANGE_LIMIT/1000.0))
                 for i in range(len(nearbyConeList)):
                     cone, distAngle = nearbyConeList[i]
@@ -80,35 +85,53 @@ class lidarProcess(MP.Process):
                                 makeNewBlob = False
                     
                     if(makeNewBlob):
-                        adjustedConeDiam = Map.Cone.coneDiam * 0.5 #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
+                        adjustedConeDiam = Map.Cone.coneLidarDiam #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
                         lidarPoints = int(6) #init var
                         if(distAngle[0] > 0.01):#avoid divide by zero, and generally approaching unreasonable numbers
-                            global DATAPOINTS_PER_DISTANCE_NUMERATOR
                             lidarPoints = int(DATAPOINTS_PER_DISTANCE_NUMERATOR / distAngle[0]) #the number of datapoints decreases with distance
                         lidarPointsAngleRange = np.deg2rad(60)
                         invCarToConeAngle = GF.radInv(distAngle[1])
                         dataPointAngles = [((-lidarPointsAngleRange + ((lidarPointsAngleRange/(lidarPoints-1))*i*2))+invCarToConeAngle) for i in range(lidarPoints)]
                         realActualConePos = (cone.position if (cone.slamData is None) else cone.slamData[0][0]) #the simulated lidar must use a constant cone position to 'measure' from
-                        newBlob = None
+                        if(hasattr(initMap.car, 'simulationVariables')):
+                            trueLidarPos = None;  trueLidarAngle = None
+                            if(type(initMap.car.simulationVariables) is list):
+                                #print("found simulated real position:", initMap.car.simulationVariables)
+                                trueLidarPos = initMap.car.simulationVariables[0]
+                                trueLidarAngle = initMap.car.simulationVariables[1]
+                            elif(initMap.car.simulationVariables is not None): #(type(initMap.car.simulationVariables) is SC.simCar):
+                                trueLidarPos = initMap.car.simulationVariables.position
+                                trueLidarAngle = initMap.car.simulationVariables.angle
+                            if(trueLidarPos is not None):
+                                distAngleFromTrue = GF.distAngleBetwPos(trueLidarPos, realActualConePos)
+                                angleError = initMap.car.angle - trueLidarAngle
+                                realActualConePos = GF.distAnglePosToPos(distAngleFromTrue[0], distAngleFromTrue[1] + angleError, initMap.car.position)
+                        newBlob = None;  appendSuccess=True; #init var
                         for j in range(len(dataPointAngles)):
-                            global STD_DEV_LIDAR_ERROR
+                            if(not appendSuccess):
+                                continue
                             randomMeasurementError = np.random.normal() * (STD_DEV_LIDAR_ERROR/1000) #add error in a normal distribution (you could scale with dist, but whatever)
                             pointPos = GF.distAnglePosToPos((adjustedConeDiam/2) + randomMeasurementError, dataPointAngles[j], realActualConePos)
                             if(j == 0):
-                                newBlob = LB.blobCreate(pointPos, lidarPos, initMap.clock())
+                                newBlob = LB.blobCreate(pointPos, initMap.car.position, initMap.clock())
                             else:
-                                appendSuccess = LB.blobAppend(newBlob, pointPos, lidarPos, initMap.clock())
-                                if(not appendSuccess):
-                                    print("(lidarBlobProcSim) bad blob append?")
-                        nearbyConeList[i].append(newBlob)
+                                appendSuccess = LB.blobAppend(newBlob, pointPos, initMap.car.position, initMap.clock())
+                                # if(not appendSuccess):
+                                #     print("(lidarBlobProcSim) bad blob append?")
+                        if(appendSuccess):
+                            nearbyConeList[i].append(newBlob)
                 
+                invalidConePoses = 0
                 for i in range(len(nearbyConeList)):
                     if(len(nearbyConeList[i]) > 3):
                         posIsValid, conePos = LB.blobToConePos(nearbyConeList[i][3])
                         if(posIsValid): #only send if the pos was successfully calculated
                             self.connToMaster.send((conePos, nearbyConeList[i][3]))
                         else:
-                            print("blob with invalid conePos:", nearbyConeList[i][3])
+                            #print("blob with invalid conePos:", nearbyConeList[i][3])
+                            invalidConePoses += 1
+                if(invalidConePoses > 0):
+                    print("invalidConePoses:", invalidConePoses)
                 
                 loopEnd = time.time() #this is only for the 'framerate' limiter (time.sleep() doesn't accept negative numbers, this solves that)
                 if((loopEnd-loopStart) < 0.2): #5 'rotations' per second limiter (optional)

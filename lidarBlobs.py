@@ -11,15 +11,15 @@ blobInProgress = None
 #whenever a point is added, new end angle = max(current end angle, new point angle)
 #the average point is just the average value of the list of points
 
-adjustedConeDiam = Map.Cone.coneDiam * 0.5
+adjustedConeDiam = Map.Cone.coneLidarDiam
 
-maxBlobPointCount = 16 #points, not angle
+maxBlobPointCount = 25 #points, not angle
 #maxBlobAverageGapSizeSqrd = 0.075**2 #if the average distance between points is larger than this, only applied if pointCount >= maxBlobAverageGapPoints
 #maxBlobAverageGapPoints = 3 #number of points in blob required to activate maxBlobAverageGapSizeSqrd check
-maxBlobSingleGap = adjustedConeDiam #if the distance between the new datapoint and the last blob-point is larger than this, don't append, (make a new blob)
+maxBlobSingleGap = adjustedConeDiam * 0.75 #if the distance between the new datapoint and the last blob-point is larger than this, don't append, (make a new blob)
 ## maxBlobSingleGap must equal adjustedConeDiam, because otherwise the np.arcsin() in blobToConePos() will fail to compute.
 
-MIN_BLOB_CONE_LEN = 3 #used for blobToConePos
+MIN_BLOB_CONE_LEN = 5 #used for blobToConePos
 
 #import time
 

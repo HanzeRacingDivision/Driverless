@@ -211,15 +211,19 @@ class pygameDrawer(pygameDrawerCommon):
                 pygame.draw.ellipse(self.window, coneColor, [coneEllipsePos, [conePixelDiam, conePixelDiam]]) #draw cone
                 
                 if(drawSlamData > 0):
-                    if((not self.mapToDraw.SLAMPresent) and (type(cone.slamData) is list)): #pre-SLAM lidar cone spotting
+                    if(#(not self.mapToDraw.SLAMPresent) and 
+                       (type(cone.slamData) is list)): #pre-SLAM lidar cone spotting
                         if((type(cone.slamData[0]) is not tuple) if (len(cone.slamData) > 0) else True): #extra safety checks
                             continue
                         invConeColor = [255-coneColor[0], 255-coneColor[1], 255-coneColor[2]]
                         
+                        trueConePos = cone.slamData[0][0] #used to check if simulation is working correctly
+                        pygame.draw.ellipse(self.window, invConeColor, [GF.ASA(-(conePixelDiam/6), self.realToPixelPos(trueConePos)), [conePixelDiam/3, conePixelDiam/3]]) #draw cone
+                        
                         try: #the blob does not HAVE to be stored in slamData (consider the extra pickling time), so if i end up removeing it, please also uncomment this
                             if(drawSlamData > 1):
                                 blob = cone.slamData[-1][2]
-                                adjustedConeDiam = Map.Cone.coneDiam * 0.5 #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
+                                adjustedConeDiam = Map.Cone.coneLidarDiam #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
                                 for i in range(blob['pointCount']-1):
                                     superAdjustedConeRadius = np.cos(np.arcsin((blob['lines'][i][0]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
                                     pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blob['points'][i]), self.realToPixelPos(blob['points'][i+1]), self.coneConnectionLineWidth)
@@ -287,6 +291,15 @@ class pygameDrawer(pygameDrawerCommon):
             (or a simple polygon instead, if sprite failed/disabled)"""
         ## drawing is currently done by calculating the position of the corners and drawing a polygon with those points. Not efficient, not pretty, but fun
         carToDraw = self.mapToDraw.car
+        
+        if(hasattr(carToDraw, 'simulationVariables')): #if we're simulating positional drift
+            if(type(carToDraw.simulationVariables) is list):
+                tempCar = Map.Car()
+                tempCar.position = carToDraw.simulationVariables[0];  tempCar.angle = carToDraw.simulationVariables[1]
+                self.drawSimTrueCar(tempCar, True, False)
+            elif(carToDraw.simulationVariables is not None):
+                self.drawSimTrueCar(carToDraw.simulationVariables, True, False)
+        
         chassisCenter = carToDraw.getChassisCenterPos()
         if(self.carPolygonMode):
             if(self.carPointRadius is None):
@@ -301,7 +314,7 @@ class pygameDrawer(pygameDrawerCommon):
             polygonPoints.append(self.realToPixelPos([chassisCenter[0] - offsets[1][0], chassisCenter[1] - offsets[1][1]])) #front right
             pygame.draw.polygon(self.window, self.carColor, polygonPoints) #draw car
             #arrow drawing (not needed, just handy to indicate direction of car)
-            arrowPoints = [self.realToPixelPos(chassisCenter), polygonPoints[1], polygonPoints[2]] 
+            arrowPoints = [self.realToPixelPos(carToDraw.position), polygonPoints[1], polygonPoints[2]] 
             oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
             pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
         else:
@@ -322,6 +335,7 @@ class pygameDrawer(pygameDrawerCommon):
             carPos = (carPos[0] - (rotatedCarRect.width / 2), carPos[1] - (rotatedCarRect.height / 2))
             #pygame.draw.rect(self.window, (200,200,200), (carPos, (rotatedCarRect.chassis_width, rotatedCarRect.height))) #draws a little box around the car sprite (just for debug)
             self.window.blit(rotatedCarSprite, carPos) #draw car
+            pygame.draw.circle(window, [255, 255, 255], self.realToPixelPos(carToDraw.position), 0.02 * self.sizeScale) #draw car position indicator
         
         if((carToDraw.pathFolData is not None) and self.mapToDraw.pathPlanningPresent):
             if(carToDraw.pathFolData.nextTarget is not None):
@@ -340,6 +354,44 @@ class pygameDrawer(pygameDrawerCommon):
             for i in range(1, len(self.carHistPoints)):
                 for j in range(len(self.carHistPoints[i])):
                     pygame.draw.line(self.window, [200, 200, 200], self.realToPixelPos(self.carHistPoints[i-1][j]), self.realToPixelPos(self.carHistPoints[i][j]), 1)
+        
+    def drawSimTrueCar(self, carToDraw, carPolygonMode, headlights):
+        chassisCenter = carToDraw.getChassisCenterPos()
+        if(carPolygonMode):
+            if(self.carPointRadius is None):
+                self.carPointRadius = (((carToDraw.chassis_width**2)+(carToDraw.chassis_length**2))**0.5)/2 #Pythagoras
+                self.carPointAngle = np.arctan2(carToDraw.chassis_width, carToDraw.chassis_length) #this is used to make corner point for polygon
+            polygonPoints = []
+            offsets = [[np.cos(self.carPointAngle+carToDraw.angle) * self.carPointRadius, np.sin(self.carPointAngle+carToDraw.angle) * self.carPointRadius],
+                        [np.cos(np.pi-self.carPointAngle+carToDraw.angle) * self.carPointRadius, np.sin(np.pi-self.carPointAngle+carToDraw.angle) * self.carPointRadius]]
+            polygonPoints.append(self.realToPixelPos([chassisCenter[0] + offsets[0][0], chassisCenter[1] + offsets[0][1]])) #front left
+            polygonPoints.append(self.realToPixelPos([chassisCenter[0] + offsets[1][0], chassisCenter[1] + offsets[1][1]])) #back left
+            polygonPoints.append(self.realToPixelPos([chassisCenter[0] - offsets[0][0], chassisCenter[1] - offsets[0][1]])) #back right
+            polygonPoints.append(self.realToPixelPos([chassisCenter[0] - offsets[1][0], chassisCenter[1] - offsets[1][1]])) #front right
+            pygame.draw.polygon(self.window, self.carColor, polygonPoints) #draw car
+            #arrow drawing (not needed, just handy to indicate direction of car)
+            arrowPoints = [self.realToPixelPos(carToDraw.position), polygonPoints[1], polygonPoints[2]] 
+            oppositeColor = [255-self.carColor[0], 255-self.carColor[1], 255-self.carColor[1]]
+            pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
+        else:
+            if(headlights):# draw headlights (first, to not overlap car sprite)
+                headlightsImageSize = int(2.0*2*self.sizeScale) #2.0 is arbitrary for now, to be replaced with apprixate camera/sensor range
+                headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
+                headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
+                #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
+                headlightsCenterAngle = -1 * np.rad2deg((self.carCamOrient) if self.carCam else (carToDraw.angle))
+                headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), headlightsCenterAngle-60, headlightsCenterAngle+60, fill= (55, 55, 35))
+                headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
+                headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(chassisCenter))
+                self.window.blit(headlightsImage, headlightsImage_rect)
+            scaledCarSprite = pygame.transform.scale(self.car_image, (int(carToDraw.chassis_length*self.sizeScale), int(carToDraw.chassis_width*self.sizeScale))) #note: height (length) and width are switched because an angle of 0 is at 3 o'clock, (and the car sprite is loaded like that)
+            rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg((self.carCamOrient) if self.carCam else (carToDraw.angle)))
+            rotatedCarRect = rotatedCarSprite.get_rect()
+            carPos = self.realToPixelPos(chassisCenter)
+            carPos = (carPos[0] - (rotatedCarRect.width / 2), carPos[1] - (rotatedCarRect.height / 2))
+            #pygame.draw.rect(self.window, (200,200,200), (carPos, (rotatedCarRect.chassis_width, rotatedCarRect.height))) #draws a little box around the car sprite (just for debug)
+            self.window.blit(rotatedCarSprite, carPos) #draw car
+            pygame.draw.circle(window, [255, 255, 255], self.realToPixelPos(carToDraw.position), 0.02 * self.sizeScale) #draw car position indicator
     
     def drawStatText(self):
         """draw some usefull information/statistics on-screen"""
@@ -348,10 +400,19 @@ class pygameDrawer(pygameDrawerCommon):
             self.statDisplayTimer = newTime
             statsToShow = [] # a list of strings
             carToDraw = self.mapToDraw.car
-            statsToShow.append(str(round(carToDraw.position[0], 2))+" , "+str(round(carToDraw.position[1], 2)))
-            statsToShow.append(str(round(np.rad2deg(carToDraw.angle), 2))+" , "+str(round(GF.degRoll(np.rad2deg(carToDraw.angle)), 2)))
-            statsToShow.append(str(round(carToDraw.velocity, 2))+"   "+str(round(np.rad2deg(carToDraw.steering), 2)))
-            statsToShow.append(str(round(carToDraw.desired_velocity, 2))+"   "+str(round(np.rad2deg(carToDraw.desired_steering), 2)))
+            statsToShow.append(str(round(carToDraw.position[0], 2))+" , "+str(round(carToDraw.position[1], 2))+" pos")
+            statsToShow.append(str(round(np.rad2deg(carToDraw.angle), 2))+" = "+str(round(GF.degRoll(np.rad2deg(carToDraw.angle)), 2))+" angle")
+            statsToShow.append(str(round(carToDraw.velocity, 2))+" & "+str(round(np.rad2deg(carToDraw.steering), 2))+" speed & steering")
+            statsToShow.append(str(round(carToDraw.desired_velocity, 2))+" & "+str(round(np.rad2deg(carToDraw.desired_steering), 2))+" desired spd&str")
+            if(hasattr(carToDraw, 'simulationVariables')): #if we're simulating positional drift
+                if(type(carToDraw.simulationVariables) is list):
+                    statsToShow.append(str(round(carToDraw.simulationVariables[0][0], 2))+" , "+str(round(carToDraw.simulationVariables[0][1], 2))+" real sim pos")
+                    statsToShow.append(str(round(np.rad2deg(carToDraw.simulationVariables[0]), 2))+" = "+str(round(GF.degRoll(np.rad2deg(carToDraw.simulationVariables[0])), 2))+" real sim angle")
+                elif(carToDraw.simulationVariables is not None):
+                    statsToShow.append(str(round(carToDraw.simulationVariables.position[0], 2))+" , "+str(round(carToDraw.simulationVariables.position[1], 2))+" real sim pos")
+                    statsToShow.append(str(round(np.rad2deg(carToDraw.simulationVariables.angle), 2))+" = "+str(round(GF.degRoll(np.rad2deg(carToDraw.simulationVariables.angle)), 2))+" real sim angle")
+            debugMousePos = self.pixelsToRealPos(pygame.mouse.get_pos())
+            statsToShow.append(str(round(debugMousePos[0], 2))+" , "+str(round(debugMousePos[1], 2))+" mouse pos")
             if(self.mapToDraw.pathPlanningPresent and (carToDraw.pathFolData is not None)):
                 statsToShow.append(str(carToDraw.pathFolData.auto)+"   "+str(carToDraw.pathFolData.laps))
             self.statRenderedFonts = [] # a list of rendered fonts (images)
@@ -619,7 +680,8 @@ class pygameDrawer3D(pygameDrawerCommon):
                     pygame.draw.line(self.window, coneColor, conePoints[i], conePoints[(i+1)%len(conePoints)], self.coneOutlineWidth)
             
             if(drawSlamData > 0):
-                if((not self.mapToDraw.SLAMPresent) and (type(cone.slamData) is list)): #pre-SLAM lidar cone spotting
+                if(#(not self.mapToDraw.SLAMPresent) and 
+                   (type(cone.slamData) is list)): #pre-SLAM lidar cone spotting
                     if((type(cone.slamData[0]) is not tuple) if (len(cone.slamData) > 0) else True): #extra safety checks
                         continue
                     textStr = str(cone.slamData[-1][-1]) #get total-spotted-count

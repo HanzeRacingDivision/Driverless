@@ -5,8 +5,8 @@
 ## it should(?) be possible to run the position update function with negative time, to better account for the delays in the communication pipeline(s) (both the serial connection from the lidar, and blobifying take time)
 ## the code would look something like 'lidarPos = intermitUpdate(dTime=(time_since_last_real_update - lidarCommDelayConstant))'
 
-global RANGE_LIMIT
-RANGE_LIMIT = 10000 #lidar range limit in mm (blobs that partly exceed the limit will be cut off, so be careful
+RANGE_LIMIT = 1300 #lidar range limit in mm (blobs that partly exceed the limit will be cut off, so be careful
+PACKET_DELAY = 0.0 # time it takes for a packet to get be received and processed (used to get the exact position at the time the measurement (packet) was made)
 
 import camsense_X1 as CX
 import lidarBlobs as LB
@@ -27,12 +27,21 @@ def uponBlobExist(blob, uponExistArgs): #a little (callback) for when blobs are 
     if(posIsValid): #only send if the pos was successfully calculated
         connToMaster.send((conePos, blob))
 
+def posAngleAtTime(carObj, targetTime):
+    dt = targetTime - carObj.lastFeedbackTimestamp
+    oldPos = carObj.position.copy();   oldAngle = carObj.angle
+    carObj.update(dt, dt*carObj.velocity)
+    returnPos = carObj.position.copy();   returnAngle = carObj.angle
+    carObj.position = oldPos;   carObj.angle = oldAngle
+    return(returnPos, returnAngle)
 
 def packetCallback(newPacket, pointsAdded, callbackExtraArg):
     startAngle = newPacket['startAngle']/CX.DEG_DIV
     angleDif = GF.degDiff(newPacket['startAngle']/CX.DEG_DIV, newPacket['endAngle']/CX.DEG_DIV) #(rollover proof) IMPORTANT: packet angles are still integers, divide by 64 to get degrees (0 to 360)
     angleStep = angleDif/7 #note: there are actually 8 datapointes per packet, but i'm assuming the endAngle is AT the 8th datapoint (and the startAngle is AT the first)
-    global RANGE_LIMIT
+    
+    lidarPos, lidarMountAngle = posAngleAtTime(callbackExtraArg[1], newPacket['timestamp'] - PACKET_DELAY)
+    
     for i in range(newPacket['dataFilled']-pointsAdded, newPacket['dataFilled']): #if it's not a new packet, but an existing one with new points, this will skip the old ones
         if((newPacket['measurements'][i] < RANGE_LIMIT) and (newPacket['measurements'][i] != CX.NO_MEASUREMENT)):
             angle = startAngle+angleStep*i
@@ -40,10 +49,9 @@ def packetCallback(newPacket, pointsAdded, callbackExtraArg):
             lidarAngleError = np.deg2rad(-15) #TBD save this somewhere else, maybe in camsense_X1
             correctedLidarAngle = (-1)*GF.radInv(np.deg2rad(angle)) + lidarAngleError #NOTE: radRoll (or a function that calls it, like radInv) is recommended, also: the *(-1) is to fix CW/CCW issues
             
-            lidarPos = callbackExtraArg[1][0] #the position of the lidar is used to get the point position. Currently, the lidar is mounted directly above the car's (rear-axle/center of rotation) position
-            lidarMountAngle = callbackExtraArg[1][1]
             pointPos = GF.distAnglePosToPos(newPacket['measurements'][i]/1000.0, lidarMountAngle + correctedLidarAngle, lidarPos) #get map position from relative position (asuming lidar is mounter on car)
-            isNewBlob, newBlob = LB.blobify(pointPos, lidarPos, callbackExtraArg[2](), uponBlobExist, callbackExtraArg[0])
+            #isNewBlob, newBlob = LB.blobify(pointPos, lidarPos, callbackExtraArg[2](), uponBlobExist, callbackExtraArg[0])
+            isNewBlob, newBlob = LB.blobify(pointPos, lidarPos, newPacket['timestamp'], uponBlobExist, callbackExtraArg[0])
 
 class lidarProcess(MP.Process):
     """a multiprocessing lidar (serial connection and blobifier)"""
@@ -63,8 +71,7 @@ class lidarProcess(MP.Process):
             slaveSharedMem = SM.sharedMemReadWrapper(*self.sharedMemInit)
             initMap = slaveSharedMem.readObj(self.keepalive) #wait for the first map object to come in (with no timeout?)
             lidar = CX.camsense_X1(self.comPort, initMap.clock)
-            lidarInitPos = (initMap.car.position, initMap.car.angle)
-            lidar.callbackExtraArg = [self.connToMaster, lidarInitPos, initMap.clock]
+            lidar.callbackExtraArg = [self.connToMaster, initMap.car, initMap.clock]
             lidar.postParseCallback = packetCallback #once everything is ready, start sending data
             
             lastCarUpdateTime = time.time()
@@ -82,7 +89,7 @@ class lidarProcess(MP.Process):
                         print("(lidarBlobProc) warning!: no car position updates received through self.connToMaster, defaulting to unpickling the whole map object (slow)")
                     if(slaveSharedMem.poll()): #if a new map is available
                         initMap = slaveSharedMem.readObj(self.keepalive) #get master map (there is no real reason to overwrite initMap, but why not right)
-                        lidar.callbackExtraArg[1] = (initMap.car.position, initMap.car.angle)
+                        lidar.callbackExtraArg[1] = initMap.car
                 
                 lidar.run() #read serial data and when/if a full packet is ready, attempt to blobify it (using the packetCallback), and once a blob is ready, send it to the master process
                 LB.checkBlobAge(initMap.clock(), uponBlobExist, self.connToMaster, (60.0/(lidar.RPM() if (lidar.RPM()>0.01) else 300))*0.25) #arguments are (timestamp, uponExistCallback, callbackExtraArgs, uponExistAppendTimeout)

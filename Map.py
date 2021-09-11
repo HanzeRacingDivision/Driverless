@@ -102,6 +102,7 @@ class Map:
     class Cone:
         """ a small class to hold all pertinent information about boundry cones (like position, left-or-right-ness, whether it's part of the finish line, etc) """
         coneDiam = 0.14 #cone diameter in meters (constant)
+        coneLidarDiam = 0.25
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
             self.position = np.array([pos[0], pos[1]], dtype=np.float64)
