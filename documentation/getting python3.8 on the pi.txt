@@ -1,0 +1,52 @@
+
+to install python 3.8:
+https://raspberrypi.stackexchange.com/questions/116118/updating-python-3-7-to-3-8
+https://itheo.nl/install-python-3-8-on-a-raspberry-pi
+//a combination of the two sites above will do the trick:
+(the big first line is the same, install all those building packages)
+wget https://www.python.org/ftp/python/3.8.0/Python-3.8.0.tar.xz
+tar xf Python-3.8.0.tar.xz
+cd Python-3.8.0
+./configure --enable-optimizations   //you can specify location like --prefix=/usr/local/opt/python-3.8.0, default location is /usr/local/bin (not the same as defualt pi python!)
+make -j4 //compile (j4 means all 4 cores of the pi)
+sudo make altinstall //install
+
+
+to set python 3.8 as the main python:
+(assuming /usr/bin/python is the link location for 'python' , /usr/bin/python3.7 is the old installation and /usr/local/bin/python3.8 is the new one)
+sudo update-alternatives --query python //to get the current links
+sudo update-alternatives --install /usr/bin/python python /usr/local/bin/python3.8 <some high priority number>
+
+sudo ln -s /usr/bin/python3 /usr/local/bin/python3.8 //a (direct) symbolic link to get 'python3' to respond to 3.8
+// OR (depending on which one works)
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.8 <some high priority number>
+
+// at this point, you may encounter a number of issues regarding pip, many of these can be solved by copying the contents of /usr/local/bin/pip3.8 to other pip files (while being mindfull of the top comment part)
+// i also notices that pip2 points to pip3 because the pip2 file uses 'python' not 'python2' at the comment at the top of the file
+
+// pip will probably spit out an error (at every install) about 'lsb_release -a', the following solves that (https://stackoverflow.com/questions/44967202/pip-is-showing-error-lsb-release-a-returned-non-zero-exit-status-1)
+sudo ln -s /usr/share/pyshared/lsb_release.py /usr/local/lib/python3.8/site-packages/lsb_release.py
+
+
+to get apt_pkg to work:
+sudo apt remove python3-apt
+sudo apt autoremove
+sudo apt autoclean
+sudo apt install python3-apt
+
+to get 'pip install scipy' to work:
+sudo apt-get install libatlas-base-dev
+sudo apt-get install gfortran
+
+as for numba:
+sudo apt install llvm-9
+LLVM_CONFIG=llvm-config-9 pip install numba  //this will auto-install llvmlite as well
+
+as for pygame:
+https://www.pygame.org/wiki/CompileUbuntu?parent=
+///and if that fails
+///https://github.com/pygame/pygame/issues/1536
+///install all the dependencies and then just pip install pygame
+REVISED:
+sudo apt install libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libfreetype6-dev libportmidi-dev
+python3 -m pip install pygame==2.0.1

@@ -167,7 +167,7 @@ class carMCUserialProcess(MP.Process):
                 except KeyboardInterrupt:
                     print("keyboardInterrupt! attempting to close carMCU serial connection...")
                     try:
-                        self.disconnect()
+                        carConn.disconnect()
                     except:
                         print("couldn't disconnect")
                     self.keepalive.acquire()
@@ -175,7 +175,7 @@ class carMCUserialProcess(MP.Process):
                 except Exception as excep:
                     print("carMCU other exception:", excep)
                     try:
-                        self.disconnect()
+                        carConn.disconnect()
                     except:
                         print("couldn't disconnect")
                     time.sleep(0.25)
@@ -349,7 +349,7 @@ class carMCUserial:
                 self.lastSendTime = rightNow
                 if(self.carMCUserial.is_open):
                     #convert floats to string ('\r' is not really needed)
-                    dataString = str(round(float(speed), 2)) + ' ' + str(round(np.rad2deg(float(angle)), 1)) + '\n'
+                    dataString = ('{:.2f}'.format(round(float(speed), 2))) + ' ' + ('{:.1f}'.format(round(np.rad2deg(float(angle)), 1))) + '\n'
                     #NOTE: the (current) serial formatting uses angles in degrees (for more precision per char (unless you start multiplying&dividing by powers of 10))
                     #print("sending:",dataString.encode())
                     try:

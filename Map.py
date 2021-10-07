@@ -102,7 +102,7 @@ class Map:
     class Cone:
         """ a small class to hold all pertinent information about boundry cones (like position, left-or-right-ness, whether it's part of the finish line, etc) """
         coneDiam = 0.14 #cone diameter in meters (constant)
-        coneLidarDiam = 0.25
+        coneLidarDiam = 0.07
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
             self.position = np.array([pos[0], pos[1]], dtype=np.float64)
@@ -275,7 +275,7 @@ class Map:
     def overlapConeCheck(self, posToCheck):
         """ return whether or not a given position overlaps an existing cone and the cone which it overlaps (if any) """
         boolAnswer = False;   coneListPointer=None #boolAnswer MUST default to False, the other variables dont matter as much
-        coneDistToler = self.Cone.coneDiam*1 #overlap tolerance  NOTE: area is square, not round
+        coneDistToler = self.Cone.coneDiam * 1.0  #overlap tolerance  NOTE: area is square, not round
         combinedConeList = (self.right_cone_list + self.left_cone_list)
         for cone in combinedConeList:
             if((posToCheck[0] > (cone.position[0]-coneDistToler)) and (posToCheck[0] < (cone.position[0]+coneDistToler)) and (posToCheck[1] > (cone.position[1]-coneDistToler)) and (posToCheck[1] < (cone.position[1]+coneDistToler))):

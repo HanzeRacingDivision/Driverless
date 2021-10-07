@@ -261,6 +261,34 @@ def handleKeyPress(pygameDrawerInput, phantomMap, keyDown, key, eventToHandle):
                 pygameDrawerInput.drawConeSlamData = 0
         elif(key==pygame.K_h): # h
             pygameDrawerInput.headlights = not pygameDrawerInput.headlights #only has an effect if car sprite is used (.carPolygonMode)
+        elif(key==pygame.K_d): # d
+            ## (debug) stop/start cone creation
+            pygameDrawerInput.makeNewCones = not pygameDrawerInput.makeNewCones
+#            ## (debug) printing the pickle size of individual components in the map object
+#            import pickle
+#            print("total len:", len(pickle.dumps(pygameDrawerInput.mapToDraw)))
+#            def getComponentPickleSize(obj, recursive=0, recursiveThresh=2000): #a function to (recursively)
+#                subLengths = []
+#                if(type(obj) in (list, tuple, np.ndarray)):
+#                    for i in range(len(obj)):
+#                        subLengths.append([i, len(pickle.dumps(obj[i]))])
+#                        if(recursive and (subLengths[-1][1] > recursiveThresh)):
+#                            subLengths[-1].append(getComponentPickleSize(obj[i], recursive-1, recursiveThresh))
+#                            subLengths[-1].append(sum(item[1] for item in subLengths[-1][2]))
+#                else:
+#                    for attrName in dir(obj):
+#                        if((not attrName.startswith('__')) and (not callable(getattr(obj, attrName)))): #if the attribute is not private (low level stuff) or a function (method)
+#                            subLengths.append([attrName, len(pickle.dumps(getattr(obj, attrName)))])
+#                            if(recursive and (subLengths[-1][1] > recursiveThresh)):
+#                                subLengths[-1].append(getComponentPickleSize(getattr(obj, attrName), recursive-1, recursiveThresh))
+#                subLengths.append(["total", sum(item[1] for item in subLengths)])
+#                return(subLengths)
+#            def printComponentPickleSizes(pickleSizeList, _recursion=0):
+#                for item in pickleSizeList:
+#                    print('\t'*_recursion, item[0:2])
+#                    if(len(item)>2):
+#                        printComponentPickleSizes(item[2], _recursion+1)
+#            printComponentPickleSizes(getComponentPickleSize(pygameDrawerInput.mapToDraw, 2, 2000))
         elif(key==pygame.K_c): # c
             # if(pygame.key.get_pressed()[pygame.K_LCTRL]): #causes too many problems, just restart the program or run pygameDrawerInput.__init__ again
             #     #reset everything
@@ -321,6 +349,7 @@ def handleWindowEvent(pygameDrawerInput, phantomMap, eventToHandle):
     """(UI element) handle general (pygame) window-event"""
     if(eventToHandle.type == pygame.QUIT):
         #global windowKeepRunning
+        print("pygame.QUIT")
         DD.windowKeepRunning = False #stop program (soon)
     
     elif(eventToHandle.type == pygame.VIDEORESIZE):

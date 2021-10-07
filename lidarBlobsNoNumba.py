@@ -19,7 +19,7 @@ maxBlobPointCount = 25 #points, not angle
 maxBlobSingleGap = adjustedConeDiam * 0.75 #if the distance between the new datapoint and the last blob-point is larger than this, don't append, (make a new blob)
 ## maxBlobSingleGap must equal adjustedConeDiam, because otherwise the np.arcsin() in blobToConePos() will fail to compute.
 
-MIN_BLOB_CONE_LEN = 5 #used for blobToConePos
+MIN_BLOB_CONE_LEN = 3 #used for blobToConePos
 
 #import time
 

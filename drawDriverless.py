@@ -48,6 +48,8 @@ class pygameDrawerCommon():
         self.drawCarHist = False #just for UI purposes, to toggle between showing the position history (thin white line) or not
         self.extraViewMode = False #triggered with CTRL+V, can be used to switch between normal and 3D view, or whatever else you want
 
+        self.makeNewCones = True #debugging boolean, used to help build track manually
+
 
 class pygameDrawer(pygameDrawerCommon):
     """a class to draw Map objects (also includes drawing of UI some elements for manually making tracks)"""
@@ -237,6 +239,11 @@ class pygameDrawer(pygameDrawerCommon):
                         renderedText = self.pygameFont.render(textStr, False, invConeColor, coneColor)
                         coneTextPos = [conePos[0] - renderedText.get_size()[0]/2, conePos[1] - renderedText.get_size()[1]/2] #to topleft corner of text size
                         self.window.blit(renderedText, coneTextPos)
+                else:
+                    textStr = str(cone.ID) #get total-spotted-count
+                    renderedText = self.pygameFont.render(textStr, False, [255-coneColor[0], 255-coneColor[1], 255-coneColor[2]], coneColor)
+                    coneTextPos = [conePos[0] - renderedText.get_size()[0]/2, conePos[1] - renderedText.get_size()[1]/2] #to topleft corner of text size
+                    self.window.blit(renderedText, coneTextPos)
             
             if(self.mapToDraw.pathPlanningPresent and self.drawQubicSplines):
                 splinePointPixelDiam = self.splinePointDiam * self.sizeScale

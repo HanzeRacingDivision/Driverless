@@ -1,0 +1,996 @@
+_updatePacketList (Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C), array(uint8, 1d, C), array(uint8, 1d, C), array(uint8, 1d, C), array(uint16, 1d, C))
+--------------------------------------------------------------------------------
+# File: C:\Users\tttth\OneDrive - Hanzehogeschool Groningen\Hanze Racing Division\pygame sim\lidar\camsense_X1.py
+# --- LINE 112 --- 
+
+@njit
+
+# --- LINE 113 --- 
+
+def _updatePacketList(newPacket, packetList, dynamicListSize, volatileIndex, rotationCount, _lastAngles):
+
+    # --- LINE 114 --- 
+
+    ## determine how to put the new data in the existing array
+
+    # --- LINE 115 --- 
+    # label 0
+    #   newPacket = arg(0, name=newPacket)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+    #   packetList = arg(1, name=packetList)  :: unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C)
+    #   dynamicListSize = arg(2, name=dynamicListSize)  :: array(uint8, 1d, C)
+    #   volatileIndex = arg(3, name=volatileIndex)  :: array(uint8, 1d, C)
+    #   rotationCount = arg(4, name=rotationCount)  :: array(uint8, 1d, C)
+    #   _lastAngles = arg(5, name=_lastAngles)  :: array(uint16, 1d, C)
+    #   $const4.1 = const(str, startAngle)  :: Literal[str](startAngle)
+    #   $6binary_subscr.2 = static_getitem(value=newPacket, index=startAngle, index_var=$const4.1)  :: uint16
+    #   del $const4.1
+    #   $const10.4 = const(int, 0)  :: Literal[int](0)
+    #   $12binary_subscr.5 = static_getitem(value=_lastAngles, index=0, index_var=$const10.4)  :: uint16
+    #   del $const10.4
+    #   $14compare_op.6 = $6binary_subscr.2 < $12binary_subscr.5  :: bool
+    #   del $6binary_subscr.2
+    #   del $12binary_subscr.5
+    #   bool16 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+    #   $16pred = call bool16($14compare_op.6, func=bool16, args=(Var($14compare_op.6, camsense_X1.py:115),), kws=(), vararg=None)  :: (bool,) -> bool
+    #   del bool16
+    #   del $14compare_op.6
+    #   branch $16pred, 18, 82
+    # label 18
+    #   del $16pred
+    #   $const20.1 = const(int, 0)  :: Literal[int](0)
+    #   $22binary_subscr.2 = static_getitem(value=volatileIndex, index=0, index_var=$const20.1)  :: uint8
+    #   del $const20.1
+    #   $const24.3 = const(int, 0)  :: Literal[int](0)
+    #   $26compare_op.4 = $22binary_subscr.2 > $const24.3  :: bool
+    #   del $const24.3
+    #   del $22binary_subscr.2
+    #   bool28 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+    #   $28pred = call bool28($26compare_op.4, func=bool28, args=(Var($26compare_op.4, camsense_X1.py:115),), kws=(), vararg=None)  :: (bool,) -> bool
+    #   del bool28
+    #   del $26compare_op.4
+    #   branch $28pred, 30, 82
+
+    if((newPacket['startAngle'] < _lastAngles[0]) and (volatileIndex[0] > 0)): #if the new packet is the first one of the new rotation (except the endAngle of the last packet can already be rolled over)
+
+        # --- LINE 116 --- 
+        # label 30
+        #   del $28pred
+        #   $const32.1 = const(int, 0)  :: Literal[int](0)
+        #   $34binary_subscr.2 = static_getitem(value=volatileIndex, index=0, index_var=$const32.1)  :: uint8
+        #   del $const32.1
+        #   $const38.4 = const(int, 0)  :: Literal[int](0)
+        #   $40binary_subscr.5 = static_getitem(value=dynamicListSize, index=0, index_var=$const38.4)  :: uint8
+        #   del $const38.4
+        #   $42compare_op.6 = $34binary_subscr.2 < $40binary_subscr.5  :: bool
+        #   del $40binary_subscr.5
+        #   del $34binary_subscr.2
+        #   bool44 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+        #   $44pred = call bool44($42compare_op.6, func=bool44, args=(Var($42compare_op.6, camsense_X1.py:116),), kws=(), vararg=None)  :: (bool,) -> bool
+        #   del bool44
+        #   del $42compare_op.6
+        #   branch $44pred, 46, 58
+
+        if(volatileIndex[0] < dynamicListSize[0]):
+
+            # --- LINE 117 --- 
+
+            #shiftList(packetList, dynamicListSize[0]-volatileIndex[0], volatileIndex[0], dynamicListSize, True, False) #delete data
+
+            # --- LINE 118 --- 
+            # label 46
+            #   del $44pred
+            #   $const48.1 = const(int, 0)  :: Literal[int](0)
+            #   $50binary_subscr.2 = static_getitem(value=volatileIndex, index=0, index_var=$const48.1)  :: uint8
+            #   del $const48.1
+            #   $const54.4 = const(int, 0)  :: Literal[int](0)
+            #   dynamicListSize[0] = $50binary_subscr.2
+            #   del $const54.4
+            #   del $50binary_subscr.2
+
+            dynamicListSize[0] = volatileIndex[0] #no need to go through shiftList(), which will only do this in this case anyway.
+
+        # --- LINE 119 --- 
+        #   jump 58
+        # label 58
+        #   del $44pred
+        #   $const58.0 = const(int, 0)  :: Literal[int](0)
+        #   $const62.2 = const(int, 0)  :: Literal[int](0)
+        #   volatileIndex[0] = $const58.0
+        #   del $const62.2
+        #   del $const58.0
+
+        volatileIndex[0] = 0
+
+        # --- LINE 120 --- 
+        #   $const68.4 = const(int, 0)  :: Literal[int](0)
+        #   $72binary_subscr.7 = static_getitem(value=rotationCount, index=0, index_var=$const68.4)  :: uint8
+        #   $const74.8 = const(int, 1)  :: Literal[int](1)
+        #   $76inplace_add.9 = inplace_binop(fn=<built-in function iadd>, immutable_fn=<built-in function add>, lhs=$72binary_subscr.7, rhs=$const74.8, static_lhs=Undefined, static_rhs=Undefined)  :: int64
+        #   del $const74.8
+        #   del $72binary_subscr.7
+        #   rotationCount[0] = $76inplace_add.9
+        #   del $const68.4
+        #   del $76inplace_add.9
+
+        rotationCount[0] += 1
+
+    # --- LINE 121 --- 
+    #   jump 82
+    # label 82
+    #   del $28pred
+    #   del $16pred
+    #   $const84.1 = const(int, 0)  :: Literal[int](0)
+    #   $86binary_subscr.2 = static_getitem(value=rotationCount, index=0, index_var=$const84.1)  :: uint8
+    #   del $const84.1
+    #   $const88.3 = const(int, 0)  :: Literal[int](0)
+    #   $90compare_op.4 = $86binary_subscr.2 == $const88.3  :: bool
+    #   del $const88.3
+    #   del $86binary_subscr.2
+    #   bool92 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+    #   $92pred = call bool92($90compare_op.4, func=bool92, args=(Var($90compare_op.4, camsense_X1.py:121),), kws=(), vararg=None)  :: (bool,) -> bool
+    #   del bool92
+    #   del $90compare_op.4
+    #   branch $92pred, 110, 94
+    # label 94
+    #   del $92pred
+    #   $const96.1 = const(int, 0)  :: Literal[int](0)
+    #   $98binary_subscr.2 = static_getitem(value=volatileIndex, index=0, index_var=$const96.1)  :: uint8
+    #   del $const96.1
+    #   $const102.4 = const(int, 0)  :: Literal[int](0)
+    #   $104binary_subscr.5 = static_getitem(value=dynamicListSize, index=0, index_var=$const102.4)  :: uint8
+    #   del $const102.4
+    #   $106compare_op.6 = $98binary_subscr.2 >= $104binary_subscr.5  :: bool
+    #   del $98binary_subscr.2
+    #   del $104binary_subscr.5
+    #   bool108 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+    #   $108pred = call bool108($106compare_op.6, func=bool108, args=(Var($106compare_op.6, camsense_X1.py:121),), kws=(), vararg=None)  :: (bool,) -> bool
+    #   del bool108
+    #   del $106compare_op.6
+    #   branch $108pred, 110, 142
+
+    if((rotationCount[0] == 0) or (volatileIndex[0] >= dynamicListSize[0])): #for the first rotation, just insert data. (inserting data at the end of the array (even if the current array size is 0) is perfectly fine)
+
+        # --- LINE 122 --- 
+
+        # append packetList (to be clear, at this point volatileIndex[0] should equal lidarDataLen[0]
+
+        # --- LINE 123 --- 
+        # label 110
+        #   del $92pred
+        #   del $108pred
+        #   $const116.3 = const(int, 0)  :: Literal[int](0)
+        #   $118binary_subscr.4 = static_getitem(value=dynamicListSize, index=0, index_var=$const116.3)  :: uint8
+        #   del $const116.3
+        #   packetList[$118binary_subscr.4] = newPacket  :: (unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C), uint64, Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)) -> none
+        #   del packetList
+        #   del $118binary_subscr.4
+
+        packetList[dynamicListSize[0]] = newPacket
+
+        # --- LINE 124 --- 
+        #   $const124.6 = const(int, 0)  :: Literal[int](0)
+        #   $128binary_subscr.9 = static_getitem(value=dynamicListSize, index=0, index_var=$const124.6)  :: uint8
+        #   $const130.10 = const(int, 1)  :: Literal[int](1)
+        #   $132inplace_add.11 = inplace_binop(fn=<built-in function iadd>, immutable_fn=<built-in function add>, lhs=$128binary_subscr.9, rhs=$const130.10, static_lhs=Undefined, static_rhs=Undefined)  :: int64
+        #   del $const130.10
+        #   del $128binary_subscr.9
+        #   dynamicListSize[0] = $132inplace_add.11
+        #   del $const124.6
+        #   del $132inplace_add.11
+        #   jump 696
+
+        dynamicListSize[0] += 1
+
+    # --- LINE 125 --- 
+
+    else:
+
+        # --- LINE 126 --- 
+        # label 142
+        #   del $108pred
+        #   $const142.0 = const(bool, True)  :: bool
+        #   keepSearchingArray = $const142.0  :: bool
+        #   del $const142.0
+
+        keepSearchingArray = True
+
+        # --- LINE 127 --- 
+        #   $const146.1 = const(int, 0)  :: Literal[int](0)
+        #   packetsToDelete = $const146.1  :: Literal[int](0)
+        #   del $const146.1
+
+        packetsToDelete = 0
+
+        # --- LINE 128 --- 
+        #   $const150.2 = const(bool, False)  :: bool
+        #   insertNewPacket = $const150.2  :: bool
+        #   del $const150.2
+
+        insertNewPacket = False
+
+        # --- LINE 129 --- 
+        #   $154load_global.3 = global(range: <class 'range'>)  :: Function(<class 'range'>)
+        #   $const158.5 = const(int, 0)  :: Literal[int](0)
+        #   $160binary_subscr.6 = static_getitem(value=volatileIndex, index=0, index_var=$const158.5)  :: uint8
+        #   del $const158.5
+        #   $const164.8 = const(int, 0)  :: Literal[int](0)
+        #   $166binary_subscr.9 = static_getitem(value=dynamicListSize, index=0, index_var=$const164.8)  :: uint8
+        #   del $const164.8
+        #   $168call_function.10 = call $154load_global.3($160binary_subscr.6, $166binary_subscr.9, func=$154load_global.3, args=[Var($160binary_subscr.6, camsense_X1.py:129), Var($166binary_subscr.9, camsense_X1.py:129)], kws=(), vararg=None)  :: (uint64, uint64) -> range_state_uint64
+        #   del $166binary_subscr.9
+        #   del $160binary_subscr.6
+        #   del $154load_global.3
+        #   $170get_iter.11 = getiter(value=$168call_function.10)  :: range_iter_uint64
+        #   del $168call_function.10
+        #   $phi172.0 = $170get_iter.11  :: range_iter_uint64
+        #   del $170get_iter.11
+        #   jump 172
+        # label 172
+        #   $172for_iter.1 = iternext(value=$phi172.0)  :: pair<uint64, bool>
+        #   $172for_iter.2 = pair_first(value=$172for_iter.1)  :: uint64
+        #   $172for_iter.3 = pair_second(value=$172for_iter.1)  :: bool
+        #   del $172for_iter.1
+        #   $phi176.1 = $172for_iter.2  :: uint64
+        #   del $172for_iter.2
+        #   branch $172for_iter.3, 176, 480
+        # label 176
+        #   del $172for_iter.3
+        #   i = $phi176.1  :: uint64
+        #   del $phi176.1
+
+        for i in range(volatileIndex[0], dynamicListSize[0]):
+
+            # --- LINE 130 --- 
+            #   $182binary_subscr.4 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+            #   $const184.5 = const(str, startAngle)  :: Literal[str](startAngle)
+            #   $186binary_subscr.6 = static_getitem(value=$182binary_subscr.4, index=startAngle, index_var=$const184.5)  :: uint16
+            #   del $const184.5
+            #   del $182binary_subscr.4
+            #   $const190.8 = const(str, startAngle)  :: Literal[str](startAngle)
+            #   $192binary_subscr.9 = static_getitem(value=newPacket, index=startAngle, index_var=$const190.8)  :: uint16
+            #   del $const190.8
+            #   $194compare_op.10 = $186binary_subscr.6 <= $192binary_subscr.9  :: bool
+            #   del $192binary_subscr.9
+            #   del $186binary_subscr.6
+            #   bool196 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+            #   $196pred = call bool196($194compare_op.10, func=bool196, args=(Var($194compare_op.10, camsense_X1.py:130),), kws=(), vararg=None)  :: (bool,) -> bool
+            #   del bool196
+            #   del $194compare_op.10
+            #   branch $196pred, 200, 404
+
+            if(packetList[i]['startAngle'] <= newPacket['startAngle']): #if next startAngle is below
+
+                # --- LINE 131 --- 
+                # label 200
+                #   del $196pred
+                #   $204binary_subscr.3 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                #   $const206.4 = const(str, endAngle)  :: Literal[str](endAngle)
+                #   $208binary_subscr.5 = static_getitem(value=$204binary_subscr.3, index=endAngle, index_var=$const206.4)  :: uint16
+                #   del $const206.4
+                #   del $204binary_subscr.3
+                #   $const212.7 = const(str, startAngle)  :: Literal[str](startAngle)
+                #   $214binary_subscr.8 = static_getitem(value=newPacket, index=startAngle, index_var=$const212.7)  :: uint16
+                #   del $const212.7
+                #   $216compare_op.9 = $208binary_subscr.5 <= $214binary_subscr.8  :: bool
+                #   del $214binary_subscr.8
+                #   del $208binary_subscr.5
+                #   bool218 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                #   $218pred = call bool218($216compare_op.9, func=bool218, args=(Var($216compare_op.9, camsense_X1.py:131),), kws=(), vararg=None)  :: (bool,) -> bool
+                #   del bool218
+                #   del $216compare_op.9
+                #   branch $218pred, 222, 284
+                # label 222
+                #   del $218pred
+                #   $226binary_subscr.3 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                #   $const228.4 = const(str, startAngle)  :: Literal[str](startAngle)
+                #   $230binary_subscr.5 = static_getitem(value=$226binary_subscr.3, index=startAngle, index_var=$const228.4)  :: uint16
+                #   del $const228.4
+                #   del $226binary_subscr.3
+                #   $236binary_subscr.8 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                #   $const238.9 = const(str, endAngle)  :: Literal[str](endAngle)
+                #   $240binary_subscr.10 = static_getitem(value=$236binary_subscr.8, index=endAngle, index_var=$const238.9)  :: uint16
+                #   del $const238.9
+                #   del $236binary_subscr.8
+                #   $242compare_op.11 = $230binary_subscr.5 < $240binary_subscr.10  :: bool
+                #   del $240binary_subscr.10
+                #   del $230binary_subscr.5
+                #   bool244 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                #   $244pred = call bool244($242compare_op.11, func=bool244, args=(Var($242compare_op.11, camsense_X1.py:131),), kws=(), vararg=None)  :: (bool,) -> bool
+                #   del bool244
+                #   del $242compare_op.11
+                #   branch $244pred, 248, 284
+
+                if((packetList[i]['endAngle'] <= newPacket['startAngle']) and (packetList[i]['startAngle'] < packetList[i]['endAngle'])): #if the old packet is completely behind the new one, then it must be deleted altogether (e.g: old{0,6} new{7,13})
+
+                    # --- LINE 132 --- 
+                    #   packetsToDelete.3 = phi(incoming_values=[Var(packetsToDelete.1, camsense_X1.py:132), Var(packetsToDelete, camsense_X1.py:127)], incoming_blocks=[402, 142])  :: int64
+                    #   del packetsToDelete.1
+                    # label 248
+                    #   del i
+                    #   del $244pred
+                    #   $const250.2 = const(int, 1)  :: Literal[int](1)
+                    #   $252inplace_add.3 = inplace_binop(fn=<built-in function iadd>, immutable_fn=<built-in function add>, lhs=packetsToDelete.3, rhs=$const250.2, static_lhs=Undefined, static_rhs=Undefined)  :: int64
+                    #   del packetsToDelete.3
+                    #   del $const250.2
+                    #   packetsToDelete.1 = $252inplace_add.3  :: int64
+                    #   del $252inplace_add.3
+
+                    packetsToDelete+=1
+
+                    # --- LINE 133 --- 
+                    #   $const258.5 = const(int, 0)  :: Literal[int](0)
+                    #   $260binary_subscr.6 = static_getitem(value=dynamicListSize, index=0, index_var=$const258.5)  :: uint8
+                    #   del $const258.5
+                    #   $264binary_subtract.8 = $260binary_subscr.6 - packetsToDelete.1  :: int64
+                    #   del $260binary_subscr.6
+                    #   $const268.10 = const(int, 0)  :: Literal[int](0)
+                    #   $270binary_subscr.11 = static_getitem(value=volatileIndex, index=0, index_var=$const268.10)  :: uint8
+                    #   del $const268.10
+                    #   $272compare_op.12 = $264binary_subtract.8 <= $270binary_subscr.11  :: bool
+                    #   del $270binary_subscr.11
+                    #   del $264binary_subtract.8
+                    #   bool274 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                    #   $274pred = call bool274($272compare_op.12, func=bool274, args=(Var($272compare_op.12, camsense_X1.py:133),), kws=(), vararg=None)  :: (bool,) -> bool
+                    #   del bool274
+                    #   del $272compare_op.12
+                    #   branch $274pred, 278, 402
+
+                    if((dynamicListSize[0]-packetsToDelete) <= volatileIndex[0]): #if it intends to delete all entries between volatileIndex[0] and the end of the list, then it must append (a.k.a. insert at lidarDataLen[0])
+
+                        # --- LINE 134 --- 
+                        # label 278
+                        #   del $274pred
+                        #   $const278.1 = const(bool, True)  :: bool
+                        #   insertNewPacket.1 = $const278.1  :: bool
+                        #   del $const278.1
+                        #   jump 402
+
+                        insertNewPacket = True
+
+                # --- LINE 135 --- 
+                # label 284
+                #   del packetsToDelete
+                #   del insertNewPacket.1
+                #   del insertNewPacket
+                #   del $phi172.0
+                #   del $244pred
+                #   del $218pred
+                #   $288binary_subscr.3 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                #   $const290.4 = const(str, endAngle)  :: Literal[str](endAngle)
+                #   $292binary_subscr.5 = static_getitem(value=$288binary_subscr.3, index=endAngle, index_var=$const290.4)  :: uint16
+                #   del $const290.4
+                #   del $288binary_subscr.3
+                #   $const296.7 = const(str, endAngle)  :: Literal[str](endAngle)
+                #   $298binary_subscr.8 = static_getitem(value=newPacket, index=endAngle, index_var=$const296.7)  :: uint16
+                #   del $const296.7
+                #   $300compare_op.9 = $292binary_subscr.5 <= $298binary_subscr.8  :: bool
+                #   del $298binary_subscr.8
+                #   del $292binary_subscr.5
+                #   bool302 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                #   $302pred = call bool302($300compare_op.9, func=bool302, args=(Var($300compare_op.9, camsense_X1.py:135),), kws=(), vararg=None)  :: (bool,) -> bool
+                #   del bool302
+                #   del $300compare_op.9
+                #   branch $302pred, 350, 306
+                # label 306
+                #   del $302pred
+                #   $const308.2 = const(str, endAngle)  :: Literal[str](endAngle)
+                #   $310binary_subscr.3 = static_getitem(value=newPacket, index=endAngle, index_var=$const308.2)  :: uint16
+                #   del $const308.2
+                #   $const314.5 = const(str, startAngle)  :: Literal[str](startAngle)
+                #   $316binary_subscr.6 = static_getitem(value=newPacket, index=startAngle, index_var=$const314.5)  :: uint16
+                #   del $const314.5
+                #   $318compare_op.7 = $310binary_subscr.3 < $316binary_subscr.6  :: bool
+                #   del $316binary_subscr.6
+                #   del $310binary_subscr.3
+                #   bool320 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                #   $320pred = call bool320($318compare_op.7, func=bool320, args=(Var($318compare_op.7, camsense_X1.py:135),), kws=(), vararg=None)  :: (bool,) -> bool
+                #   del bool320
+                #   del $318compare_op.7
+                #   branch $320pred, 324, 362
+                # label 324
+                #   del $320pred
+                #   $328binary_subscr.3 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                #   $const330.4 = const(str, startAngle)  :: Literal[str](startAngle)
+                #   $332binary_subscr.5 = static_getitem(value=$328binary_subscr.3, index=startAngle, index_var=$const330.4)  :: uint16
+                #   del $const330.4
+                #   del $328binary_subscr.3
+                #   $338binary_subscr.8 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                #   $const340.9 = const(str, endAngle)  :: Literal[str](endAngle)
+                #   $342binary_subscr.10 = static_getitem(value=$338binary_subscr.8, index=endAngle, index_var=$const340.9)  :: uint16
+                #   del $const340.9
+                #   del $338binary_subscr.8
+                #   $344compare_op.11 = $332binary_subscr.5 < $342binary_subscr.10  :: bool
+                #   del $342binary_subscr.10
+                #   del $332binary_subscr.5
+                #   bool346 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                #   $346pred = call bool346($344compare_op.11, func=bool346, args=(Var($344compare_op.11, camsense_X1.py:135),), kws=(), vararg=None)  :: (bool,) -> bool
+                #   del bool346
+                #   del $344compare_op.11
+                #   branch $346pred, 350, 362
+
+                elif((packetList[i]['endAngle'] <= newPacket['endAngle']) or ((newPacket['endAngle'] < newPacket['startAngle']) and (packetList[i]['startAngle'] < packetList[i]['endAngle']))): #if next endAngle falls in within angle-range of the new packet
+
+                    # --- LINE 136 --- 
+                    # label 350
+                    #   del i
+                    #   del $346pred
+                    #   del $302pred
+                    #   $const350.1 = const(bool, False)  :: bool
+                    #   keepSearchingArray.1 = $const350.1  :: bool
+                    #   del $const350.1
+
+                    keepSearchingArray = False #the packet to overwrite has been found, stop searching
+
+                    # --- LINE 137 --- 
+                    #   jump 480
+
+                    break
+
+                # --- LINE 138 --- 
+
+                else: #if this is true, the old packet completely encompasses the new packet, which is strange
+
+                    # --- LINE 139 --- 
+                    # label 362
+                    #   del $346pred
+                    #   del $320pred
+                    #   $366binary_subscr.3 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                    #   $const368.4 = const(str, startAngle)  :: Literal[str](startAngle)
+                    #   $370binary_subscr.5 = static_getitem(value=$366binary_subscr.3, index=startAngle, index_var=$const368.4)  :: uint16
+                    #   del $const368.4
+                    #   del $366binary_subscr.3
+                    #   $376binary_subscr.8 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                    #   del i
+                    #   $const378.9 = const(str, endAngle)  :: Literal[str](endAngle)
+                    #   $380binary_subscr.10 = static_getitem(value=$376binary_subscr.8, index=endAngle, index_var=$const378.9)  :: uint16
+                    #   del $const378.9
+                    #   del $376binary_subscr.8
+                    #   $382compare_op.11 = $370binary_subscr.5 < $380binary_subscr.10  :: bool
+                    #   del $380binary_subscr.10
+                    #   del $370binary_subscr.5
+                    #   bool384 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                    #   $384pred = call bool384($382compare_op.11, func=bool384, args=(Var($382compare_op.11, camsense_X1.py:139),), kws=(), vararg=None)  :: (bool,) -> bool
+                    #   del bool384
+                    #   del $382compare_op.11
+                    #   branch $384pred, 388, 392
+
+                    if(packetList[i]['startAngle'] < packetList[i]['endAngle']):#in normal non-rollover conditions (so old{5,15} is fine, but old{355,10} is not)
+
+                        # --- LINE 140 --- 
+                        # label 388
+                        #   del $384pred
+                        #   $const388.1 = const(bool, True)  :: bool
+                        #   insertNewPacket.2 = $const388.1  :: bool
+                        #   del $const388.1
+
+                        insertNewPacket = True #will preserve more data (at the cost of array complexety, and therefore time)
+
+                    # --- LINE 141 --- 
+
+                    #in rollover conditions, the last packet should simply be overwritten (at the cost of minor data loss) because it will not get deleted/overwritten correctly once obsolete
+
+                    # --- LINE 142 --- 
+                    #   jump 392
+                    # label 392
+                    #   $const392.1 = const(bool, False)  :: bool
+                    #   keepSearchingArray.2 = $const392.1  :: bool
+                    #   del $const392.1
+
+                    keepSearchingArray = False
+
+                    # --- LINE 143 --- 
+                    #   jump 480
+                    # label 402
+                    #   jump 172
+
+                    break
+
+            # --- LINE 144 --- 
+
+            else: #the next startAngle is obove the current one
+
+                # --- LINE 145 --- 
+                # label 404
+                #   del packetsToDelete
+                #   del insertNewPacket.1
+                #   del insertNewPacket
+                #   del $phi172.0
+                #   del $196pred
+                #   $408binary_subscr.3 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                #   $const410.4 = const(str, endAngle)  :: Literal[str](endAngle)
+                #   $412binary_subscr.5 = static_getitem(value=$408binary_subscr.3, index=endAngle, index_var=$const410.4)  :: uint16
+                #   del $const410.4
+                #   del $408binary_subscr.3
+                #   $const416.7 = const(str, endAngle)  :: Literal[str](endAngle)
+                #   $418binary_subscr.8 = static_getitem(value=newPacket, index=endAngle, index_var=$const416.7)  :: uint16
+                #   del $const416.7
+                #   $420compare_op.9 = $412binary_subscr.5 <= $418binary_subscr.8  :: bool
+                #   del $418binary_subscr.8
+                #   del $412binary_subscr.5
+                #   bool422 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                #   $422pred = call bool422($420compare_op.9, func=bool422, args=(Var($420compare_op.9, camsense_X1.py:145),), kws=(), vararg=None)  :: (bool,) -> bool
+                #   del bool422
+                #   del $420compare_op.9
+                #   branch $422pred, 426, 464
+                # label 426
+                #   del $422pred
+                #   $430binary_subscr.3 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                #   $const432.4 = const(str, startAngle)  :: Literal[str](startAngle)
+                #   $434binary_subscr.5 = static_getitem(value=$430binary_subscr.3, index=startAngle, index_var=$const432.4)  :: uint16
+                #   del $const432.4
+                #   del $430binary_subscr.3
+                #   $440binary_subscr.8 = getitem(value=packetList, index=i)  :: Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)
+                #   del i
+                #   $const442.9 = const(str, endAngle)  :: Literal[str](endAngle)
+                #   $444binary_subscr.10 = static_getitem(value=$440binary_subscr.8, index=endAngle, index_var=$const442.9)  :: uint16
+                #   del $const442.9
+                #   del $440binary_subscr.8
+                #   $446compare_op.11 = $434binary_subscr.5 < $444binary_subscr.10  :: bool
+                #   del $444binary_subscr.10
+                #   del $434binary_subscr.5
+                #   bool448 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                #   $448pred = call bool448($446compare_op.11, func=bool448, args=(Var($446compare_op.11, camsense_X1.py:145),), kws=(), vararg=None)  :: (bool,) -> bool
+                #   del bool448
+                #   del $446compare_op.11
+                #   branch $448pred, 452, 464
+
+                if((packetList[i]['endAngle'] <= newPacket['endAngle']) and (packetList[i]['startAngle'] < packetList[i]['endAngle'])): #if this is true, the new packet completely encompasses the old packet, which is strange
+
+                    # --- LINE 146 --- 
+
+                    #(very niche scenario) just overwrite the old packet with the new (encompassing) one.  (BTW, the (nextAngles[0] < nextAngles[1]) is to avoid old{358,5} packets being misinterpreted)
+
+                    # --- LINE 147 --- 
+                    # label 452
+                    #   del $448pred
+                    #   $const452.1 = const(bool, False)  :: bool
+                    #   keepSearchingArray.3 = $const452.1  :: bool
+                    #   del $const452.1
+
+                    keepSearchingArray = False
+
+                    # --- LINE 148 --- 
+                    #   jump 480
+
+                    break
+
+                # --- LINE 149 --- 
+
+                else:
+
+                    # --- LINE 150 --- 
+                    # label 464
+                    #   del i
+                    #   del $448pred
+                    #   del $422pred
+                    #   $const464.1 = const(bool, True)  :: bool
+                    #   insertNewPacket.3 = $const464.1  :: bool
+                    #   del $const464.1
+
+                    insertNewPacket = True
+
+                    # --- LINE 151 --- 
+                    #   $const468.2 = const(bool, False)  :: bool
+                    #   keepSearchingArray.4 = $const468.2  :: bool
+                    #   del $const468.2
+
+                    keepSearchingArray = False
+
+                    # --- LINE 152 --- 
+                    #   jump 480
+
+                    break
+
+        # --- LINE 153 --- 
+        # label 480
+        #   del packetsToDelete
+        #   del insertNewPacket.1
+        #   del insertNewPacket
+        #   del $phi176.1
+        #   del $phi172.0
+        #   del $172for_iter.3
+        #   keepSearchingArray.5 = phi(incoming_values=[Var(keepSearchingArray.3, camsense_X1.py:147), Var(keepSearchingArray.2, camsense_X1.py:142), Var(keepSearchingArray, camsense_X1.py:126), Var(keepSearchingArray.4, camsense_X1.py:151), Var(keepSearchingArray.1, camsense_X1.py:136)], incoming_blocks=[452, 392, 172, 464, 350])  :: bool
+        #   del keepSearchingArray.4
+        #   del keepSearchingArray.3
+        #   del keepSearchingArray.2
+        #   del keepSearchingArray.1
+        #   del keepSearchingArray
+        #   bool482 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+        #   $482pred = call bool482(keepSearchingArray.5, func=bool482, args=(Var(keepSearchingArray.5, camsense_X1.py:153),), kws=(), vararg=None)  :: (bool,) -> bool
+        #   del keepSearchingArray.5
+        #   del bool482
+        #   branch $482pred, 486, 516
+        # label 486
+        #   del $482pred
+        #   $const488.1 = const(int, 0)  :: Literal[int](0)
+        #   $490compare_op.2 = packetsToDelete.3 == $const488.1  :: bool
+        #   del $const488.1
+        #   bool492 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+        #   $492pred = call bool492($490compare_op.2, func=bool492, args=(Var($490compare_op.2, camsense_X1.py:153),), kws=(), vararg=None)  :: (bool,) -> bool
+        #   del bool492
+        #   del $490compare_op.2
+        #   branch $492pred, 496, 516
+
+        if((keepSearchingArray) and (packetsToDelete==0)):
+
+            # --- LINE 154 --- 
+            # label 496
+            #   del $492pred
+            #   $496load_global.0 = global(print: <built-in function print>)  :: Function(<built-in function print>)
+            #   del $496load_global.0
+            #   $const498.1 = const(str, keepSearchingArray but no deleted packets)  :: Literal[str](keepSearchingArray but no deleted packets)
+            #   $const502.3 = const(int, 0)  :: Literal[int](0)
+            #   $504binary_subscr.4 = static_getitem(value=volatileIndex, index=0, index_var=$const502.3)  :: uint8
+            #   del $const502.3
+            #   $const508.6 = const(int, 0)  :: Literal[int](0)
+            #   $510binary_subscr.7 = static_getitem(value=dynamicListSize, index=0, index_var=$const508.6)  :: uint8
+            #   del $const508.6
+            #   print($const498.1, $504binary_subscr.4, $510binary_subscr.7)
+            #   del $const498.1
+            #   del $510binary_subscr.7
+            #   del $504binary_subscr.4
+            #   $512call_function.8 = const(NoneType, None)  :: none
+            #   del $512call_function.8
+
+            print("keepSearchingArray but no deleted packets", volatileIndex[0], dynamicListSize[0]) #error
+
+        # --- LINE 155 --- 
+        #   insertNewPacket.5 = phi(incoming_values=[Var(insertNewPacket.6, camsense_X1.py:155), Var(insertNewPacket, camsense_X1.py:128)], incoming_blocks=[402, 142])  :: bool
+        #   del insertNewPacket.6
+        #   del $384pred
+        #   insertNewPacket.7 = phi(incoming_values=[Var(insertNewPacket.5, camsense_X1.py:155), Var(insertNewPacket.2, camsense_X1.py:140)], incoming_blocks=[362, 388])  :: bool
+        #   del insertNewPacket.2
+        #   del $274pred
+        #   insertNewPacket.6 = phi(incoming_values=[Var(insertNewPacket.5, camsense_X1.py:155), Var(insertNewPacket.1, camsense_X1.py:134)], incoming_blocks=[248, 278])  :: bool
+        #   del insertNewPacket.5
+        #   insertNewPacket.4 = phi(incoming_values=[Var(insertNewPacket.5, camsense_X1.py:155), Var(insertNewPacket.7, camsense_X1.py:155), Var(insertNewPacket.5, camsense_X1.py:155), Var(insertNewPacket.3, camsense_X1.py:150), Var(insertNewPacket.5, camsense_X1.py:155)], incoming_blocks=[452, 392, 172, 464, 350])  :: bool
+        #   del insertNewPacket.7
+        #   del insertNewPacket.5
+        #   del insertNewPacket.3
+        #   jump 516
+        # label 516
+        #   del $492pred
+        #   del $482pred
+        #   bool518 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+        #   $518pred = call bool518(insertNewPacket.4, func=bool518, args=(Var(insertNewPacket.4, camsense_X1.py:155),), kws=(), vararg=None)  :: (bool,) -> bool
+        #   del bool518
+        #   branch $518pred, 546, 522
+        # label 522
+        #   del $518pred
+        #   $const524.1 = const(int, 0)  :: Literal[int](0)
+        #   $526compare_op.2 = packetsToDelete.3 == $const524.1  :: bool
+        #   del $const524.1
+        #   bool528 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+        #   $528pred = call bool528($526compare_op.2, func=bool528, args=(Var($526compare_op.2, camsense_X1.py:155),), kws=(), vararg=None)  :: (bool,) -> bool
+        #   del bool528
+        #   del $526compare_op.2
+        #   branch $528pred, 532, 546
+
+        if((not insertNewPacket) and (packetsToDelete==0)):
+
+            # --- LINE 156 --- 
+
+            #no weird stuff, just overwrite the existing packet at volatileIndex[0]
+
+            # --- LINE 157 --- 
+            # label 532
+            #   del packetsToDelete.3
+            #   del insertNewPacket.4
+            #   del $528pred
+            #   $const538.3 = const(int, 0)  :: Literal[int](0)
+            #   $540binary_subscr.4 = static_getitem(value=volatileIndex, index=0, index_var=$const538.3)  :: uint8
+            #   del $const538.3
+            #   packetList[$540binary_subscr.4] = newPacket  :: (unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C), uint64, Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)) -> none
+            #   del packetList
+            #   del $540binary_subscr.4
+            #   jump 696
+
+            packetList[volatileIndex[0]] = newPacket
+
+        # --- LINE 158 --- 
+        # label 546
+        #   del $528pred
+        #   del $518pred
+        #   bool548 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+        #   $548pred = call bool548(insertNewPacket.4, func=bool548, args=(Var(insertNewPacket.4, camsense_X1.py:155),), kws=(), vararg=None)  :: (bool,) -> bool
+        #   del insertNewPacket.4
+        #   del bool548
+        #   branch $548pred, 552, 652
+
+        elif(insertNewPacket):
+
+            # --- LINE 159 --- 
+            # label 552
+            #   del $548pred
+            #   $const554.1 = const(int, 0)  :: Literal[int](0)
+            #   $556compare_op.2 = packetsToDelete.3 > $const554.1  :: bool
+            #   del $const554.1
+            #   bool558 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+            #   $558pred = call bool558($556compare_op.2, func=bool558, args=(Var($556compare_op.2, camsense_X1.py:159),), kws=(), vararg=None)  :: (bool,) -> bool
+            #   del bool558
+            #   del $556compare_op.2
+            #   branch $558pred, 562, 616
+
+            if(packetsToDelete > 0): #no need to delete AND insert, if you just delete one less and overwrite the leftover one, you can save a lot of time
+
+                # --- LINE 160 --- 
+                # label 562
+                #   del $558pred
+                #   $const564.1 = const(int, 1)  :: Literal[int](1)
+                #   $566inplace_subtract.2 = inplace_binop(fn=<built-in function isub>, immutable_fn=<built-in function sub>, lhs=packetsToDelete.3, rhs=$const564.1, static_lhs=Undefined, static_rhs=Undefined)  :: int64
+                #   del packetsToDelete.3
+                #   del $const564.1
+                #   packetsToDelete.2 = $566inplace_subtract.2  :: int64
+                #   del $566inplace_subtract.2
+
+                packetsToDelete-=1
+
+                # --- LINE 161 --- 
+                #   $const572.4 = const(int, 0)  :: Literal[int](0)
+                #   $574compare_op.5 = packetsToDelete.2 > $const572.4  :: bool
+                #   del $const572.4
+                #   bool576 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+                #   $576pred = call bool576($574compare_op.5, func=bool576, args=(Var($574compare_op.5, camsense_X1.py:161),), kws=(), vararg=None)  :: (bool,) -> bool
+                #   del bool576
+                #   del $574compare_op.5
+                #   branch $576pred, 580, 602
+
+                if(packetsToDelete > 0): #if multiple packets
+
+                    # --- LINE 162 --- 
+                    # label 580
+                    #   del $576pred
+                    #   $580load_global.0 = global(shiftList: CPUDispatcher(<function shiftList at 0x000001F481752310>))  :: type(CPUDispatcher(<function shiftList at 0x000001F481752310>))
+                    #   $const588.4 = const(int, 0)  :: Literal[int](0)
+                    #   $590binary_subscr.5 = static_getitem(value=volatileIndex, index=0, index_var=$const588.4)  :: uint8
+                    #   del $const588.4
+                    #   $const594.7 = const(bool, True)  :: bool
+                    #   $const596.8 = const(bool, False)  :: bool
+                    #   $598call_function.9 = call $580load_global.0(packetList, packetsToDelete.2, $590binary_subscr.5, dynamicListSize, $const594.7, $const596.8, func=$580load_global.0, args=[Var(packetList, camsense_X1.py:115), Var(packetsToDelete.2, camsense_X1.py:160), Var($590binary_subscr.5, camsense_X1.py:162), Var(dynamicListSize, camsense_X1.py:115), Var($const594.7, camsense_X1.py:162), Var($const596.8, camsense_X1.py:162)], kws=(), vararg=None)  :: (unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C), int64, uint8, array(uint8, 1d, C), bool, bool) -> bool
+                    #   del packetsToDelete.2
+                    #   del $const596.8
+                    #   del $const594.7
+                    #   del $598call_function.9
+                    #   del $590binary_subscr.5
+                    #   del $580load_global.0
+
+                    shiftList(packetList, packetsToDelete, volatileIndex[0], dynamicListSize, True, False) #delete data
+
+                # --- LINE 163 --- 
+                #   jump 602
+                # label 602
+                #   del packetsToDelete.2
+                #   del $576pred
+                #   $const608.3 = const(int, 0)  :: Literal[int](0)
+                #   $610binary_subscr.4 = static_getitem(value=volatileIndex, index=0, index_var=$const608.3)  :: uint8
+                #   del $const608.3
+                #   packetList[$610binary_subscr.4] = newPacket  :: (unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C), uint64, Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)) -> none
+                #   del packetList
+                #   del $610binary_subscr.4
+                #   jump 650
+
+                packetList[volatileIndex[0]] = newPacket
+
+            # --- LINE 164 --- 
+
+            else:
+
+                # --- LINE 165 --- 
+
+                #insertData(packetList, dynamicListSize, np.array([newPacket], dtype=lidarPacket), volatileIndex[0])
+
+                # --- LINE 166 --- 
+                # label 616
+                #   del packetsToDelete.3
+                #   del $558pred
+                #   $616load_global.0 = global(shiftList: CPUDispatcher(<function shiftList at 0x000001F481752310>))  :: type(CPUDispatcher(<function shiftList at 0x000001F481752310>))
+                #   $const620.2 = const(int, 1)  :: Literal[int](1)
+                #   $const624.4 = const(int, 0)  :: Literal[int](0)
+                #   $626binary_subscr.5 = static_getitem(value=volatileIndex, index=0, index_var=$const624.4)  :: uint8
+                #   del $const624.4
+                #   $const630.7 = const(bool, False)  :: bool
+                #   $const632.8 = const(bool, False)  :: bool
+                #   $634call_function.9 = call $616load_global.0(packetList, $const620.2, $626binary_subscr.5, dynamicListSize, $const630.7, $const632.8, func=$616load_global.0, args=[Var(packetList, camsense_X1.py:115), Var($const620.2, camsense_X1.py:166), Var($626binary_subscr.5, camsense_X1.py:166), Var(dynamicListSize, camsense_X1.py:115), Var($const630.7, camsense_X1.py:166), Var($const632.8, camsense_X1.py:166)], kws=(), vararg=None)  :: (unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C), Literal[int](1), uint8, array(uint8, 1d, C), bool, bool) -> bool
+                #   del $const632.8
+                #   del $const630.7
+                #   del $const620.2
+                #   del $634call_function.9
+                #   del $626binary_subscr.5
+                #   del $616load_global.0
+
+                shiftList(packetList, 1, volatileIndex[0], dynamicListSize, False, False)
+
+                # --- LINE 167 --- 
+                #   $const644.13 = const(int, 0)  :: Literal[int](0)
+                #   $646binary_subscr.14 = static_getitem(value=volatileIndex, index=0, index_var=$const644.13)  :: uint8
+                #   del $const644.13
+                #   packetList[$646binary_subscr.14] = newPacket  :: (unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C), uint64, Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)) -> none
+                #   del packetList
+                #   del $646binary_subscr.14
+                #   jump 650
+                # label 650
+                #   jump 696
+
+                packetList[volatileIndex[0]] = newPacket
+
+        # --- LINE 168 --- 
+        # label 652
+        #   del $548pred
+        #   $const654.1 = const(int, 0)  :: Literal[int](0)
+        #   $656compare_op.2 = packetsToDelete.3 > $const654.1  :: bool
+        #   del $const654.1
+        #   bool658 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+        #   $658pred = call bool658($656compare_op.2, func=bool658, args=(Var($656compare_op.2, camsense_X1.py:168),), kws=(), vararg=None)  :: (bool,) -> bool
+        #   del bool658
+        #   del $656compare_op.2
+        #   branch $658pred, 662, 696
+
+        elif(packetsToDelete > 0):
+
+            # --- LINE 169 --- 
+            # label 662
+            #   del $658pred
+            #   $662load_global.0 = global(shiftList: CPUDispatcher(<function shiftList at 0x000001F481752310>))  :: type(CPUDispatcher(<function shiftList at 0x000001F481752310>))
+            #   $const670.4 = const(int, 0)  :: Literal[int](0)
+            #   $672binary_subscr.5 = static_getitem(value=volatileIndex, index=0, index_var=$const670.4)  :: uint8
+            #   del $const670.4
+            #   $const676.7 = const(bool, True)  :: bool
+            #   $const678.8 = const(bool, False)  :: bool
+            #   $680call_function.9 = call $662load_global.0(packetList, packetsToDelete.3, $672binary_subscr.5, dynamicListSize, $const676.7, $const678.8, func=$662load_global.0, args=[Var(packetList, camsense_X1.py:115), Var(packetsToDelete.3, camsense_X1.py:132), Var($672binary_subscr.5, camsense_X1.py:169), Var(dynamicListSize, camsense_X1.py:115), Var($const676.7, camsense_X1.py:169), Var($const678.8, camsense_X1.py:169)], kws=(), vararg=None)  :: (unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C), int64, uint8, array(uint8, 1d, C), bool, bool) -> bool
+            #   del packetsToDelete.3
+            #   del $const678.8
+            #   del $const676.7
+            #   del $680call_function.9
+            #   del $672binary_subscr.5
+            #   del $662load_global.0
+
+            shiftList(packetList, packetsToDelete, volatileIndex[0], dynamicListSize, True, False) #delete data
+
+            # --- LINE 170 --- 
+            #   $const690.13 = const(int, 0)  :: Literal[int](0)
+            #   $692binary_subscr.14 = static_getitem(value=volatileIndex, index=0, index_var=$const690.13)  :: uint8
+            #   del $const690.13
+            #   packetList[$692binary_subscr.14] = newPacket  :: (unaligned array(Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False), 1d, C), uint64, Record(RPM[type=uint16;offset=0],startAngle[type=uint16;offset=2],endAngle[type=uint16;offset=4],timestamp[type=float64;offset=6],measurements[type=nestedarray(uint16, (8,));offset=14],reservedData[type=nestedarray(uint8, (8,));offset=30],dataFilled[type=int16;offset=38],CRCpassed[type=bool;offset=40];41;False)) -> none
+            #   del packetList
+            #   del $692binary_subscr.14
+
+            packetList[volatileIndex[0]] = newPacket
+
+    # --- LINE 171 --- 
+    #   jump 696
+    # label 696
+    #   del packetsToDelete.3
+    #   del packetList
+    #   del $658pred
+    #   $const698.1 = const(int, 0)  :: Literal[int](0)
+    #   $702binary_subscr.4 = static_getitem(value=volatileIndex, index=0, index_var=$const698.1)  :: uint8
+    #   $const704.5 = const(int, 1)  :: Literal[int](1)
+    #   $706inplace_add.6 = inplace_binop(fn=<built-in function iadd>, immutable_fn=<built-in function add>, lhs=$702binary_subscr.4, rhs=$const704.5, static_lhs=Undefined, static_rhs=Undefined)  :: int64
+    #   del $const704.5
+    #   del $702binary_subscr.4
+    #   volatileIndex[0] = $706inplace_add.6
+    #   del $const698.1
+    #   del $706inplace_add.6
+
+    volatileIndex[0]+=1
+
+    # --- LINE 172 --- 
+    #   $const714.8 = const(str, endAngle)  :: Literal[str](endAngle)
+    #   $716binary_subscr.9 = static_getitem(value=newPacket, index=endAngle, index_var=$const714.8)  :: uint16
+    #   del $const714.8
+    #   $const720.11 = const(str, startAngle)  :: Literal[str](startAngle)
+    #   $722binary_subscr.12 = static_getitem(value=newPacket, index=startAngle, index_var=$const720.11)  :: uint16
+    #   del $const720.11
+    #   $724compare_op.13 = $716binary_subscr.9 < $722binary_subscr.12  :: bool
+    #   del $722binary_subscr.12
+    #   del $716binary_subscr.9
+    #   bool726 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+    #   $726pred = call bool726($724compare_op.13, func=bool726, args=(Var($724compare_op.13, camsense_X1.py:172),), kws=(), vararg=None)  :: (bool,) -> bool
+    #   del bool726
+    #   del $724compare_op.13
+    #   branch $726pred, 730, 784
+
+    if(newPacket['endAngle'] < newPacket['startAngle']): #if this is a rollover packet
+
+        # --- LINE 173 --- 
+        # label 730
+        #   del $726pred
+        #   $const732.1 = const(int, 0)  :: Literal[int](0)
+        #   $734binary_subscr.2 = static_getitem(value=volatileIndex, index=0, index_var=$const732.1)  :: uint8
+        #   del $const732.1
+        #   $const738.4 = const(int, 0)  :: Literal[int](0)
+        #   $740binary_subscr.5 = static_getitem(value=dynamicListSize, index=0, index_var=$const738.4)  :: uint8
+        #   del $const738.4
+        #   $742compare_op.6 = $734binary_subscr.2 < $740binary_subscr.5  :: bool
+        #   del $740binary_subscr.5
+        #   del $734binary_subscr.2
+        #   bool744 = global(bool: <class 'bool'>)  :: Function(<class 'bool'>)
+        #   $744pred = call bool744($742compare_op.6, func=bool744, args=(Var($742compare_op.6, camsense_X1.py:173),), kws=(), vararg=None)  :: (bool,) -> bool
+        #   del bool744
+        #   del $742compare_op.6
+        #   branch $744pred, 748, 760
+
+        if(volatileIndex[0] < dynamicListSize[0]): #volatileIndex[0] should be at the max (technically an illigal position) by now. if it isn't, that means there is old data at the end
+
+            # --- LINE 174 --- 
+
+            #shiftList(packetList, dynamicListSize[0]-volatileIndex[0], volatileIndex[0], dynamicListSize, True, False) #delete data
+
+            # --- LINE 175 --- 
+            # label 748
+            #   del $744pred
+            #   $const750.1 = const(int, 0)  :: Literal[int](0)
+            #   $752binary_subscr.2 = static_getitem(value=volatileIndex, index=0, index_var=$const750.1)  :: uint8
+            #   del $const750.1
+            #   $const756.4 = const(int, 0)  :: Literal[int](0)
+            #   dynamicListSize[0] = $752binary_subscr.2
+            #   del dynamicListSize
+            #   del $const756.4
+            #   del $752binary_subscr.2
+
+            dynamicListSize[0] = volatileIndex[0] #no need to go through shiftList(), which will only do this in this case anyway.
+
+        # --- LINE 176 --- 
+        #   jump 760
+        # label 760
+        #   del dynamicListSize
+        #   del $744pred
+        #   $const760.0 = const(int, 0)  :: Literal[int](0)
+        #   $const764.2 = const(int, 0)  :: Literal[int](0)
+        #   volatileIndex[0] = $const760.0
+        #   del volatileIndex
+        #   del $const764.2
+        #   del $const760.0
+
+        volatileIndex[0] = 0 #not 100% necessary, but this does make sure volatileIndex[0] is never equal to dynamicListSize[0] (i think)
+
+        # --- LINE 177 --- 
+        #   $const770.4 = const(int, 0)  :: Literal[int](0)
+        #   $774binary_subscr.7 = static_getitem(value=rotationCount, index=0, index_var=$const770.4)  :: uint8
+        #   $const776.8 = const(int, 1)  :: Literal[int](1)
+        #   $778inplace_add.9 = inplace_binop(fn=<built-in function iadd>, immutable_fn=<built-in function add>, lhs=$774binary_subscr.7, rhs=$const776.8, static_lhs=Undefined, static_rhs=Undefined)  :: int64
+        #   del $const776.8
+        #   del $774binary_subscr.7
+        #   rotationCount[0] = $778inplace_add.9
+        #   del rotationCount
+        #   del $const770.4
+        #   del $778inplace_add.9
+
+        rotationCount[0] += 1
+
+    # --- LINE 178 --- 
+    #   jump 784
+    # label 784
+    #   del volatileIndex
+    #   del rotationCount
+    #   del dynamicListSize
+    #   del $726pred
+    #   $const786.1 = const(str, startAngle)  :: Literal[str](startAngle)
+    #   $788binary_subscr.2 = static_getitem(value=newPacket, index=startAngle, index_var=$const786.1)  :: uint16
+    #   del $const786.1
+    #   $const792.4 = const(int, 0)  :: Literal[int](0)
+    #   _lastAngles[0] = $788binary_subscr.2
+    #   del $const792.4
+    #   del $788binary_subscr.2
+
+    _lastAngles[0] = newPacket['startAngle']
+
+    # --- LINE 179 --- 
+    #   $const798.6 = const(str, endAngle)  :: Literal[str](endAngle)
+    #   $800binary_subscr.7 = static_getitem(value=newPacket, index=endAngle, index_var=$const798.6)  :: uint16
+    #   del newPacket
+    #   del $const798.6
+    #   $const804.9 = const(int, 1)  :: Literal[int](1)
+    #   _lastAngles[1] = $800binary_subscr.7
+    #   del _lastAngles
+    #   del $const804.9
+    #   del $800binary_subscr.7
+    #   $const808.10 = const(NoneType, None)  :: none
+    #   $810return_value.11 = cast(value=$const808.10)  :: none
+    #   del $const808.10
+    #   return $810return_value.11
+
+    _lastAngles[1] = newPacket['endAngle']
+
+
+================================================================================

@@ -143,13 +143,6 @@ class camsense_X1:
     #     except:
     #         print("couldn't close camsense_X1 serial port from __del__")
     
-    # def __del__(self):
-    #     try:
-    #         self.lidarDataSharedMem.close()
-    #         self.lidarDataSharedMem.unlink()
-    #     except:
-    #         print("(__del__) sharedMem unlink failed! for camsense_X1")
-    
     def __repr__(self):
         return("lidar("+str(self._serialPort.port)+\
                ", spin:"+str(self.spinning)+\

@@ -1,0 +1,4 @@
+cone ID,leftOrRight,Xpos,Ypos,prev ID,next ID,coneData
+0,LEFT,11.83,5.37,-1,1,
+1,LEFT,13.27,5.43,0,2,
+2,LEFT,14.67,5.47,1,-1,

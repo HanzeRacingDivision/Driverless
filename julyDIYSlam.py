@@ -29,13 +29,15 @@ useSLAM = True
 
 simulatePositionalDrift = True
 
+makeConesAfterMapload = True #whether to completely rely on the loaded map, or to allow for new cone detection
+## TBD: stop cone creation after a drag-drop mapload (currently only cmdline argumented mapfiles stop cone creation)
 makeConesOnlyFirstLap = True #only works if pathPlanningPresent
 delaySLAMuntillDriving = True
 
 useRemote = False
 useDrawer = True
 
-reverseStart = True  #a debugging boolean, used specifically for the IRL tests done on 8-9 Sept 2021
+reverseStart = False  #a debugging boolean, used specifically for the IRL tests done on 8-9 Sept 2021
 
 from Map import Map
 import GF.generalFunctions as GF
@@ -211,11 +213,15 @@ def makeCone(mapToUse, conePos, blob):
 if __name__ == "__main__":
     try:
         masterMap = masterMapClass()
+
+        makeNewCones = True #whether to allow the creation of cones at all (determined by things like makeConesAfterMapload)
         
         import map_loader as ML
         if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
             print("found sys.argv[1], attempting to import:", sys.argv[1])
             ML.mapLoader.load_map(sys.argv[1], masterMap)
+            if(not makeConesAfterMapload):
+                makeNewCones = False
         
         connToSlaves, connToMaster = MP.Pipe(False) #disable duplex (for now)
         masterSharedMem = SM.makeNewSharedMem('driverless', 10*1000*1000) #note: max (pickled) object size is HALF of this size, due to the double-buffering
@@ -233,13 +239,13 @@ if __name__ == "__main__":
         connToCar = None; connToCarMaster = None; carSerial = None #init vars
         if(not simulation):
             connToCar, connToCarMaster = MP.Pipe(True) #a two-way pipe to the carMCUserialProcess (which (encodes/decodes and) passes it on to/from the serial connection)
-            carSerial = RC.carMCUserialProcess(connToCarMaster, masterSharedMem.passToProcess, comPort="/dev/ttyUSB0", autoFind=False, autoreconnect=True)
+            carSerial = RC.carMCUserialProcess(connToCarMaster, masterSharedMem.passToProcess, comPort="/dev/ttyUSB1", autoFind=False, autoreconnect=True)
             carSerial.start()
         
         connToLidar = None; connToLidarMaster = None; lidar = None; lidarConeBuff = [] #init var
         if(useLidar):
             connToLidar, connToLidarMaster = MP.Pipe(True) #a two-way pipe through which the lidar process sends blobs (cones), and the master sends the lidar's position
-            lidar = LP.lidarProcess(connToLidarMaster, masterSharedMem.passToProcess, comPort="/dev/ttyUSB1")
+            lidar = LP.lidarProcess(connToLidarMaster, masterSharedMem.passToProcess, comPort="/dev/ttyUSB0")
             lidar.start()
             lidarConeBuff = [] #an appendable list, to which blobs are added. entries are removed when the blobs have been used
         
@@ -349,11 +355,11 @@ if __name__ == "__main__":
                 #    print("landmarkBufferLengthThreshold crossed:", len(lidarConeBuff), ">", landmarkBufferLengthThreshold)
                 
                 if(useSLAM and ((not delaySLAMuntillDriving) or (delaySLAMuntillDriving and masterMap.car.pathFolData.auto))):
-                    makeNewCones = True
-                    if(masterMap.pathPlanningPresent and (masterMap.car.pathFolData is not None) and makeConesOnlyFirstLap):
-                        makeNewCones = (masterMap.car.pathFolData.laps < 1) #only on the first lap
-                    SLAM.updatePosition(masterMap, [lidarConeBuff, []], (1.0, 1.0), makeNewCones, storeBlob)
-                else: ## backup code to process lidar data in a simpler (non-position correcting!) way
+                    makeNewConesTemp = makeNewCones
+                    if(masterMap.pathPlanningPresent and (masterMap.car.pathFolData is not None) and makeConesOnlyFirstLap and makeNewCones):
+                        makeNewConesTemp = (masterMap.car.pathFolData.laps < 1) #only on the first lap
+                    SLAM.updatePosition(masterMap, [lidarConeBuff, []], (1.0, 1.0), makeNewConesTemp, storeBlob)
+                elif(makeNewCones): ## backup code to process lidar data in a simpler (non-position correcting!) way
                     while(len(lidarConeBuff) > 0):
                         conePos, blob = lidarConeBuff[0]
                         #blobFirstPointTime = blob['timestamp']

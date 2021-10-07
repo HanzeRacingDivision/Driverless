@@ -1,0 +1,4 @@
+cone ID,leftOrRight,Xpos,Ypos,prev ID,next ID,coneData
+0,RIGHT,6.4,10.47,-1,2,['finish']
+1,RIGHT,13.0,10.63,-1,-1,['finish']
+2,RIGHT,9.1,10.37,0,-1,['finish']

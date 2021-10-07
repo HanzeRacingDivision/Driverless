@@ -106,7 +106,7 @@ class drawProcess(MP.Process):
 if __name__ == "__main__":
     try:
         resolution = [1280, 720]
-        host = '192.168.137.27'
+        host = '192.168.43.170'
         port = 65432
         if(len(sys.argv)>1):
             for i, arg in enumerate(sys.argv[1::]):
