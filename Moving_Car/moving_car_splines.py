@@ -264,10 +264,6 @@ class PathPlanning:
         
             map_file.to_csv(f'{name}.csv')
         
-        
-        
-        
-        
         def load_map(mouse_pos_list):
             
             left_cones = []
@@ -292,8 +288,6 @@ class PathPlanning:
                 
             
             return left_cones, right_cones, mouse_pos_list
-        
-        
 
         
         while not self.exit:
@@ -397,8 +391,8 @@ class PathPlanning:
                 right_spline_linked == False
                 left_spline_linked == False
                 mouse_pos_list = []
-                #left_spline = 0
-                #right_spline = 0
+                left_spline = 0
+                right_spline = 0
                 path_midpoints_spline = 0
                 first_visible_left_cone = 0
                 first_visible_right_cone = 0
@@ -477,8 +471,8 @@ class PathPlanning:
                 right_spline_linked == False
                 left_spline_linked == False
                 mouse_pos_list = []
-                #left_spline = 0
-                #right_spline = 0
+                left_spline = 0
+                right_spline = 0
                 path_midpoints_spline = 0
                 first_visible_left_cone = 0
                 first_visible_right_cone = 0
@@ -849,20 +843,22 @@ class PathPlanning:
                             car_crashed = True
                             break
                         
-                #checking left_spline for crash
-                if car_crashed == False and left_spline != 0:
-                    for i in range(len(left_spline[0])):
-                        if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [left_spline[0][i],left_spline[1][i]]))) < 0.25:
-                            car_crashed = True
-                            break                
- 
-                #checking right_spline for crash
-                if car_crashed == False and right_spline != 0:
-                    for i in range(len(right_spline[0])):
-                        if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [right_spline[0][i],right_spline[1][i]]))) < 0.25:
-                            car_crashed = True
-                            break        
-
+# =============================================================================
+#                 #checking left_spline for crash
+#                 if car_crashed == False and left_spline != 0:
+#                     for i in range(len(left_spline[0])):
+#                         if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [left_spline[0][i],left_spline[1][i]]))) < 0.25:
+#                             car_crashed = True
+#                             break                
+#  
+#                 #checking right_spline for crash
+#                 if car_crashed == False and right_spline != 0:
+#                     for i in range(len(right_spline[0])):
+#                         if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [right_spline[0][i],right_spline[1][i]]))) < 0.25:
+#                             car_crashed = True
+#                             break        
+# 
+# =============================================================================
                                             
                        
                 if car_crashed == True:
