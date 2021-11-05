@@ -48,8 +48,6 @@ class pygameDrawerCommon():
         self.drawCarHist = False #just for UI purposes, to toggle between showing the position history (thin white line) or not
         self.extraViewMode = False #triggered with CTRL+V, can be used to switch between normal and 3D view, or whatever else you want
 
-        self.makeNewCones = True #debugging boolean, used to help build track manually
-
 
 class pygameDrawer(pygameDrawerCommon):
     """a class to draw Map objects (also includes drawing of UI some elements for manually making tracks)"""

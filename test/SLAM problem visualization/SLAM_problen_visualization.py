@@ -255,7 +255,7 @@ resetConePoses = False
 global showGraph
 showGraph = False
 global carPos
-carPos = np.array([25.0, -10.0]) #pixels per meter
+carPos = np.array([0.0, 0.0]) #pixels per meter
 global changeAngle
 changeAngle = None
 

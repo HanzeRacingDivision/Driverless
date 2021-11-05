@@ -28,7 +28,7 @@ class pathPlannerMapData: #a class to go in Map.pathFolData (with these variable
 
 ########################### some (static!!!) functions ####################################
 
-def nextTarget(mapToUse, currentTarget):
+def getNextTarget(mapToUse, currentTarget, panic=True):
     """returns the next target in the target_list"""
     for i in range(len(mapToUse.target_list)):
         if(currentTarget == mapToUse.target_list[i]): #slightly risky pointer comparison
@@ -38,7 +38,22 @@ def nextTarget(mapToUse, currentTarget):
                 #print("target rollover")
                 return(mapToUse.target_list[0])
             else:
-                print("PANIC, ran out of targets")
+                if(panic):
+                    print("PANIC, ran out of targets")
+                return(currentTarget)
+
+def getPrevTarget(mapToUse, currentTarget, panic=True): #deleteme (only needed for predictive steering)
+    """returns the previous target in the target_list"""
+    for i in range(len(mapToUse.target_list)):
+        if(currentTarget == mapToUse.target_list[i]): #slightly risky pointer comparison
+            if(i>0):
+                return(mapToUse.target_list[i-1])
+            elif(mapToUse.targets_full_circle):
+                #print("target rollover")
+                return(mapToUse.target_list[len(mapToUse.target_list)-1])
+            else:
+                if(panic):
+                    print("PANIC, ran out of targets")
                 return(currentTarget)
 
 def targetUpdate(mapToUse, currentTarget, distToTarget, angleToTarget, velocity):
@@ -51,17 +66,17 @@ def targetUpdate(mapToUse, currentTarget, distToTarget, angleToTarget, velocity)
             print("there are no targets, how am i supposed to update it >:(")
             return(currentTarget)
     else:
-        if(distToTarget < (pathPlanner.targetReachedThreshold + (pathPlanner.targetDistSpeedMultiplier*pathPlanner.targetReachedThreshold*(velocity-1.0)))):
+        if(distToTarget < (pathPlanner.targetReachedThreshold + pathPlanner.targetDistSpeedMargin(velocity))):
             #print("target reached normally", distToTarget, np.rad2deg(angleToTarget))
             #currentTarget.passed += 1
-            return(nextTarget(mapToUse,currentTarget))
-        elif((distToTarget < (pathPlanner.targetPassedDistThreshold + (pathPlanner.targetDistSpeedMultiplier*pathPlanner.targetPassedDistThreshold*(velocity-1.0)))) and (abs(angleToTarget) > pathPlanner.targetPassedAngleThreshold)):
+            return(getNextTarget(mapToUse,currentTarget))
+        elif((distToTarget < (pathPlanner.targetPassedDistThreshold + pathPlanner.targetDistSpeedMargin(velocity))) and (abs(angleToTarget) > pathPlanner.targetPassedAngleThreshold)):
             print("target passed kinda wonky", distToTarget, np.rad2deg(angleToTarget))
             #currentTarget.passed += 1
-            return(nextTarget(mapToUse,currentTarget))
+            return(getNextTarget(mapToUse,currentTarget))
         elif(abs(angleToTarget) > pathPlanner.targetMissedAngleThreshold):
             print("TARGET MISSED!(?)", distToTarget, np.rad2deg(angleToTarget))
-            return(nextTarget(mapToUse,currentTarget))
+            return(getNextTarget(mapToUse,currentTarget))
         else: #just keep heading towards current target
             return(currentTarget)
     
@@ -86,9 +101,46 @@ def calcAutoDriving(mapToUse, saveOutput=True):
             dist, angle = GF.distAngleBetwPos(mapToUse.car.position, nextTarget.position)
             angle = GF.radRoll(angle-mapToUse.car.angle)
         
-        #desired_steering = min(max(np.arctan(angle/(dist**pathPlanner.turning_sharpness)), -25), 25)
-        desired_steering = min(max(angle,-mapToUse.car.maxSteeringAngle),mapToUse.car.maxSteeringAngle)
+        ## velocity target TBD
         desired_velocity = mapToUse.car.pathFolData.targetVelocity
+
+        ## steering target is still very simple
+        desired_steering = min(max(angle,-mapToUse.car.maxSteeringAngle),mapToUse.car.maxSteeringAngle) #simply the constrained angle
+        lastPredictTarget = mapToUse.car.pathFolData.nextTarget
+        for i in range(pathPlanner.steeringPredictDepth):
+            predictTarget = getNextTarget(mapToUse, lastPredictTarget, False)
+            if(predictTarget != lastPredictTarget):
+                lastPredictDist, lastPredictAngle = GF.distAngleBetwPos(mapToUse.car.position, lastPredictTarget.position)
+                predictDist, predictAngle = GF.distAngleBetwPos(mapToUse.car.position, predictTarget.position)
+                ## this is for cutting corners (angling towards the next target early)
+                predictAngle = GF.radRoll(predictAngle-mapToUse.car.angle)
+                #print("predicting:", desired_steering, pathPlanner.steeringPredictDepthCurve(i+1), pathPlanner.steeringPredictDistCurve(lastPredictDist, desired_velocity), predictAngle, pathPlanner.steeringPredictDepthCurve(i+1) * pathPlanner.steeringPredictDistCurve(lastPredictDist, desired_velocity) * predictAngle)
+                desired_steering += pathPlanner.steeringPredictDepthCurve(i+1) * \
+                                    pathPlanner.steeringPredictDistCurve(lastPredictDist, desired_velocity) * \
+                                    predictAngle
+                #print("post-predict:", desired_steering)
+                
+                ## this is for setting up for sharp corners (going towards the outside corner, so you have the distance you need to actually make the turn)
+                ## note: this code is pretty fiddly (and should be replaced by AI as soon as possible), but it does help sometimes
+                ##TBD
+                prevPredictTarget = getPrevTarget(mapToUse, lastPredictTarget, False)
+                if(prevPredictTarget != lastPredictTarget):
+                    prevAngle = GF.distAngleBetwPos(prevPredictTarget.position, lastPredictTarget.position)[1]
+                    nextAngle = GF.distAngleBetwPos(lastPredictTarget.position, predictTarget.position)[1]
+                    angleDiff = GF.radDiff(prevAngle, nextAngle) #use this angle difference to determine how sharp the turn is
+                    #if(abs(angleDiff) > pathPlanner.steeringPredictCounterThresh):
+                    #    desired_steering += pathPlanner.steeringPredictDepthCurve(i+1) * \
+                    #                        pathPlanner.steeringPredictDistCurve(predictDist, desired_velocity) * \
+                    #                        pathPlanner.steeringPredictCounterCurve(angleDiff) #calculate how aggressively to countersteer
+                #else:
+                #    print("cant do the thing with the countersteer or whatever")
+
+                lastPredictTarget = predictTarget
+            else:
+                print("cant predict target???", i, nextTarget, lastPredictTarget, predictTarget)
+                break;
+        desired_steering = min(max(desired_steering,-mapToUse.car.maxSteeringAngle),mapToUse.car.maxSteeringAngle) #constrain one more time
+
         if(saveOutput):
             mapToUse.car.pathFolData.nextTarget = nextTarget
             mapToUse.car.desired_steering = desired_steering
@@ -180,19 +232,31 @@ class pathPlanner():
     pathSplineSamplingPower = 1.2
     pathSplineSmoothing = 0.075 #0 means it MUST cross all points, 1 is too much for the scale car, so just pick whatever looks decent
     
-    #turning_sharpness = 1.8
     
     targetDistSpeedMultiplier = 0.25 #at high speed, the tolerance for targer reached distance should increase (because turning radius increases and accuracy does not). To disable this, set it to 0
     targetReachedThreshold = 0.3 #if distance to target (regardless of orientation) is less than this, target is reached (larger means less likely to spin off, smaller means more accurate)
+    targetDistSpeedMargin = lambda velocity : (pathPlanner.targetDistSpeedMultiplier*pathPlanner.targetReachedThreshold*(velocity-1.0)) #note: 1.0 is in m/s, it's the value for which targetReachedThreshold is intended
     ##if the target can't be reached, due to turning radius limitations (TBD: slowing down), then passing is enough
     targetPassedDistThreshold = targetReachedThreshold*2.0 #if it passes a target (without hitting it perfectly), the distance to target should still be less than this
     targetPassedAngleThreshold = np.deg2rad(75) #if it passes a target (without hitting it perfectly), the angle to target will probably be more than this
     targetMissedAngleThreshold = np.deg2rad(140) #if the angle to target is larger than this, (panic, and) move on to the next target (or something)
+
+    steeringPredictDepth = 2 #how many targets to predictively steer towards
+    steeringPredictDepthStrength = 1.25 #(higher = stronger)
+    steeringPredictDepthCurve = lambda depth : (pathPlanner.steeringPredictDepthStrength / (max(depth, 1.0)**2)) #inverse exponential, starting at a depth of 1 (0 depth would be the current target)
+    ##a distance-based steering power curve may be useful (especially for predictive steering)
+    steeringPredictDistStrength = 1.5 #(higher = stronger) how sharp/strong the inverse exponential curve of distance over prediction_relevance (plot 1/((x+1)^2) in a graphing calculator)
+    steeringPredictDistExpon = 4.0 #(higher = more exponential (sharper)) how sharp/strong the inverse exponential curve of distance over prediction_relevance (plot 1/((x+1)^2) in a graphing calculator)
+    steeringPredictDistCurve = lambda dist, velocity=1.0 : min((pathPlanner.steeringPredictDistStrength / (((max(dist, 0.0) * pathPlanner.steeringPredictDistExpon) + (1.0 - ((pathPlanner.targetReachedThreshold + pathPlanner.targetDistSpeedMargin(velocity)) * pathPlanner.steeringPredictDistExpon)))**2)), pathPlanner.steeringPredictDistStrength)
+    ##in some situations the car should (besides slowing down), start at the outer edge of the corner, because the turn would otherwise be too tight
+    steeringPredictCounterThresh = np.deg2rad(30) #only if the angle is sharper than this, do we need to perform this pre-emptive counter-steer
+    #steeringPredictCounterCurve = lambda turnAngle : TBD  (also note, maybe this should use the same distance function, as this countersteer needs to happen a little further away maybe)
+    ##TBD: consider the distance to the predicted target as well (if it's far away, there's less need to cut corners, there will be time to react normally)
     
-    #this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
+    ##this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
     @staticmethod
-    def nextTarget(mapToUse, currentTarget):
-        return(nextTarget(mapToUse, currentTarget))
+    def getNextTarget(mapToUse, currentTarget, panic=True):
+        return(getNextTarget(mapToUse, currentTarget, panic))
     
     @staticmethod
     def targetUpdate(mapToUse, currentTarget, distToTarget, angleToTarget, velocity):

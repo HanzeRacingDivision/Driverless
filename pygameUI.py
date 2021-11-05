@@ -261,9 +261,7 @@ def handleKeyPress(pygameDrawerInput, phantomMap, keyDown, key, eventToHandle):
                 pygameDrawerInput.drawConeSlamData = 0
         elif(key==pygame.K_h): # h
             pygameDrawerInput.headlights = not pygameDrawerInput.headlights #only has an effect if car sprite is used (.carPolygonMode)
-        elif(key==pygame.K_d): # d
-            ## (debug) stop/start cone creation
-            pygameDrawerInput.makeNewCones = not pygameDrawerInput.makeNewCones
+#        elif(key==pygame.K_d): # d
 #            ## (debug) printing the pickle size of individual components in the map object
 #            import pickle
 #            print("total len:", len(pickle.dumps(pygameDrawerInput.mapToDraw)))
