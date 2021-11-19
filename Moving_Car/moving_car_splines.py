@@ -202,7 +202,7 @@ class PathPlanning:
         right_spline_linked = False
         left_spline_linked = False
         fullscreen = False
-        track_number = 0
+        track_number = -1
         cruising_speed = 2
         cone_connect_list = False
         first_right_cone_found = False
@@ -211,6 +211,8 @@ class PathPlanning:
         track_number_changed = False
         car_crashed = False
         start_time_set = False
+        total_reward = 0
+        lap_reward = False
         
         def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length = 10, exclude_corners = True):
 
@@ -400,6 +402,7 @@ class PathPlanning:
                 first_left_cone_found = False
                 track_number_changed = False
                 car_crashed = False
+                total_reward = 0
                 
                 
             #if 2 is pressed, increasing cruising speed
@@ -808,22 +811,18 @@ class PathPlanning:
                 start_midpoint_y = np.mean([first_visible_left_cone.position.y,first_visible_right_cone.position.y])     
                 midpoint_created = True
                 
-            #if the track number = 3, exit
-            if first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu and track_number_changed == False and track_number == 3:
-                print('FINISHED!', 'TIME : ', time.time() - time_start_track)
-                self.exit = True
-                track_number_changed = True    
+
                 
             #if car passes finishing line, add 1 to track number
-            elif first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu and track_number_changed == False:
+            elif first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu and track_number_changed == False and track == True:
                 track_number += 1
                 print('TIME : ', time.time() - time_start_track)
+                lap_reward = True
                 track_number_changed = True
                 
             #setting track_number_changed to false when not on finishing line
-            elif first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) > 20/ppu:
+            elif first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) > 20/ppu and track == True:
                 track_number_changed = False
-
 
 
             # Car crash mechanic
@@ -866,7 +865,29 @@ class PathPlanning:
                     print('TIME : ', time.time() - time_start_sim)
                     self.exit = True
                     #change car image to explosion 
+                    
+            #reward function
+            def calculate_reward(lap_reward):
+                reward = 0
+             
+                if car.auto == True:
+                    if lap_reward == True and track_number > 0:
+                        reward += 100
+                        lap_reward = False
+                    reward += 0.01 * car.velocity.x/car.max_velocity
+                    reward += 0.005
+                return reward, lap_reward
+            
+            reward, lap_reward = calculate_reward(lap_reward)
+            total_reward += reward
+            
                 
+            #if the track number = 3, exit
+            if first_visible_left_cone != 0 and first_visible_right_cone != 0 and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu and track_number == 3 and track == True:
+                print('FINISHED!', 'TIME : ', time.time() - time_start_track)
+                print('TOTAL REWARD:', total_reward)
+                self.exit = True
+                track_number_changed = True    
                 
                     
             # Logic
@@ -999,9 +1020,15 @@ class PathPlanning:
              #   text_pos = [10, 10]
              #   self.screen.blit(text_surf, text_pos)
                 
-                text_surf = text_font.render(f'Car angle : {round(car_angle,1)}', 1, (255, 255, 255))
+             #   text_surf = text_font.render(f'Car angle : {round(car_angle,1)}', 1, (255, 255, 255))
+             #   text_pos = [10, 15]
+             #   self.screen.blit(text_surf, text_pos)
+                
+                text_surf = text_font.render(f'REWARD : {round(total_reward,1)}', 1, (255, 255, 255))
                 text_pos = [10, 15]
                 self.screen.blit(text_surf, text_pos)
+                
+                
                 
                 text_surf = text_font.render(f'Steering : {round(car.steering,1)}', 1, (255, 255, 255))
                 text_pos = [10, 35]
@@ -1045,12 +1072,12 @@ class PathPlanning:
                # text_surf = text_font.render(f'Headlights: {car.headlights}', 1, (255, 255, 255))
                # text_pos = [10, 190]
                # self.screen.blit(text_surf, text_pos)
-               
+           
                 text_surf = text_font.render('Press F to enter Fullscreen', 1, (155, 155, 155))
                 text_pos = [10, 500]
                 self.screen.blit(text_surf, text_pos)
                
-                text_surf = text_font.render('Press 1 and 2 to alter car cruising speed', 1, (155, 155, 155))
+                text_surf = text_font.render('Press 1 and 2 to alter car speed', 1, (155, 155, 155))
                 text_pos = [10, 520]
                 self.screen.blit(text_surf, text_pos)
                 
@@ -1085,7 +1112,7 @@ class PathPlanning:
                 text_surf = text_font.render('Press D to load map', 1, (155, 155, 155))
                 text_pos = [10, 660]
                 self.screen.blit(text_surf, text_pos)
-            else:
+            else:  
                 text_surf = text_font.render('Press F to exit Fullscreen', 1, (80, 80, 80))
                 text_pos = [10, 690]
                 self.screen.blit(text_surf, text_pos)
