@@ -143,7 +143,7 @@ class Cone:
 
 
 class PathPlanning:
-    def __init__(self):
+    def __init__(self, map_name = 'MAP_NULL'):
         pygame.init()
         pygame.display.set_caption("Car")
         width = 1280
@@ -152,6 +152,9 @@ class PathPlanning:
         self.clock = pygame.time.Clock()
         self.ticks = 60
         self.exit = False
+        self.total_reward = 0
+        self.cruising_speed = 0
+        self.map_name = map_name
 
     def run(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -218,7 +221,6 @@ class PathPlanning:
         track_number_changed = False
         car_crashed = False
         start_time_set = False
-        total_reward = 0
         lap_reward = False
         time_start_track = None
          
@@ -243,7 +245,7 @@ class PathPlanning:
             path_midpoints, right_spline_linked, left_spline_linked, mouse_pos_list, \
             left_spline, right_spline, path_midpoints_spline, first_visible_left_cone,\
             first_visible_right_cone, first_right_cone_found, first_left_cone_found, \
-            track_number_changed, car_crashed, total_reward, car, track, cruising_speed,\
+            track_number_changed, car_crashed, self.total_reward, car, track, cruising_speed,\
             fullscreen, time_start_track \
                  = pp_functions.manual_controls.user_input(mouse_pos_list, Target, ppu, targets,non_passed_targets,
                                                                        Cone,left_cones,right_cones, right_spline_linked,
@@ -253,7 +255,7 @@ class PathPlanning:
                                                                        path_midpoints_spline,first_visible_left_cone,
                                                                        first_visible_right_cone,first_right_cone_found,
                                                                        first_left_cone_found,track_number_changed,car_crashed,
-                                                                       total_reward,time_start_track)
+                                                                       self.total_reward,time_start_track)
                         
             #Defining the time running since simulation started
             time_running = time.time() - time_start
@@ -384,8 +386,8 @@ class PathPlanning:
             pp_functions.car_crash.car_crash_mechanic(self, left_cones, right_cones, car, time_start_sim)
                     
             #reward function
-            reward, lap_reward = pp_functions.reward_function.calculate_reward(lap_reward, car, track_number)
-            total_reward += reward
+            reward, lap_reward = pp_functions.reward_function.calculate_reward(lap_reward, car, track_number, dt)
+            self.total_reward += reward
             
                 
             #if the track number = 3, end simulation
@@ -395,7 +397,7 @@ class PathPlanning:
             and track_number == 3 
             and track == True):
                 print('FINISHED!', 'TIME : ', time.time() - time_start_track)
-                print('TOTAL REWARD:', total_reward)
+                print('TOTAL REWARD:', self.total_reward)
                 self.exit = True
                 track_number_changed = True     
                     
@@ -431,7 +433,6 @@ class PathPlanning:
                                         car_crashed,
                                         explosion_image,
                                         fullscreen,
-                                        total_reward,
                                         track,
                                         track_number)
             
