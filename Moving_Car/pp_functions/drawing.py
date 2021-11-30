@@ -29,7 +29,6 @@ def render(self,
            car_crashed,
            explosion_image,
            fullscreen,
-           total_reward,
            track,
            track_number):
     
@@ -151,7 +150,7 @@ def render(self,
      #   text_pos = [10, 15]
      #   self.screen.blit(text_surf, text_pos)
         
-        text_surf = text_font.render(f'REWARD : {round(total_reward,1)}', 1, (255, 255, 255))
+        text_surf = text_font.render(f'REWARD : {round(self.total_reward,1)}', 1, (255, 255, 255))
         text_pos = [10, 15]
         self.screen.blit(text_surf, text_pos)
         
