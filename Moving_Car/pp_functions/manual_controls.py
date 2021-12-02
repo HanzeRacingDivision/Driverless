@@ -12,8 +12,8 @@ import pandas as pd
 import pp_functions.utils
 
  # User input
- 
-def user_input(mouse_pos_list,
+def user_input(self,
+               mouse_pos_list,
                Target,
                ppu,
                targets,
@@ -43,7 +43,6 @@ def user_input(mouse_pos_list,
                first_left_cone_found,
                track_number_changed,
                car_crashed,
-               total_reward,
                time_start_track):
     
     pressed = pygame.key.get_pressed()
@@ -64,7 +63,7 @@ def user_input(mouse_pos_list,
                 
     # press l for left cone
     if pressed[pygame.K_l]:
-        mouse_pos = pygame.mouse.get_pos()
+        mouse_pos = (pygame.mouse.get_pos()[0] - self.view_offset[0], pygame.mouse.get_pos()[1] - self.view_offset[1])
         
         if mouse_pos in mouse_pos_list:
             pass
@@ -85,8 +84,8 @@ def user_input(mouse_pos_list,
             
     # press r for right cone
     if pressed[pygame.K_r]:
-        mouse_pos = pygame.mouse.get_pos()
-        
+        mouse_pos = (pygame.mouse.get_pos()[0] - self.view_offset[0], pygame.mouse.get_pos()[1] - self.view_offset[1])
+
         if mouse_pos in mouse_pos_list:
             pass
         else:
@@ -129,7 +128,7 @@ def user_input(mouse_pos_list,
         first_left_cone_found = False
         track_number_changed = False
         car_crashed = False
-        total_reward = 0
+        self.total_reward = 0
         time_start_track = None
         
         
@@ -211,12 +210,28 @@ def user_input(mouse_pos_list,
         first_left_cone_found = False
         track_number_changed = False
         car_crashed = False
-        total_reward = 0
+        self.total_reward = 0
         time_start_track = None
         
         left_cones, right_cones, mouse_pos_list = pp_functions.utils.load_map(mouse_pos_list, current_dir, Cone, ppu)
         
-            
+    #dragging screen using left mouse butto
+    for event in events:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 or self.moving_view_offset == True:
+            if self.moving_view_offset == False:
+                self.moving_view_offset = True
+                self.view_offset_mouse_pos_start = pygame.mouse.get_pos()
+            mouse_pos = pygame.mouse.get_pos()
+            mouseDelta = [float(mouse_pos[0] - self.view_offset_mouse_pos_start[0]), float(mouse_pos[1] - self.view_offset_mouse_pos_start[1])]
+            self.view_offset[0] = self.prev_view_offset[0] + mouseDelta[0]
+            self.view_offset[1] = self.prev_view_offset[1] + mouseDelta[1]
+
+    for event in events:
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            self.prev_view_offset[0] = self.view_offset[0]
+            self.prev_view_offset[1] = self.view_offset[1]
+            self.moving_view_offset = False
+
     #manual acceleration
     if pressed[pygame.K_UP]:
         if car.velocity.x < 0:
@@ -265,7 +280,8 @@ def user_input(mouse_pos_list,
 # =============================================================================
                 
                 
-    return targets, \
+    return self, \
+           targets, \
            non_passed_targets, \
            circles, \
            left_cones, \
@@ -287,7 +303,6 @@ def user_input(mouse_pos_list,
            first_left_cone_found, \
            track_number_changed, \
            car_crashed, \
-           total_reward, \
            car, \
            track, \
            cruising_speed, \

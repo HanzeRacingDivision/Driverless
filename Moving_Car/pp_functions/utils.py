@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw
 from scipy.interpolate import splprep, splev
 import pandas as pd
 
-def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length = 10, exclude_corners = True):
+def draw_line_dashed(surface, color, start_pos, end_pos, offset, width = 1, dash_length = 10, exclude_corners = True):
 
          'simply a function that draws dashed lines in pygame'    
      
@@ -24,7 +24,8 @@ def draw_line_dashed(surface, color, start_pos, end_pos, width = 1, dash_length 
          dash_amount = int(length / dash_length)
      
          # x-y-value-pairs of where dashes start (and on next, will end)
-         dash_knots = np.array([np.linspace(start_pos[i], end_pos[i], dash_amount) for i in range(2)]).transpose()
+         dash_knots = np.array([np.linspace(start_pos[i] , end_pos[i], dash_amount) for i in range(2)]).transpose()
+         dash_knots += offset
      
          return [pygame.draw.line(surface, color, tuple(dash_knots[n]), tuple(dash_knots[n+1]), width)
                  for n in range(int(exclude_corners), dash_amount - int(exclude_corners), 2)]    
@@ -79,7 +80,28 @@ def load_map(mouse_pos_list, current_dir, Cone, ppu):
     
     return left_cones, right_cones, mouse_pos_list
 
+def auto_load_map(mouse_pos_list, current_dir, Cone, ppu, map_name):
+    
+    left_cones = []
+    right_cones = []
+    name = map_name
+    
+    map_path = os.path.join(current_dir, f"{name}.csv")
+    map_file = pd.read_csv(map_path)
+    
+    for i in range(len(map_file.iloc[:,0])):
+        if map_file['Cone_Type'].iloc[i] == 'LEFT':
 
+            left_cone = Cone(map_file['Cone_X'].iloc[i],map_file['Cone_Y'].iloc[i], 'left')
+            left_cones.append(left_cone)
+            mouse_pos_list.append((map_file['Cone_X'].iloc[i]*ppu,map_file['Cone_Y'].iloc[i]*ppu))             
+        
+        else:
+            right_cone = Cone(map_file['Cone_X'].iloc[i],map_file['Cone_Y'].iloc[i], 'right')
+            right_cones.append(right_cone)
+            mouse_pos_list.append((map_file['Cone_X'].iloc[i]*ppu,map_file['Cone_Y'].iloc[i]*ppu))             
+        
+    return left_cones, right_cones, mouse_pos_list
 
 def update_target_lists(targets, non_passed_targets):
     
