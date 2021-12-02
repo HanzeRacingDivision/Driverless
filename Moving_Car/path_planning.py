@@ -156,6 +156,11 @@ class PathPlanning:
         self.cruising_speed = 0
         self.map_name = map_name
 
+        self.view_offset = [0.0, 0.0]
+        self.prev_view_offset = [0.0, 0.0]
+        self.moving_view_offset = False
+        self.view_offset_mouse_pos_start = [0.0,0.0]
+
     def run(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         image_path = os.path.join(current_dir, "car_r_30.png")
@@ -226,7 +231,6 @@ class PathPlanning:
          
         while not self.exit:
             
-            
             if start_time_set == False:
                 time_start_sim = time.time()
                 start_time_set = True
@@ -240,14 +244,14 @@ class PathPlanning:
                     self.exit = True
                         
             #User input/manual controls
-            targets, non_passed_targets, circles, left_cones, right_cones, \
+            self, targets, non_passed_targets, circles, left_cones, right_cones, \
             visible_left_cones, visible_right_cones, left_spline, right_spline, \
             path_midpoints, right_spline_linked, left_spline_linked, mouse_pos_list, \
-            left_spline, right_spline, path_midpoints_spline, first_visible_left_cone,\
+            left_spline, right_spline, path_midpoints_spline, first_visible_left_cone, \
             first_visible_right_cone, first_right_cone_found, first_left_cone_found, \
-            track_number_changed, car_crashed, self.total_reward, car, track, cruising_speed,\
+            track_number_changed, car_crashed, car, track, cruising_speed,\
             fullscreen, time_start_track \
-                 = pp_functions.manual_controls.user_input(mouse_pos_list, Target, ppu, targets,non_passed_targets,
+                 = pp_functions.manual_controls.user_input(self, mouse_pos_list, Target, ppu, targets,non_passed_targets,
                                                                        Cone,left_cones,right_cones, right_spline_linked,
                                                                        left_spline_linked,events,cruising_speed,car,track,
                                                                        fullscreen,current_dir,dt,circles,visible_left_cones,
@@ -255,7 +259,7 @@ class PathPlanning:
                                                                        path_midpoints_spline,first_visible_left_cone,
                                                                        first_visible_right_cone,first_right_cone_found,
                                                                        first_left_cone_found,track_number_changed,car_crashed,
-                                                                       self.total_reward,time_start_track)
+                                                                       time_start_track)
                         
             #Defining the time running since simulation started
             time_running = time.time() - time_start
