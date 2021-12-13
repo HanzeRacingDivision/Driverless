@@ -1,5 +1,5 @@
 """
-Extended Kalman Filter SLAM example
+Extended Kalman Filter SLAM.py example
 author: Atsushi Sakai (@Atsushi_twi)
 """
 
@@ -117,12 +117,12 @@ def calc_input():
 def observation(xTrue, u, cones_visible, DT):
     # add noise to gps x-y
     z = np.zeros((0, 3))
-    # print("Before update SLAM")
+    # print("Before update SLAM.py")
     # print(xTrue)
 
     x_state = motion_model(xTrue, u, DT)
 
-    # print("After update SLAM")
+    # print("After update SLAM.py")
     # print(x_state)
     for i in range(len(cones_visible[:, 0])):
         dx = cones_visible[i, 0] - x_state[0, 0]

@@ -286,7 +286,7 @@ class carMCU:
                 return()
 
 
-#a TEMPORARY class, to be replaced by SLAM code (which uses real filtering and stuff)
+#a TEMPORARY class, to be replaced by SLAM.py code (which uses real filtering and stuff)
 class realCar(carMCU, Map.Car):
     """ a TEMPORARY class that uses carMCU sensor feedback to get car state (position, velocity, etc.)
         (overwrites Map.Car.update() and carMCU.runOnThread()) """

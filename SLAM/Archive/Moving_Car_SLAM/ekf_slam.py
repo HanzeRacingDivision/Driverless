@@ -1,5 +1,5 @@
 """
-Extended Kalman Filter SLAM example
+Extended Kalman Filter SLAM.py example
 author: Atsushi Sakai (@Atsushi_twi)
 """
 
@@ -13,10 +13,10 @@ import numpy as np
 Cx = np.diag([0.5, 0.5, np.deg2rad(30.0)]) ** 2
 
 #  Simulation parameter
-Q_sim = np.diag([0.2, np.deg2rad(1.0)]) ** 2
-R_sim = np.diag([1.0, np.deg2rad(10.0)]) ** 2
+Q_sim = np.diag([0.1, np.deg2rad(1.0)]) ** 1.5
+R_sim = np.diag([0.5, np.deg2rad(5.0)]) ** 1.5
 
-DT = 0.1  # time tick [s]
+#DT = 0.1  # time tick [s]
 SIM_TIME = 50.0  # simulation time [s]
 MAX_RANGE = 20.0  # maximum observation range
 M_DIST_TH = 2.0  # Threshold of Mahalanobis distance for data association.
@@ -29,19 +29,18 @@ xEST: belief of last position + LM locations will be (x_car, y_car, theta, x_1, 
 PEst: uncertainty last position -> shape STATE_SIZE * STATE_SIZE // Covariance matrix
 u: control applied since last position; should be (v, w) linear + angular velocity
 z: measurements of landmarks at the current step; (distance, angle, num_id)
-
 Explanation u(v, w):
 Angular velocity: w = change in angle / change in time (how much time passed since last state)
 change in angle = angle of car after motion - angle of car before motion
 Linear velocity: v = distance / change in time      (if the car was going on straight line how much distance would it have travelled)
 """
-def ekf_slam(xEst, PEst, u, z):
+def ekf_slam(xEst, PEst, u, z, DT):
     # Predict
     S = STATE_SIZE
     # caluclate Jacobbian for state + motion and Fx -> identity of size STATE_SIZE
-    G, Fx = jacob_motion(xEst[0:S], u)
+    G, Fx = jacob_motion(xEst[0:S], u, DT)
     # computes new state/location based on current state and motion
-    xEst[0:S] = motion_model(xEst[0:S], u)
+    xEst[0:S] = motion_model(xEst[0:S], u, DT)
     # update covariance / how uncertain are we about the new location
     # after motion
     PEst[0:S, 0:S] = G.T @ PEst[0:S, 0:S] @ G + Fx.T @ Cx @ Fx
@@ -74,13 +73,13 @@ def ekf_slam(xEst, PEst, u, z):
 
 def calc_input():
     v = 1.0  # [m/s]
-    yaw_rate = 0.1  # [rad/s]
+    yaw_rate = 0.2  # [rad/s]
     u = np.array([[v, yaw_rate]]).T
     return u
 
 
-def observation(xTrue, xd, u, RFID):
-    xTrue = motion_model(xTrue, u)
+def observation(xTrue, xd, u, RFID, DT):
+    xTrue = motion_model(xTrue, u, DT)
 
     # add noise to gps x-y
     z = np.zeros((0, 3))
@@ -92,10 +91,9 @@ def observation(xTrue, xd, u, RFID):
         d = math.hypot(dx, dy)
         angle = pi_2_pi(math.atan2(dy, dx) - xTrue[2, 0])
         if d <= MAX_RANGE:
-            dn = d + np.random.randn() * Q_sim[0, 0] ** 2 # add noise
-            angle_n = angle + np.random.randn() * Q_sim[1, 1] ** 0.5  # add noise
+            dn = d + np.random.randn() * Q_sim[0, 0] # add noise
+            angle_n = angle + np.random.randn() * Q_sim[1, 1] # add noise
             zi = np.array([dn, angle_n, i])
-            print("One LM", zi)
             z = np.vstack((z, zi))
 
     # add noise to input
@@ -103,7 +101,7 @@ def observation(xTrue, xd, u, RFID):
         u[0, 0] + np.random.randn() * R_sim[0, 0] ** 0.5,
         u[1, 0] + np.random.randn() * R_sim[1, 1] ** 0.5]]).T
 
-    xd = motion_model(xd, ud)
+    xd = motion_model(xd, ud, DT)
     return xTrue, z, xd, ud
 
 """
@@ -111,16 +109,13 @@ x: (x,y,theta) previous location + orientation
 u: linear + angular velocity
 returns new state (x,y,theta)
 """
-def motion_model(x, u):
+def motion_model(x, u, DT):
     F = np.array([[1.0, 0, 0],
                   [0, 1.0, 0],
                   [0, 0, 1.0]])
-    print("State vector: ", x, x[2, 0])
-    print("motion vector: ", u)
     B = np.array([[DT * math.cos(x[2, 0]), 0],
                   [DT * math.sin(x[2, 0]), 0],
                   [0.0, DT]])
-    print("B", B.shape)
     x = (F @ x) + (B @ u)
     return x
 
@@ -135,7 +130,7 @@ x: state (x,y,theta)
 u: linear + angular velocity
 returns Jacobian and Fx -> identity of size STATE_SIZE
 """
-def jacob_motion(x, u):
+def jacob_motion(x, u, DT):
     Fx = np.hstack((np.eye(STATE_SIZE), np.zeros(
         (STATE_SIZE, LM_SIZE * calc_n_lm(x)))))
     # formula to get first deriviatives (Jacobian)
@@ -150,7 +145,6 @@ def jacob_motion(x, u):
 
 def calc_landmark_position(x, z):
     zp = np.zeros((2, 1))
-    print("z ", z)
     zp[0, 0] = x[0, 0] + z[0] * math.cos(x[2, 0] + z[1])
     zp[1, 0] = x[1, 0] + z[0] * math.sin(x[2, 0] + z[1])
 
@@ -255,8 +249,6 @@ def main():
         u = calc_input()
 
         xTrue, z, xDR, ud = observation(xTrue, xDR, u, RFID)
-        print("measurment vector", z)
-        print("motion vec", ud)
         xEst, PEst = ekf_slam(xEst, PEst, ud, z)
 
         x_state = xEst[0:STATE_SIZE]
@@ -291,6 +283,18 @@ def main():
             plt.grid(True)
             plt.pause(0.001)
 
+#------------------------------------------------------------------#
+#-------------Handmade functions for the simulation----------------#
+def get_linear_velocity(v_x, v_y):
+    return math.sqrt(v_x**2 + v_y**2)
 
-if __name__ == '__main__':
-    main()
+print(get_linear_velocity(2.2, 2.1))
+# if __name__ == '__main__':
+#     main()
+
+
+
+
+
+
+

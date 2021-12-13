@@ -4,7 +4,7 @@ import numpy as np
 
 
 class Map:
-    """ A Parent Map Class that SLAM, PathPlanning and other simulations inherit from """
+    """ A Parent Map Class that SLAM.py, PathPlanning and other simulations inherit from """
 
     def __init__(self):  # variables here that define the scenario/map
         self.car = self.Car(5, 11)
