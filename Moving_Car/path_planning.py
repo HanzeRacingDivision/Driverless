@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from scipy.interpolate import splprep, splev
 import pandas as pd
+import gym
 
 import pp_functions.utils
 import pp_functions.drawing
@@ -228,6 +229,7 @@ class PathPlanning:
         start_time_set = False
         lap_reward = False
         time_start_track = None
+        undo_done = False
          
         while not self.exit:
             
@@ -250,7 +252,7 @@ class PathPlanning:
             left_spline, right_spline, path_midpoints_spline, first_visible_left_cone, \
             first_visible_right_cone, first_right_cone_found, first_left_cone_found, \
             track_number_changed, car_crashed, car, track, cruising_speed,\
-            fullscreen, time_start_track \
+            fullscreen, time_start_track, undo_done \
                  = pp_functions.manual_controls.user_input(self, mouse_pos_list, Target, ppu, targets,non_passed_targets,
                                                                        Cone,left_cones,right_cones, right_spline_linked,
                                                                        left_spline_linked,events,cruising_speed,car,track,
@@ -259,7 +261,7 @@ class PathPlanning:
                                                                        path_midpoints_spline,first_visible_left_cone,
                                                                        first_visible_right_cone,first_right_cone_found,
                                                                        first_left_cone_found,track_number_changed,car_crashed,
-                                                                       time_start_track)
+                                                                       time_start_track, undo_done)
                         
             #Defining the time running since simulation started
             time_running = time.time() - time_start
@@ -438,7 +440,8 @@ class PathPlanning:
                                         explosion_image,
                                         fullscreen,
                                         track,
-                                        track_number)
+                                        track_number,
+                                        car_angle)
             
         pygame.quit()
 
