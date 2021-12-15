@@ -30,7 +30,8 @@ def render(self,
            explosion_image,
            fullscreen,
            track,
-           track_number):
+           track_number,
+           car_angle):
     
     self.screen.fill((0, 0, 0))
     rotated = pygame.transform.rotate(car_image, car.angle)
@@ -39,6 +40,9 @@ def render(self,
     pos_temp = car.position * ppu
     pos_1 = int(pos_temp.x)
     pos_2 = int(pos_temp.y)
+
+    def apply_view_offset(item):
+        return item + (self.view_offset[0], self.view_offset[1])
      
     #circle = (pos_1,pos_2)
     #circles.append(circle)
@@ -57,7 +61,7 @@ def render(self,
         data = pil_image.tobytes()
         
         image = pygame.image.fromstring(data, size, mode)
-        image_rect = image.get_rect(center= (pos_1, pos_2))
+        image_rect = image.get_rect(center = (pos_1 + self.view_offset[0], pos_2 + self.view_offset[1]))
     
         self.screen.blit(image, image_rect)        
         
@@ -72,7 +76,7 @@ def render(self,
         for target in targets:
             if target in non_passed_targets:
                 pass
-                self.screen.blit(target_image, target.position * ppu - (3,3))
+                self.screen.blit(target_image, apply_view_offset(target.position * ppu - (3,3)))
             else:
                 pass
                 #self.screen.blit(target_image_g, target.position * ppu - (3,3))
@@ -83,37 +87,37 @@ def render(self,
         
     if len(left_cones) > 0:
         for left_cone in left_cones:
-            self.screen.blit(left_cone_image, left_cone.position * ppu - (3,3))
+            self.screen.blit(left_cone_image, apply_view_offset(left_cone.position * ppu - (3,3)))
             
     if len(right_cones) > 0:
         for right_cone in right_cones:
-            self.screen.blit(right_cone_image, right_cone.position * ppu - (3,3))
+            self.screen.blit(right_cone_image, apply_view_offset(right_cone.position * ppu - (3,3)))
             
     if len(visible_left_cones) > 0:
         for left_cone in visible_left_cones:
             if left_cone.in_fov == True:
-                pp_functions.utils.draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , left_cone.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
+                pp_functions.utils.draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , left_cone.position * ppu , self.view_offset, width = 1, dash_length = 10, exclude_corners = True)
     
             
     if len(visible_right_cones) > 0:
         for right_cone in visible_right_cones:
             if right_cone.in_fov == True:
-                pp_functions.utils.draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , right_cone.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
+                pp_functions.utils.draw_line_dashed(self.screen, (150,150,150),(pos_1,pos_2) , right_cone.position * ppu, self.view_offset , width = 1, dash_length = 10, exclude_corners = True)
     
     
     
     if left_spline != 0 and len(left_spline) > 0:
         for i in range(len(left_spline[0])):
-            self.screen.blit(left_spline_image, Vector2(left_spline[0][i],left_spline[1][i]) * ppu - (3,3))
+            self.screen.blit(left_spline_image, apply_view_offset(Vector2(left_spline[0][i],left_spline[1][i]) * ppu - (3,3)))
             
     if right_spline != 0 and len(right_spline) > 0:
      #   print(f'right spline : {right_spline}')
         for i in range(len(right_spline[0])):
-            self.screen.blit(right_spline_image, Vector2(right_spline[0][i],right_spline[1][i]) * ppu - (3,3))
+            self.screen.blit(right_spline_image, apply_view_offset(Vector2(right_spline[0][i],right_spline[1][i]) * ppu - (3,3)))
     
     
     if first_visible_left_cone != 0 and first_visible_right_cone != 0:
-        pp_functions.utils.draw_line_dashed(self.screen, (255, 51, 0),(first_visible_left_cone.position.x* ppu ,first_visible_left_cone.position.y* ppu) , (first_visible_right_cone.position.x* ppu ,first_visible_right_cone.position.y* ppu) , width = 2, dash_length = 5, exclude_corners = True)
+        pp_functions.utils.draw_line_dashed(self.screen, (255, 51, 0),(first_visible_left_cone.position.x* ppu ,first_visible_left_cone.position.y* ppu) , (first_visible_right_cone.position.x* ppu ,first_visible_right_cone.position.y* ppu), self.view_offset , width = 2, dash_length = 5, exclude_corners = True,)
     
     
     
@@ -131,7 +135,7 @@ def render(self,
     # draw the car sprite
     #pygame.draw.rect(self.screen, (200,200,200), (car.position * ppu - ((rect.width / 2),(rect.height / 2)), (rect.width, rect.height))) #draws a little box around the car sprite (just for debug)
     if car_crashed == False:
-        self.screen.blit(rotated, car.position * ppu - ((rect.width / 2),(rect.height / 2))) #draw car
+        self.screen.blit(rotated, apply_view_offset(car.position * ppu - ((rect.width / 2),(rect.height / 2)))) #draw car
     else:
         self.screen.blit(explosion_image, car.position * ppu - ((explosion_image.get_rect().width / 2),(explosion_image.get_rect().height / 2)))
     
@@ -146,14 +150,13 @@ def render(self,
      #   text_pos = [10, 10]
      #   self.screen.blit(text_surf, text_pos)
         
-     #   text_surf = text_font.render(f'Car angle : {round(car_angle,1)}', 1, (255, 255, 255))
-     #   text_pos = [10, 15]
-     #   self.screen.blit(text_surf, text_pos)
-        
-        text_surf = text_font.render(f'REWARD : {round(self.total_reward,1)}', 1, (255, 255, 255))
+        text_surf = text_font.render(f'Car angle : {round(car_angle,1)}', 1, (255, 255, 255))
         text_pos = [10, 15]
         self.screen.blit(text_surf, text_pos)
         
+        #text_surf = text_font.render(f'offset : {round(self.view_offset[0],1)}, {round(self.view_offset[1],1)} ', 1, (255, 255, 255))
+        #text_pos = [10, 15]
+        #self.screen.blit(text_surf, text_pos)
         
         
         text_surf = text_font.render(f'Steering : {round(car.steering,1)}', 1, (255, 255, 255))
