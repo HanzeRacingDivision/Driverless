@@ -238,29 +238,29 @@ def user_input(self,
         undo_done = True
         if len(visible_left_cones) > 0:
             if left_cones[-1] == visible_left_cones[-1]:
+                mouse_pos_list.remove((left_cones[-1].position.x * ppu, left_cones[-1].position.y * ppu))
                 left_cones.pop(-1)
                 visible_left_cones.pop(-1)
-                mouse_pos_list.pop(-1)
             else:
+                mouse_pos_list.remove((left_cones[-1].position.x * ppu, left_cones[-1].position.y * ppu))
                 left_cones.pop(-1)
-                mouse_pos_list.pop(-1)
         else:
             if len(left_cones) > 0:
+                mouse_pos_list.remove((left_cones[-1].position.x * ppu, left_cones[-1].position.y * ppu))
                 left_cones.pop(-1)
-                mouse_pos_list.pop(-1)
 
         if len(visible_right_cones) > 0:
             if right_cones[-1] == visible_right_cones[-1]:
+                mouse_pos_list.remove((right_cones[-1].position.x * ppu, right_cones[-1].position.y * ppu))
                 right_cones.pop(-1)
                 visible_right_cones.pop(-1)
-                mouse_pos_list.pop(-1)
             else:
+                mouse_pos_list.remove((right_cones[-1].position.x * ppu, right_cones[-1].position.y * ppu))
                 right_cones.pop(-1)
-                mouse_pos_list.pop(-1)
         else:
             if len(right_cones) > 0:
+                mouse_pos_list.remove((right_cones[-1].position.x * ppu, right_cones[-1].position.y * ppu))
                 right_cones.pop(-1)
-                mouse_pos_list.pop(-1)
 
     for event in events:
         if event.type == pygame.KEYUP and event.key == pygame.K_z:
