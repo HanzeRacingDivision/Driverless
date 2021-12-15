@@ -43,7 +43,8 @@ def user_input(self,
                first_left_cone_found,
                track_number_changed,
                car_crashed,
-               time_start_track):
+               time_start_track,
+               undo_done):
     
     pressed = pygame.key.get_pressed()
     
@@ -232,6 +233,40 @@ def user_input(self,
             self.prev_view_offset[1] = self.view_offset[1]
             self.moving_view_offset = False
 
+    #if CTRL + Z pressed then undo last left and right cone
+    if undo_done == False and pressed[pygame.K_LCTRL] and pressed[pygame.K_z]:
+        undo_done = True
+        if len(visible_left_cones) > 0:
+            if left_cones[-1] == visible_left_cones[-1]:
+                left_cones.pop(-1)
+                visible_left_cones.pop(-1)
+                mouse_pos_list.pop(-1)
+            else:
+                left_cones.pop(-1)
+                mouse_pos_list.pop(-1)
+        else:
+            if len(left_cones) > 0:
+                left_cones.pop(-1)
+                mouse_pos_list.pop(-1)
+
+        if len(visible_right_cones) > 0:
+            if right_cones[-1] == visible_right_cones[-1]:
+                right_cones.pop(-1)
+                visible_right_cones.pop(-1)
+                mouse_pos_list.pop(-1)
+            else:
+                right_cones.pop(-1)
+                mouse_pos_list.pop(-1)
+        else:
+            if len(right_cones) > 0:
+                right_cones.pop(-1)
+                mouse_pos_list.pop(-1)
+
+    for event in events:
+        if event.type == pygame.KEYUP and event.key == pygame.K_z:
+            undo_done = False
+
+
     #manual acceleration
     if pressed[pygame.K_UP]:
         if car.velocity.x < 0:
@@ -307,4 +342,5 @@ def user_input(self,
            track, \
            cruising_speed, \
            fullscreen, \
-           time_start_track 
+           time_start_track, \
+           undo_done

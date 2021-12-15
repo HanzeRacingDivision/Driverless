@@ -30,7 +30,8 @@ def render(self,
            explosion_image,
            fullscreen,
            track,
-           track_number):
+           track_number,
+           car_angle):
     
     self.screen.fill((0, 0, 0))
     rotated = pygame.transform.rotate(car_image, car.angle)
@@ -60,9 +61,9 @@ def render(self,
         data = pil_image.tobytes()
         
         image = pygame.image.fromstring(data, size, mode)
-        image_rect = image.get_rect(center= (pos_1, pos_2))
+        image_rect = image.get_rect(center = (pos_1 + self.view_offset[0], pos_2 + self.view_offset[1]))
     
-        self.screen.blit(image, apply_view_offset(image_rect))        
+        self.screen.blit(image, image_rect)        
         
     
     # draw dotted line of past car locations
@@ -149,13 +150,13 @@ def render(self,
      #   text_pos = [10, 10]
      #   self.screen.blit(text_surf, text_pos)
         
-     #   text_surf = text_font.render(f'Car angle : {round(car_angle,1)}', 1, (255, 255, 255))
-     #   text_pos = [10, 15]
-     #   self.screen.blit(text_surf, text_pos)
-        
-        text_surf = text_font.render(f'offset : {round(self.view_offset[0],1)}, {round(self.view_offset[1],1)} ', 1, (255, 255, 255))
+        text_surf = text_font.render(f'Car angle : {round(car_angle,1)}', 1, (255, 255, 255))
         text_pos = [10, 15]
         self.screen.blit(text_surf, text_pos)
+        
+        #text_surf = text_font.render(f'offset : {round(self.view_offset[0],1)}, {round(self.view_offset[1],1)} ', 1, (255, 255, 255))
+        #text_pos = [10, 15]
+        #self.screen.blit(text_surf, text_pos)
         
         
         text_surf = text_font.render(f'Steering : {round(car.steering,1)}', 1, (255, 255, 255))
