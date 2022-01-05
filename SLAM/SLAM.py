@@ -1,14 +1,5 @@
 import numpy as np
 
-# To keep the structure of Thijs' SLAM:
-#
-#
-#
-#
-
-
-
-
 #
 # The prediction step of the Extended Kalman Filter
 #
