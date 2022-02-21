@@ -65,8 +65,8 @@ class Car:
             self.angle += degrees(self.angular_velocity) * dt   
 
         #adding some noise/sensor error to the estimated position and angle
-        self.position += (np.random.normal(loc = 0, scale = 1e-3) , np.random.normal(loc = 0, scale= 1e-3))
-        self.angle += np.random.normal(loc = 0, scale = 1e-2)
+        self.position += (np.random.normal(loc = 0, scale = 1e-10) , np.random.normal(loc = 0, scale= 1e-10))
+        self.angle += np.random.normal(loc = 0, scale = 1e-10)
         
 class Target:
     def __init__(self, x, y):
@@ -114,7 +114,7 @@ class Target:
             
 class Cone:
     def __init__(self, x, y, category, left_cones, right_cones):
-        self.position = Vector2(x + np.random.normal(loc = 0, scale = 1e-2), y + np.random.normal(loc = 0, scale = 1e-2))
+        self.position = Vector2(x + np.random.normal(loc = 0, scale = 1e-10), y + np.random.normal(loc = 0, scale = 1e-10))
         self.true_position = Vector2(x,y)
         self.visible = False   
         self.in_fov = False
@@ -183,9 +183,11 @@ class PathPlanning:
         self.mu = np.zeros(500)
         self.mu[0] = 15
         self.mu[1] = 3
+
         self.cov = np.zeros((500,500))
         for i in range(3, 500):
             self.cov[i,i] = 10**10
+
         self.u = np.zeros(3)
         self.Rt = np.array([1e-6,1e-6,0])
         self.obs = []
@@ -206,16 +208,16 @@ class PathPlanning:
         self.obs = []
         self.c_prob = np.ones(len(self.mu))
         for i in range(len(visible_left_cones)):
-            observed_car_dist = visible_left_cones[i].true_dist_car + np.random.normal(loc = 0, scale = 1e-2)
-            observed_alpha = visible_left_cones[i].alpha + np.random.normal(loc = 0, scale = 1e-2)
+            observed_car_dist = visible_left_cones[i].true_dist_car + np.random.normal(loc = 0, scale = 1e-10)
+            observed_alpha = visible_left_cones[i].alpha + np.random.normal(loc = 0, scale = 1e-10)
 
             self.obs.append([observed_car_dist, observed_alpha, visible_left_cones[i].id])
             cone_dists.append(observed_car_dist)
             cone_angles.append(observed_alpha)
 
         for i in range(len(visible_right_cones)):
-            observed_car_dist = visible_right_cones[i].true_dist_car + np.random.normal(loc = 0, scale = 1e-2)
-            observed_alpha = visible_right_cones[i].alpha + np.random.normal(loc = 0, scale = 1e-2)
+            observed_car_dist = visible_right_cones[i].true_dist_car + np.random.normal(loc = 0, scale = 1e-10)
+            observed_alpha = visible_right_cones[i].alpha + np.random.normal(loc = 0, scale = 1e-10)
 
             self.obs.append([observed_car_dist, observed_alpha, visible_right_cones[i].id])
             cone_dists.append(observed_car_dist)
@@ -420,6 +422,8 @@ class PathPlanning:
         time_start_track = None
         undo_done = False
         time_prev = None
+
+        ticker = 0
          
         while not self.exit:
             
@@ -564,7 +568,7 @@ class PathPlanning:
                     first_right_cone_found = True
                                                                                                  
              # SLAM
-            if car.slam == True: #and round(time_running*100, 0) % 25 == 0:
+            if car.slam == True and ticker % 4 == 0: #and round(time_running*100, 0) % 25 == 0:
                 #print(round(time_running*10, 0))
                 self.slam(car, visible_left_cones, visible_right_cones, left_cones, right_cones, dt)                                                                                   
                  
@@ -663,6 +667,8 @@ class PathPlanning:
                                         track_number,
                                         car_angle,
                                         dt)
+
+            ticker += 1
             
         pygame.quit()
 
