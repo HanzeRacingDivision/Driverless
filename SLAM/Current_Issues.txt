@@ -3,13 +3,24 @@ Notes FPS problem:
 Depends on number of cones
 No difference between PC/Laptop/whatever
 
-I think this is limited by Python and not by CPU
+I think this is limited by the code and not by CPU: Works the same on my laptop and PC
 
 No cones: 30 fps
 20 cones: 25 fps
 Full track: 14 fps (with drops below 10)
 
 Only thing I changed was to convert the images, but it's not making a difference
+
+We need to figure out what is our code is the most time consuming and see if we can rewrite that (SLAM probs?)
+OR see if we can run SLAM every few frames. We tries this but then SLAM thought the car was driving at 1/4th of the speed
+and fucked some things up.
+
+on my PC:
+CPU steady around 60-65% while running a map
+GPU steady around 6-7 % while running a map
+
+This is more than fine, should not cause the frame drop
+
 
 Other problems:
 
