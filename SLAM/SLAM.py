@@ -1,5 +1,6 @@
 import numpy as np
 
+
 #
 # The prediction step of the Extended Kalman Filter
 #
@@ -7,13 +8,12 @@ def predict(mu, cov, u, Rt):
     n_landmarks = len(mu) - 3
 
     # This function can possibly be replaced by the information from the car itself,
-    # such that we have a new x, y and thetha of the vehicle.
+    # such that we have a new x, y and theta of the vehicle.
     # Define motion model f(mu,u)
     [dtrans, drot1, drot2] = u
     motion = np.array([[dtrans * np.cos(mu[2][0] + drot1)],
                        [dtrans * np.sin(mu[2][0] + drot1)],
                        [drot1 + drot2]])
-
 
     # This matrix is used to apply the new motion results to the mu matrix (such that only the first 3 rows are updated)
     F = np.append(np.eye(3), np.zeros((3, n_landmarks)), axis=1)
@@ -27,16 +27,17 @@ def predict(mu, cov, u, Rt):
                   [0, 0, dtrans * np.cos(mu[2][0] + drot1)],
                   [0, 0, 0]])
     # create the G matrices (see documentation in the drive)
-    G = np.eye(n_landmarks+3) + (F.T).dot(J).dot(F)
+    G = np.eye(n_landmarks + 3) + (F.T).dot(J).dot(F)
 
     # Predict new covariance
     cov_bar = G.dot(cov).dot(G.T) + (F.T).dot(Rt).dot(F)
 
-    #print('Predicted location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(mu_bar[0][0], mu_bar[1][0],
+    # print('Predicted location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(mu_bar[0][0], mu_bar[1][0],
     #                                                                               mu_bar[2][0]))
 
     # return updated mu and covbar
     return mu_bar, cov_bar
+
 
 #
 # The update step of the Extended Kalman Filter
@@ -94,5 +95,5 @@ def update(mu, cov, obs, c_prob, Qt):
             mu = mu + K.dot(z_dif)
             cov = (np.eye(N) - K.dot(H)).dot(cov)
 
-    #print('Updated location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(mu[0][0], mu[1][0], mu[2][0]))
+    # print('Updated location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(mu[0][0], mu[1][0], mu[2][0]))
     return mu, cov

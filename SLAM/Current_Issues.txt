@@ -1,0 +1,16 @@
+Notes FPS problem:
+
+Depends on number of cones
+No difference between PC/Laptop/whatever
+
+I think this is limited by Python and not by CPU
+
+No cones: 30 fps
+20 cones: 25 fps
+Full track: 14 fps (with drops below 10)
+
+Only thing I changed was to convert the images, but it's not making a difference
+
+Other problems:
+
+Map 3 it's having some issues with. Cones + car estimation is off from reality. changing the noise does not change this.
