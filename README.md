@@ -23,6 +23,8 @@ requirements:
  - PIL (a.k.a. Python Image Library, a.k.a. Pillow, only used for rendering headlights)
  - numba (used to make some code faster, there are usually NoNumba versions of things though)
 numba is recommended, but there are backup files in case you're having difficulty installing it (understandable on a Rpi/Jetson)
+if map-loading is not working as it should, you may need to 'pip install openpyxl'. try loading the file as a cmdline argument (instead of drag-dropping) to get better feedback.
+note: on windows, multithreaded python only prints the main thread's data, while on linux, all threads's print() data is shown.
 
 # How to use
 controls:
