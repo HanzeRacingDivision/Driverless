@@ -1,242 +1,223 @@
 import os
 import pygame
-from math import sin, radians, degrees, copysign
-from pygame.math import Vector2
 import time
-import numpy as np
-from PIL import Image, ImageDraw
-from scipy.interpolate import splprep, splev
-import pandas as pd
-import gym
+import random
 
-import pp_functions.utils
-import pp_functions.drawing
-import pp_functions.car_crash
-import pp_functions.reward_function
+from car import Car
+from cone import *
+from path import *
+
 import pp_functions.manual_controls
-import pp_functions.boundary_midpoints_splines
-
-
-class Car:
-    def __init__(self, x, y, angle = 0, length = 2, max_steering = 80, max_acceleration = 4.0):
-        self.position = Vector2(x, y)
-        self.velocity = Vector2(0.0, 0.0)
-        self.angle = angle
-        self.length = length
-        self.max_acceleration = max_acceleration
-        self.max_steering = max_steering
-        self.max_velocity = 5
-        self.brake_deceleration = 4
-        self.free_deceleration = 1
-
-        self.acceleration = 0.0
-        self.steering = 0.0
-        self.fov = 175 #150
-        self.turning_sharpness = 1.8
-        self.breaks = True
-        self.fov_range = 60
-        self.auto = False
-        self.headlights = False
-
-    def update(self, dt):
-        self.velocity += (self.acceleration * dt, 0)
-        self.velocity.x = max(-self.max_velocity, min(self.velocity.x, self.max_velocity))
-
-        if self.steering:
-            turning_radius = self.length / sin(radians(self.steering))
-            angular_velocity = self.velocity.x / turning_radius
-        else:
-            angular_velocity = 0
-
-        self.position += self.velocity.rotate(-self.angle) * dt
-        self.angle += degrees(angular_velocity) * dt
-        
-        
-        
-class Target:
-    def __init__(self, x, y):
-        self.position = Vector2(x, y)
-        self.passed = False
-        self.dist_car = 10**10
-        self.alpha = 0
-        self.visible = False
-        
-        
-    def update(self, car, time_running, ppu, car_angle): 
-        
-        #distance to car
-        self.dist_car = np.linalg.norm(self.position-car.position)
-        
-        # if within 20 pixels of car, target has been 'passed' by the car
-        if self.passed == False and np.linalg.norm(self.position-car.position) <= 20/ppu: 
-            self.passed = True
-            self.visible = False
-            
-        #calculating angle between car angle and target
-        if np.linalg.norm(self.position-car.position) < car.fov/ppu:
-            
-            a_b = self.position-car.position
-            a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
-            
-            rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
-                                [np.sin(-car_angle*np.pi/180),np.cos(-car_angle*np.pi/180)]])
-            
-            a_b = rotate*a_b
-            
-            a = a_b[0]
-            b = a_b[1]
-            
-            beta = np.arctan(b/a)*(180/np.pi)
-            alpha = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
-            self.alpha = alpha[0,0]
-            
-            #if the target is outside the car fov, it is no longer visible
-            if np.abs(self.alpha) < car.fov_range and self.passed == False:
-                self.visible = True
-            else:
-                self.visible = False
-        else:
-            self.visible = False
-            
-            
-class Cone:
-    def __init__(self, x, y, category):
-        self.position = Vector2(x, y)        
-        self.visible = False   
-        self.in_fov = False
-        self.category = category
-        
-    def update(self, car, time_running, ppu, car_angle): 
-        
-        #distance to car
-        self.dist_car = np.linalg.norm(self.position-car.position)
-        
-        #calculating angle between car angle and cone
-        if np.linalg.norm(self.position-car.position) < car.fov/ppu and car.auto == True:
-            
-            a_b = self.position-car.position
-            a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
-            
-            rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
-                                [np.sin(-car_angle*np.pi/180),np.cos(-car_angle*np.pi/180)]])
-            
-            a_b = rotate*a_b
-            
-            a = a_b[0]
-            b = a_b[1]
-            
-            beta = np.arctan(b/a)*(180/np.pi)
-            alpha = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
-            self.alpha = alpha[0,0]
-            
-            #if cone within car fov, set to visible
-            if np.abs(self.alpha) < car.fov_range:
-                self.visible = True
-                self.in_fov = True
-            else:
-                pass
-                #self.visible = False #commenting this line allows cones to be remembered
-                self.in_fov = False
-        else:
-            pass
-            #self.visible = False  #commenting this line allows cones to be remembered
-            self.in_fov = False
-
+import pp_functions.drawing
+from pp_functions.reward_function import calculate_reward
 
 class PathPlanning:
-    def __init__(self, map_name = 'MAP_NULL'):
+    def __init__(self):
+        self.target = Target(-1000,-1000) #could this be a an empty list instead?
+        self.car = Car(7,10)
+        self.cone = Cone(-1000,-1000,Side.LEFT) #could this be a an empty list instead?
+        self.path = Path()
+        self.LEVEL_ID = 'None'
+        self.initialize_images()
+        self.initialize_map() #comment this if you want to start with blank sheet map
+
         pygame.init()
         pygame.display.set_caption("Car")
-        width = 1280
-        height = 720
-        self.screen = pygame.display.set_mode((width, height))
+
+        self.width = 1280
+        self.height = 720
+        self.screen = pygame.display.set_mode((self.width, self.height))
+        self.fullscreen = False
         self.clock = pygame.time.Clock()
         self.ticks = 60
         self.exit = False
+        self.mouse_pos_list = []
         self.total_reward = 0
-        self.cruising_speed = 0
-        self.map_name = map_name
+        self.cruising_speed = 2
+        self.ppu = 32
 
-        self.view_offset = [0.0, 0.0]
-        self.prev_view_offset = [0.0, 0.0]
+        self.view_offset = [0, 0]
+        self.car_centre = False #THIS DOESNT WORK YET
+        self.prev_view_offset = [0, 0]
         self.moving_view_offset = False
-        self.view_offset_mouse_pos_start = [0.0,0.0]
+        self.view_offset_mouse_pos_start = [0, 0]
+        self.midpoint_created = False
+        self.undo_done = False
 
-    def run(self):
+        self.track = False
+        self.track_number = -1
+        self.track_number_changed = False
+        self.time_start_sim = None
+        
+        self.time_running = 0
+        self.reward = 0
+        self.done = False
+
+        self.episode_num = None
+        self.num_steps = 0
+        
+
+    def initialize_images(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        image_path = os.path.join(current_dir, "car_r_30.png")
-        car_image = pygame.image.load(image_path)
-        
-        image_path7 = os.path.join(current_dir, "explosion_image.png")
-        explosion_image = pygame.image.load(image_path7)
-        
-        image_path1 = os.path.join(current_dir, "target_r_t.png")
-        target_image = pygame.image.load(image_path1)
-        
-        image_path2 = os.path.join(current_dir, "target_g_t.png")
-        target_image_g = pygame.image.load(image_path2)
-        
-        image_path3 = os.path.join(current_dir, "left_cone_s.png")
-        left_cone_image = pygame.image.load(image_path3)
-        
-        image_path4 = os.path.join(current_dir, "right_cone_s.png")
-        right_cone_image = pygame.image.load(image_path4)
+        image_path = os.path.join(current_dir, "images/car_r_30.png")
+        self.car.car_image = pygame.image.load(image_path)
 
-        image_path5 = os.path.join(current_dir, "left_spline_s.png")
-        left_spline_image = pygame.image.load(image_path5)
+        # image_path7 = os.path.join(current_dir, "explosion_image.png")
+        # explosion_image = pygame.image.load(image_path7)
         
-        image_path6 = os.path.join(current_dir, "right_spline_s.png")
-        right_spline_image = pygame.image.load(image_path6)
+        image_path1 = os.path.join(current_dir, "images/target_r_t.png")
+        self.target.image = pygame.image.load(image_path1)
+        
+        image_path3 = os.path.join(current_dir, "images/left_cone_s.png")
+        self.cone.image[Side.LEFT] = pygame.image.load(image_path3)
+        
+        image_path4 = os.path.join(current_dir, "images/right_cone_s.png")
+        self.cone.image[Side.RIGHT] = pygame.image.load(image_path4)
 
-        car = Car(15,3)
+        image_path5 = os.path.join(current_dir, "images/left_spline_s.png")
+        self.path.spline_image[Side.LEFT] = pygame.image.load(image_path5)
+        
+        image_path6 = os.path.join(current_dir, "images/right_spline_s.png")
+        self.path.spline_image[Side.RIGHT] = pygame.image.load(image_path6)
 
-        ppu = 32
+    def initialize_map(self):
+        random_number = random.randint(1, 7)
+        self.LEVEL_ID = f"MAP_{random_number}"
+
+        left_cones, right_cones = pp_functions.utils.load_existing_map(self.LEVEL_ID)
+        self.cone.cone_list[Side.LEFT] = left_cones
+        self.cone.cone_list[Side.RIGHT] = right_cones
+
+    def reset_new_lap(self):
+        # reset targets for new lap
+        if (len(self.target.targets) > 0
+        and len(self.target.non_passed_targets) == 0 
+        and (self.path.spline_linked[Side.LEFT] == True or self.path.spline_linked[Side.RIGHT] == True)
+        and self.track):
+            self.target.reset_targets()
+
+    def track_logic(self):
+        if self.cone.first_visible_cone[Side.LEFT] != 0 and self.cone.first_visible_cone[Side.RIGHT] != 0: 
+            
+            #Setting the finishing line/point
+            if not self.midpoint_created and self.track:
+                self.path.start_midpoint_x = np.mean([self.cone.first_visible_cone[Side.LEFT].position.x, self.cone.first_visible_cone[Side.RIGHT].position.x])
+                self.path.start_midpoint_y = np.mean([self.cone.first_visible_cone[Side.LEFT].position.y, self.cone.first_visible_cone[Side.RIGHT].position.y])     
+                self.midpoint_created = True
+                
+            #Incrementing lap number by 1
+            elif (np.linalg.norm((self.path.start_midpoint_x, self.path.start_midpoint_y)-self.car.position) < 20/self.ppu 
+            and not self.track_number_changed and self.track):
+                self.track_number += 1
+                lap_reward = True
+                self.track_number_changed = True
+                
+            #Setting track_number_changed to false when not on finishing line
+            elif (np.linalg.norm((self.path.start_midpoint_x, self.path.start_midpoint_y)-self.car.position) > 20/self.ppu
+            and self.track):
+                self.track_number_changed = False  
+
+    def steering(self):
+        if (len(self.target.visible_targets) > 0 
+        and np.linalg.norm(self.target.closest_target.position-self.car.position) < self.car.fov/self.ppu
+        and np.linalg.norm(self.target.closest_target.position-self.car.position) > 20/self.ppu
+        and self.car.auto == True 
+        and self.target.closest_target.passed == False):
+            
+            dist = self.target.closest_target.dist_car
+            alpha = self.target.closest_target.alpha
+            self.car.steering_angle = (self.car.max_steering*2/np.pi)*np.arctan(alpha/dist**self.car.turning_sharpness)
+            self.car.velocity.x = self.cruising_speed
+
+        self.car.acceleration = max(-self.car.max_acceleration, min(self.car.acceleration, self.car.max_acceleration))
+        self.car.steering_angle = max(-self.car.max_steering, min(self.car.steering_angle, self.car.max_steering))
+
+
+    def implement_main_logic(self, dt):
+        self.car.update(dt)
+
+        for target in self.target.targets:
+            target.update(self)
+
+        for category in Side:
+            for cone in self.cone.cone_list[category]:
+                cone.update(self)
+
+        #When using CarEnv, this is unnecessary (and important to keep off), as it is handled by 'done' var
+        #if self.car.crashed:
+            #self.exit = True
+
+    def set_done(self, episode_time_running, episode_num, num_steps):
+        self.path.compute_boundaries(self)
+        self.car.car_crash_mechanic(self.cone, self.path)
+        episode_ending = None
+            
+        if self.car.crashed:
+            self.done = True
+            print('car crashed : ' + self.LEVEL_ID)
+            episode_ending = ('crash', self.LEVEL_ID, episode_num, num_steps)
+            return True, episode_ending
+
+        elif np.linalg.norm((7 * self.ppu, 10 * self.ppu) - self.car.position * self.ppu) < 40 and int(episode_time_running) > 4:
+            print("track complete! : " + self.LEVEL_ID)
+            self.done = True
+            episode_ending = ('success', self.LEVEL_ID, episode_num, num_steps)
+            return True, episode_ending
+
+        elif int(episode_time_running) > 100:
+            print('timelimit reached : ' + self.LEVEL_ID)
+            self.done = True
+            episode_ending = ('time limit', self.LEVEL_ID, episode_num, num_steps)
+            return True, episode_ending
+
+        else:    
+            self.done = False
+            return False, episode_ending
+
+    def get_observation(self, num_obs):
+
+        observation = np.zeros(num_obs)
+
+        observation[0] = np.interp(self.car.velocity.x, [0, self.car.max_velocity], [-1, 1])
+        observation[1] = np.interp(self.car.angle, [-180,180], [-1, 1])
+        #observation[2] = np.interp(self.car.position.x, [0,30], [-1, 1])
+        #observation[3] = np.interp(self.car.position.y, [-20,20], [-1, 1])
+
+
+        for i, cone in enumerate(self.cone.polar_boundary_sample[Side.LEFT]):
+            observation[2 + 2*i] = np.interp(cone[0], [0, self.car.fov/self.ppu], [-1, 1])
+            observation[3 + 2*i] = np.interp(cone[1], [-1 * self.car.fov_range, self.car.fov_range], [-1, 1])
+
+        for i, cone in enumerate(self.cone.polar_boundary_sample[Side.RIGHT]):
+            observation[12 + 2*i] = np.interp(cone[0], [0, self.car.fov/self.ppu], [-1, 1])
+            observation[13 + 2*i] = np.interp(cone[1], [-1 * self.car.fov_range, self.car.fov_range], [-1, 1])
+
+
+        #for i in range(len(self.cone.boundary_sample[Side.LEFT][0])):
+           #observation[2 + 2*i] = np.interp(self.cone.boundary_sample[Side.LEFT][0][i] - self.car.position.x, [-self.car.fov/self.ppu, self.car.fov/self.ppu], [-1, 1])
+           #observation[3 + 2*i] = np.interp(self.cone.boundary_sample[Side.LEFT][1][i] - self.car.position.y, [-self.car.fov/self.ppu, self.car.fov/self.ppu], [-1, 1])
+
+        #for i in range(len(self.cone.boundary_sample[Side.RIGHT][0])):
+           #observation[12 + 2*i] = np.interp(self.cone.boundary_sample[Side.RIGHT][0][i] - self.car.position.x, [-self.car.fov/self.ppu, self.car.fov/self.ppu], [-1, 1])
+           #observation[13 + 2*i] = np.interp(self.cone.boundary_sample[Side.RIGHT][1][i] - self.car.position.y, [-self.car.fov/self.ppu, self.car.fov/self.ppu], [-1, 1])
+
+        return observation
+
+    def run(self, method = "autonomous"):
+
+        self.initialize_images()
+
+        if method == "autonomous":
+            self.initialize_map()
+        else:
+            self.car.auto = False
+        
         time_start = time.time()
 
-        
-        targets = []
-        non_passed_targets = targets.copy()
-        
-        left_cones = []
-        right_cones = []
-        visible_left_cones = []
-        visible_right_cones = []
-        left_spline = 0
-        right_spline = 0
-        path_midpoints = 0
-        path_midpoints_spline = 0
-        first_visible_left_cone = 0
-        first_visible_right_cone = 0
-        
-        alpha = 0
-        circles = []
-        dist = 0
-        closest_target = None
-        mouse_pos_list = []
-        target_locations = []
-        track = False
-        right_spline_linked = False
-        left_spline_linked = False
-        fullscreen = False
-        track_number = -1
-        cruising_speed = 2
-        cone_connect_list = False
-        first_right_cone_found = False
-        first_left_cone_found = False
-        midpoint_created = False
-        track_number_changed = False
-        car_crashed = False
-        start_time_set = False
-        lap_reward = False
-        time_start_track = None
-        undo_done = False
-         
-        while not self.exit:
+        while not self.exit and not self.done:
             
-            if start_time_set == False:
-                time_start_sim = time.time()
-                start_time_set = True
-            
+            self.num_steps += 1
+
             dt = self.clock.get_time() / 500
 
             # Event queue
@@ -244,207 +225,67 @@ class PathPlanning:
             for event in events:
                 if event.type == pygame.QUIT:
                     self.exit = True
-                        
-            #User input/manual controls
-            self, targets, non_passed_targets, circles, left_cones, right_cones, \
-            visible_left_cones, visible_right_cones, left_spline, right_spline, \
-            path_midpoints, right_spline_linked, left_spline_linked, mouse_pos_list, \
-            left_spline, right_spline, path_midpoints_spline, first_visible_left_cone, \
-            first_visible_right_cone, first_right_cone_found, first_left_cone_found, \
-            track_number_changed, car_crashed, car, track, cruising_speed,\
-            fullscreen, time_start_track, undo_done \
-                 = pp_functions.manual_controls.user_input(self, mouse_pos_list, Target, ppu, targets,non_passed_targets,
-                                                                       Cone,left_cones,right_cones, right_spline_linked,
-                                                                       left_spline_linked,events,cruising_speed,car,track,
-                                                                       fullscreen,current_dir,dt,circles,visible_left_cones,
-                                                                       visible_right_cones,left_spline,right_spline,path_midpoints,
-                                                                       path_midpoints_spline,first_visible_left_cone,
-                                                                       first_visible_right_cone,first_right_cone_found,
-                                                                       first_left_cone_found,track_number_changed,car_crashed,
-                                                                       time_start_track, undo_done)
-                        
-            #Defining the time running since simulation started
-            time_running = time.time() - time_start
+
+            if method == "autonomous":
+                pp_functions.manual_controls.enable_dragging_screen(self, events)
+            else:
+                # user inputs
+                pp_functions.manual_controls.user_input(self, events, dt)
+                         
+            # Defining the time running since simulation started
+            self.time_running = time.time() - time_start
             
             #redefining the car angle so that it is in (-180,180)
-            temp_sign = np.mod(car.angle,360)
-            if temp_sign > 180:
-                car_angle_sign = -1
-            else:
-                car_angle_sign = 1
-                
-            car_angle = np.mod(car.angle,180)*car_angle_sign
-            
-            if car_angle < 0:
-                car_angle = -180 - car_angle
+            self.car.config_angle()
 
             #update target list
-            visible_targets, \
-            non_passed_dists, \
-            visible_dists, \
-            dists = pp_functions.utils.update_target_lists(targets, non_passed_targets)
+            self.target.update_target_lists()
            
             #update cone list
-            visible_left_cones, \
-            visible_right_cones, \
-            len_visible_left_cones_new, \
-            len_visible_right_cones_new, \
-            new_visible_left_cone_flag, \
-            new_visible_right_cone_flag = pp_functions.utils.update_cone_lists(left_cones, right_cones, visible_left_cones, visible_right_cones)
+            self.cone.update_cone_list(self)
             
             #calculate closest target
-            closest_target, visible_targets = pp_functions.utils.closest_target(visible_targets, visible_dists)
+            self.target.update_closest_target()
                 
             #reset targets for new lap
-            if (len(targets) > 0
-            and len(non_passed_targets) == 0 
-            and track == True 
-            and (right_spline_linked == True or left_spline_linked == True)):
-                
-                targets, non_passed_targets = pp_functions.utils.reset_targets(targets, non_passed_targets)
-            
+            self.reset_new_lap()
             
             #automatic steering
-            if (len(visible_targets) > 0 
-            and np.linalg.norm(closest_target.position-car.position) < car.fov/ppu
-            and np.linalg.norm(closest_target.position-car.position) > 20/ppu
-            and car.auto == True 
-            and closest_target.passed == False):
-                
-                dist = closest_target.dist_car
-                alpha = closest_target.alpha
-                car.steering = (car.max_steering*2/np.pi)*np.arctan(alpha/dist**car.turning_sharpness)
-                car.velocity.x = cruising_speed
-
+            self.steering()
             
-            #deceleration
-            car.acceleration = max(-car.max_acceleration, min(car.acceleration, car.max_acceleration))
-            
-            #clipping car steering angle
-            car.steering = max(-car.max_steering, min(car.steering, car.max_steering))
-
             #computing boundary estimation
-            left_spline, \
-            right_spline, \
-            first_left_cone_found, \
-            left_spline_linked, \
-            first_right_cone_found, \
-            right_spline_linked, \
-            first_visible_left_cone, \
-            first_visible_right_cone = pp_functions.boundary_midpoints_splines.compute_boundaries(car,
-                                                                                                  left_cones,
-                                                                                                  right_cones,
-                                                                                                  visible_left_cones,
-                                                                                                  visible_right_cones,
-                                                                                                  first_left_cone_found,
-                                                                                                  first_right_cone_found,
-                                                                                                  new_visible_left_cone_flag,
-                                                                                                  new_visible_right_cone_flag,
-                                                                                                  left_spline_linked,
-                                                                                                  right_spline_linked,
-                                                                                                  track,
-                                                                                                  left_spline,
-                                                                                                  right_spline,
-                                                                                                  first_visible_left_cone,
-                                                                                                  first_visible_right_cone)        
-                 
-            #compute midpoint path
-            targets, \
-            non_passed_targets, \
-            target_locations = pp_functions.boundary_midpoints_splines.generate_midpoint_path(car,
-                                                                                              Target,
-                                                                                              targets,
-                                                                                              non_passed_targets,
-                                                                                              target_locations,
-                                                                                              ppu,
-                                                                                              visible_left_cones,
-                                                                                              visible_right_cones,
-                                                                                              car_angle,
-                                                                                              new_visible_left_cone_flag,
-                                                                                              new_visible_right_cone_flag)
-                    
-            #Setting the finishing line/point
-            if first_visible_left_cone != 0 and first_visible_right_cone != 0 and midpoint_created == False:     
-                start_midpoint_x = np.mean([first_visible_left_cone.position.x,first_visible_right_cone.position.x])
-                start_midpoint_y = np.mean([first_visible_left_cone.position.y,first_visible_right_cone.position.y])     
-                midpoint_created = True
-                
-                
-            #incrementing lap number by 1
-            elif (first_visible_left_cone != 0 
-            and first_visible_right_cone != 0 
-            and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu 
-            and track_number_changed == False 
-            and track == True):
-                track_number += 1
-                print('TIME : ', time.time() - time_start_track)
-                lap_reward = True
-                track_number_changed = True
-                
-            #setting track_number_changed to false when not on finishing line
-            elif (first_visible_left_cone != 0 
-            and first_visible_right_cone != 0 
-            and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) > 20/ppu 
-            and track == True):
-                track_number_changed = False
+            self.path.compute_boundaries(self)
 
-            #if car hits a cone, it crashes and the simulation ends
-            pp_functions.car_crash.car_crash_mechanic(self, left_cones, right_cones, car, time_start_sim)
-                    
-            #reward function
-            reward, lap_reward = pp_functions.reward_function.calculate_reward(lap_reward, car, track_number, dt)
-            self.total_reward += reward
-            
-                
-            #if the track number = 3, end simulation
-            if (first_visible_left_cone != 0 
-            and first_visible_right_cone != 0 
-            and np.linalg.norm((start_midpoint_x, start_midpoint_y)-car.position) < 20/ppu 
-            and track_number == 3 
-            and track == True):
-                print('FINISHED!', 'TIME : ', time.time() - time_start_track)
-                print('TOTAL REWARD:', self.total_reward)
-                self.exit = True
-                track_number_changed = True     
+            #compute midpoint path
+            self.path.generate_midpoint_path(self)
+                   
+            #implement track logic
+            self.track_logic()
+
+            #car crash logic 
+            self.car.car_crash_mechanic(self.cone, self.path)
+
+            #Calculate reward
+            self.reward = calculate_reward(self)
+
+            #checking exit conditions
+            self.set_done(self.time_running, self.episode_num, self.num_steps)
                     
             # Logic
-            car.update(dt)
+            self.implement_main_logic(dt)
             
-            for target in targets:
-                target.update(car, time_running, ppu, car_angle)
-                
-            for left_cone in left_cones:
-                left_cone.update(car, time_running, ppu, car_angle)
-                
-            for right_cone in right_cones:
-                right_cone.update(car, time_running, ppu, car_angle)
+            #Drawing
+            pp_functions.drawing.render(self)
 
-            # Drawing
-            pp_functions.drawing.render(self,
-                                        car_image,car,
-                                        ppu,targets,
-                                        non_passed_targets,
-                                        target_image,
-                                        left_cones,
-                                        left_cone_image,
-                                        right_cones,
-                                        right_cone_image,
-                                        visible_left_cones,
-                                        visible_right_cones,
-                                        left_spline,right_spline,
-                                        left_spline_image,
-                                        right_spline_image,
-                                        first_visible_left_cone,
-                                        first_visible_right_cone,
-                                        car_crashed,
-                                        explosion_image,
-                                        fullscreen,
-                                        track,
-                                        track_number,
-                                        car_angle)
-            
+            self.clock.tick(self.ticks)
+
         pygame.quit()
+        
 
 if __name__ == '__main__':
     sim = PathPlanning()
-    sim.run()
+
+    # 2 methods:
+    #   1) autonomous: no user inputs, only screen dragging
+    #   2) user: old simulation with user inputs
+    sim.run(method = "manual") 
