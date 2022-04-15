@@ -1,0 +1,5 @@
+MAP_1: baseline track
+MAP_2: angle too tight
+MAP_3: works but VERY shaky
+MAP_4: stops advancing for some reason?
+MAP_5: stops advancing for some reason?
