@@ -214,29 +214,39 @@ class PathPlanning:
 
     def run(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        image_path = os.path.join(current_dir, "car_r_30.png")
-        car_image = pygame.image.load(image_path).convert()
+        assets_dir = os.path.join(current_dir, "assets")
 
-        image_path7 = os.path.join(current_dir, "explosion_image.png")
-        explosion_image = pygame.image.load(image_path7).convert()
+        car_image = pygame.image.load(
+            os.path.join(assets_dir, "car_r_30.png")
+        )
+        
+        explosion_image = pygame.image.load(
+            os.path.join(assets_dir, "explosion_image.png")
+        )
+        
+        target_image = pygame.image.load(
+            os.path.join(assets_dir, "target_r_t.png")
+        )
+        
+        target_image_g = pygame.image.load(
+            os.path.join(assets_dir, "target_g_t.png")
+        )
+        
+        left_cone_image = pygame.image.load(
+            os.path.join(assets_dir, "left_cone_s.png")
+        )
+        
+        right_cone_image = pygame.image.load(
+            os.path.join(assets_dir, "right_cone_s.png")
+        )
 
-        image_path1 = os.path.join(current_dir, "target_r_t.png")
-        target_image = pygame.image.load(image_path1).convert()
-
-        image_path2 = os.path.join(current_dir, "target_g_t.png")
-        target_image_g = pygame.image.load(image_path2).convert()
-
-        image_path3 = os.path.join(current_dir, "left_cone_s.png")
-        left_cone_image = pygame.image.load(image_path3).convert()
-
-        image_path4 = os.path.join(current_dir, "right_cone_s.png")
-        right_cone_image = pygame.image.load(image_path4).convert()
-
-        image_path5 = os.path.join(current_dir, "left_spline_s.png")
-        left_spline_image = pygame.image.load(image_path5).convert()
-
-        image_path6 = os.path.join(current_dir, "right_spline_s.png")
-        right_spline_image = pygame.image.load(image_path6).convert()
+        left_spline_image = pygame.image.load(
+            os.path.join(assets_dir, "left_spline_s.png")
+        )
+        
+        right_spline_image = pygame.image.load(
+            os.path.join(assets_dir, "right_spline_s.png")
+        )
 
         car = Car(15, 3)
         self.mu[0] = car.position.x
