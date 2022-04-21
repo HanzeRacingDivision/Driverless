@@ -3,7 +3,7 @@ import os
 import pygame
 import numpy as np
 import pandas as pd
-
+import inquirer
 
 def draw_line_dashed(surface, color, start_pos, end_pos, offset, width=1, dash_length=10, exclude_corners=True):
     """simply a function that draws dashed lines in pygame"""
@@ -51,10 +51,20 @@ def save_map(left_cones, right_cones):
 def load_map(mouse_pos_list, current_dir, cone, ppu):
     left_cones = []
     right_cones = []
-    print('LOAD MAP: ')
-    name = input()
 
-    map_path = os.path.join(current_dir, f"{name}.csv")
+    mapNames = [
+        inquirer.List('map',
+            message="Which map do you want to load?",
+            choices=['MAP_CSA1','MAP_CSA2','MAP_CSA3','MAP_CSA4'],
+        ),
+    ]
+    mapName = inquirer.prompt(mapNames)['map']
+    
+    if ".csv" not in mapName:
+        mapName = mapName + ".csv"
+    
+    print("Loading", mapName)
+    map_path = os.path.join(current_dir, "maps", mapName)
     map_file = pd.read_csv(map_path)
 
     for i in range(len(map_file.iloc[:, 0])):
