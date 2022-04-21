@@ -23,6 +23,7 @@ from objects import *
 from objects import *
 
 
+
 class PathPlanning:
     def __init__(self, map_name='MAP_NULL'):
         pygame.init()
