@@ -17,7 +17,7 @@ import pp_functions.reward_function
 import pp_functions.manual_controls
 import pp_functions.boundary_midpoints_splines
 
-SIZE = 210
+SIZE = 210 # size of the SLAM matrix, determines complexity of the algorithm
 
 from objects import *
 from objects import *
@@ -165,7 +165,7 @@ class PathPlanning:
                 # z_hat = h() function
 
                 # This matrix is used to apply the calculations only to the relevant landmark and used to transfer
-                # the low Jacobian into the high Jacobian
+                # the low Jacobian into the high Jacobian.
                 F = np.zeros((5, N))
                 F[:3, :3] = np.eye(3)
                 # x location of cone j
