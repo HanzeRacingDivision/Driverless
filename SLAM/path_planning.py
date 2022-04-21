@@ -9,7 +9,6 @@ import numpy as np
 from PIL import Image, ImageDraw
 from scipy.interpolate import splprep, splev
 import pandas as pd
-import gym
 
 import pp_functions.utils
 import pp_functions.drawing
@@ -18,149 +17,10 @@ import pp_functions.reward_function
 import pp_functions.manual_controls
 import pp_functions.boundary_midpoints_splines
 
+SIZE = 210
 
-class Car:
-    def __init__(self, x, y, angle=0, length=2, max_steering=80, max_acceleration=4.0):
-        self.position = Vector2(x, y)
-        self.true_position = Vector2(x, y)
-        self.velocity = Vector2(0.0, 0.0)
-        self.angle = angle
-        self.true_angle = angle
-
-        self.length = length
-        self.max_acceleration = max_acceleration
-        self.max_steering = max_steering
-        self.max_velocity = 5
-        self.brake_deceleration = 4
-        self.free_deceleration = 1
-        self.angular_velocity = 0
-
-        self.acceleration = 0.0
-        self.steering = 0.0
-        self.fov = 175  # 150
-        self.turning_sharpness = 1.8
-        self.breaks = True
-        self.fov_range = 60
-        self.auto = False
-        self.slam = True
-        self.headlights = False
-
-    def update(self, dt):
-        self.velocity += (self.acceleration * dt, 0)
-        self.velocity.x = max(-self.max_velocity, min(self.velocity.x, self.max_velocity))
-
-        if self.steering:
-            turning_radius = self.length / sin(radians(self.steering))
-            self.angular_velocity = self.velocity.x / turning_radius
-        else:
-            self.angular_velocity = 0
-
-        # updating true position and angle
-        self.true_position += self.velocity.rotate(-self.true_angle) * dt
-        self.true_angle += degrees(self.angular_velocity) * dt
-
-        # updating estimated position and angle
-        if self.slam == False:
-            self.position += self.velocity.rotate(-self.angle) * dt
-            self.angle += degrees(self.angular_velocity) * dt
-
-            # adding some noise/sensor error to the estimated position and angle
-        self.position += (np.random.normal(loc=0, scale=1e-10), np.random.normal(loc=0, scale=1e-10))
-        self.angle += np.random.normal(loc=0, scale=1e-10)
-
-
-class Target:
-    def __init__(self, x, y):
-        self.position = Vector2(x, y)
-        self.passed = False
-        self.dist_car = 10 ** 10
-        self.alpha = 0
-        self.visible = False
-
-    def update(self, car, time_running, ppu, car_angle):
-
-        # distance to car
-        self.dist_car = np.linalg.norm(self.position - car.position)
-
-        # if within 20 pixels of car, target has been 'passed' by the car
-        if self.passed == False and np.linalg.norm(self.position - car.position) <= 20 / ppu:
-            self.passed = True
-            self.visible = False
-
-        # calculating angle between car angle and target
-        if np.linalg.norm(self.position - car.position) < car.fov / ppu:
-
-            a_b = self.position - car.position
-            a_b = np.transpose(np.matrix([a_b.x, -1 * a_b.y]))
-
-            rotate = np.matrix([[np.cos(-car_angle * np.pi / 180), -1 * np.sin(-car_angle * np.pi / 180)],
-                                [np.sin(-car_angle * np.pi / 180), np.cos(-car_angle * np.pi / 180)]])
-
-            a_b = rotate * a_b
-
-            a = a_b[0]
-            b = a_b[1]
-
-            beta = np.arctan(b / a) * (180 / np.pi)
-            alpha = beta + 90 * (b / np.abs(b)) * np.abs((a / np.abs(a)) - 1)
-            self.alpha = alpha[0, 0]
-
-            # if the target is outside the car fov, it is no longer visible
-            if np.abs(self.alpha) < car.fov_range and self.passed == False:
-                self.visible = True
-            else:
-                self.visible = False
-        else:
-            self.visible = False
-
-
-class Cone:
-    def __init__(self, x, y, category, left_cones, right_cones):
-        self.position = Vector2(x + np.random.normal(loc=0, scale=1e-10), y + np.random.normal(loc=0, scale=1e-10))
-        self.true_position = Vector2(x, y)
-        self.visible = False
-        self.in_fov = False
-        self.category = category
-        self.dist_car = 10 ** 10
-        self.id = len(left_cones) + len(right_cones) + 2
-
-    def update(self, car, time_running, ppu, car_angle):
-
-        # distance to car
-        self.dist_car = np.linalg.norm(self.position - car.position)
-        self.true_dist_car = np.linalg.norm(self.true_position - car.true_position)
-
-        # calculating angle between car angle and cone
-        if np.linalg.norm(self.true_position - car.true_position) < car.fov / ppu:
-
-            a_b = self.true_position - car.true_position
-            a_b = np.transpose(np.matrix([a_b.x, -1 * a_b.y]))
-
-            rotate = np.matrix([[np.cos(-car_angle * np.pi / 180), -1 * np.sin(-car_angle * np.pi / 180)],
-                                [np.sin(-car_angle * np.pi / 180), np.cos(-car_angle * np.pi / 180)]])
-
-            a_b = rotate * a_b
-
-            a = a_b[0]
-            b = a_b[1]
-
-            beta = np.arctan(b / a) * (180 / np.pi)
-            alpha = beta + 90 * (b / np.abs(b)) * np.abs((a / np.abs(a)) - 1)
-            self.alpha = alpha[0, 0]
-
-            # if cone within car fov, set to visible
-            if np.abs(self.alpha) < car.fov_range:
-                self.visible = True
-                self.in_fov = True
-            else:
-                pass
-                self.visible = False  # commenting this line allows cones to be remembered
-                self.in_fov = False
-
-        else:
-            pass
-            self.visible = False  # commenting this line allows cones to be remembered
-            self.in_fov = False
+from objects import *
+from objects import *
 
 
 class PathPlanning:
@@ -182,12 +42,12 @@ class PathPlanning:
         self.moving_view_offset = False
         self.view_offset_mouse_pos_start = [0.0, 0.0]
 
-        self.mu = np.zeros(500)
+        self.mu = np.zeros(SIZE)
         self.mu[0] = 15
         self.mu[1] = 3
 
-        self.cov = np.zeros((500, 500))
-        for i in range(3, 500):
+        self.cov = np.zeros((SIZE, SIZE))
+        for i in range(3, SIZE):
             self.cov[i, i] = 10 ** 10
 
         self.u = np.zeros(3)
@@ -256,28 +116,28 @@ class PathPlanning:
                       [0, 0, 0]])
 
         # create the G matrices (see documentation in the drive)
-        G = np.eye(n_landmarks + 3) + (F.T).dot(J).dot(F)
+        G = np.eye(n_landmarks + 3) + F.T.dot(J).dot(F) # slow line 1
 
         # Predict new state
-        self.mu = self.mu + (F.T).dot(motion)[:, 0]
+        self.mu = self.mu + F.T.dot(motion)[:, 0]
 
         # Predict new covariance
         R_t = np.zeros((n_landmarks + 3, n_landmarks + 3))
         R_t[0, 0] = self.Rt[0]
         R_t[1, 1] = self.Rt[1]
         R_t[2, 2] = self.Rt[2]
-        self.cov = G.dot(self.cov).dot(G.T) + R_t
+        self.cov = G.dot(self.cov).dot(G.T) + R_t # slow line 2
 
         # print('Predicted location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(mu_bar[0][0], mu_bar[1][0],
         #                                                                               mu_bar[2][0])
 
     def EKF_update(self, car, left_cones, right_cones):
-        '''
+        """
         The update step of the Extended Kalman Filter
         Threshold for observed before is currently 1e6 (this number has to be high, as the uncertainty
         has been set to a high number for un
         threshold for static landmark is c_prob >= 0.5. Maybe we can assume all landmarks are static
-        '''
+        """
 
         N = len(self.mu)
         for [r, theta, j] in self.obs:
@@ -424,11 +284,12 @@ class PathPlanning:
 
         while not self.exit:
 
-            if start_time_set == False:
+            if not start_time_set:
                 time_start_sim = time.time()
                 start_time_set = True
 
             dt = self.clock.get_time() / 500
+            # FPS = round(1/(dt + 10**-10))
 
             # Event queue
             events = pygame.event.get()
@@ -502,18 +363,15 @@ class PathPlanning:
             closest_target, visible_targets = pp_functions.utils.closest_target(visible_targets, visible_dists)
 
             # reset targets for new lap
-            if (len(targets) > 0
-                    and len(non_passed_targets) == 0
-                    and track == True
-                    and (right_spline_linked == True or left_spline_linked == True)):
-                targets, non_passed_targets = pp_functions.utils.reset_targets(targets, non_passed_targets)
+            if (len(targets) > 0 and len(non_passed_targets) == 0
+                    and track and (right_spline_linked or left_spline_linked)):
+                targets, non_passed_targets = pp_functions.utils.reset_targets(targets)
 
             # automatic steering
             if (len(visible_targets) > 0
-                    and np.linalg.norm(closest_target.position - car.position) < car.fov / ppu
-                    and np.linalg.norm(closest_target.position - car.position) > 20 / ppu
-                    and car.auto == True
-                    and closest_target.passed == False):
+                    and car.fov / ppu > np.linalg.norm(closest_target.position - car.position) > 20 / ppu
+                    and car.auto
+                    and not closest_target.passed):
 
                 dist = closest_target.dist_car
                 alpha = closest_target.alpha
@@ -556,17 +414,17 @@ class PathPlanning:
             # first_visible_right_cone)
 
             if len(visible_left_cones) > 1 and car.auto == True and new_visible_left_cone_flag == True:
-                if first_left_cone_found == False:
+                if not first_left_cone_found:
                     first_visible_left_cone = visible_left_cones[0]
                     first_left_cone_found = True
 
             if len(visible_right_cones) > 1 and car.auto == True and new_visible_right_cone_flag == True:
-                if first_right_cone_found == False:
+                if not first_right_cone_found:
                     first_visible_right_cone = visible_right_cones[0]
                     first_right_cone_found = True
 
             # SLAM
-            if car.slam == True:  # and round(time_running*100, 0) % 25 == 0:
+            if car.slam:  # and round(time_running*100, 0) % 25 == 0:
                 # print(round(time_running*10, 0))
                 self.slam(car, visible_left_cones, visible_right_cones, left_cones, right_cones, dt)
 
@@ -586,20 +444,19 @@ class PathPlanning:
                                                                                               new_visible_right_cone_flag)
 
             # Setting the finishing line/point
-            if first_visible_left_cone != 0 and first_visible_right_cone != 0 and midpoint_created == False:
+            if first_visible_left_cone != 0 and first_visible_right_cone != 0 and not midpoint_created:
                 start_midpoint_x = np.mean([first_visible_left_cone.position.x, first_visible_right_cone.position.x])
                 start_midpoint_y = np.mean([first_visible_left_cone.position.y, first_visible_right_cone.position.y])
                 midpoint_created = True
-
 
             # incrementing lap number by 1
             elif (first_visible_left_cone != 0
                   and first_visible_right_cone != 0
                   and np.linalg.norm((start_midpoint_x, start_midpoint_y) - car.position) < 20 / ppu
-                  and track_number_changed == False
-                  and track == True):
+                  and not track_number_changed
+                  and track):
                 track_number += 1
-                print('TIME : ', time.time() - time_start_track)
+                print('TIME: ', time.time() - time_start_track)
                 lap_reward = True
                 track_number_changed = True
 
@@ -622,8 +479,8 @@ class PathPlanning:
                     and first_visible_right_cone != 0
                     and np.linalg.norm((start_midpoint_x, start_midpoint_y) - car.position) < 20 / ppu
                     and track_number == 3
-                    and track == True):
-                print('FINISHED!', 'TIME : ', time.time() - time_start_track)
+                    and track):
+                print('FINISHED!', 'TIME: ', time.time() - time_start_track)
                 print('TOTAL REWARD:', self.total_reward)
                 self.exit = True
                 track_number_changed = True
@@ -633,7 +490,7 @@ class PathPlanning:
 
             # updating cones and targets
             for target in targets:
-                target.update(car, time_running, ppu, car_angle)
+                target.update(car, ppu, car_angle)
 
             for left_cone in left_cones:
                 left_cone.update(car, time_running, ppu, true_car_angle)

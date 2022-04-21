@@ -11,7 +11,7 @@ def save_map(left_cones, right_cones):
          cone_y = []
          cone_type = []
          print('SAVE MAP AS : ')
-         name = input()
+         name = 'MAP_CSA1' # input()
      
          for i in range(len(left_cones)):
              cone_x.append(left_cones[i].position.x)

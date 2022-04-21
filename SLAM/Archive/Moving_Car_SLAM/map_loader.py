@@ -36,9 +36,7 @@ def save_map(left_cones, right_cones):
                                       'Cone_Y' : cone_y})
      
          map_file.to_csv(f'{name}.csv')
-     
-     
-     
+
      
 
 def load_map(mouse_pos_list):
