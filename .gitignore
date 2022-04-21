@@ -3,10 +3,5 @@
 **/.idea/
 desktop.ini
 .idea/
-SLAM/pp_functions/__pycache__/utils.cpython-310.pyc
-SLAM/pp_functions/__pycache__/manual_controls.cpython-310.pyc
-SLAM/pp_functions/__pycache__/drawing.cpython-310.pyc
-SLAM/__pycache__/objects.cpython-310.pyc
-SLAM/pp_functions/__pycache__/boundary_midpoints_splines.cpython-310.pyc
-SLAM/pp_functions/__pycache__/reward_function.cpython-310.pyc
-SLAM/pp_functions/__pycache__/car_crash.cpython-310.pyc
+*.pyc
+**/__pycache__/
