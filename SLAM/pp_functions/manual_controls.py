@@ -8,10 +8,9 @@ from PIL import Image, ImageDraw
 from scipy.interpolate import splprep, splev
 import pandas as pd
 
-
 import pp_functions.utils
 
- # User input
+# User input
 def user_input(self,
                mouse_pos_list,
                Target,
@@ -48,19 +47,18 @@ def user_input(self,
     
     pressed = pygame.key.get_pressed()
     
-    #manual steering  
+    # manual steering
     if pressed[pygame.K_RIGHT]:
         car.steering -= 50 * dt
     elif pressed[pygame.K_LEFT]:
-       car.steering += 50 * dt
+        car.steering += 50 * dt
     else:
-        if(car.steering > (50 * dt)):
+        if car.steering > (50 * dt):
             car.steering -= 120 * dt
-        elif(car.steering < -(50 * dt)):
+        elif car.steering < -(50 * dt):
             car.steering += 120 * dt
         else:
             car.steering = 0
-                
                 
     # press l for left cone
     if pressed[pygame.K_l]:
@@ -72,17 +70,15 @@ def user_input(self,
             
             make_cone = True
             for i in range(len(mouse_pos_list)):
-                if np.linalg.norm(tuple(x-y for x,y in zip(mouse_pos_list[i],mouse_pos))) < 50:
+                if np.linalg.norm(tuple(x-y for x, y in zip(mouse_pos_list[i], mouse_pos))) < 50:
                     make_cone = False
                     break
             
-            if make_cone == True:
+            if make_cone:
                 left_cone = Cone(mouse_pos[0]/ppu, mouse_pos[1]/ppu, 'left', left_cones, right_cones)
                 left_cones.append(left_cone)
                 mouse_pos_list.append(mouse_pos)
-                
-                
-            
+
     # press r for right cone
     if pressed[pygame.K_r]:
         mouse_pos = (pygame.mouse.get_pos()[0] - self.view_offset[0], pygame.mouse.get_pos()[1] - self.view_offset[1])
@@ -93,21 +89,21 @@ def user_input(self,
             
             make_cone = True
             for i in range(len(mouse_pos_list)):
-                if np.linalg.norm(tuple(x-y for x,y in zip(mouse_pos_list[i],mouse_pos))) < 50:
+                if np.linalg.norm(tuple(x-y for x, y in zip(mouse_pos_list[i], mouse_pos))) < 50:
                     make_cone = False
                     break
             
-            if make_cone == True:
+            if make_cone:
                 right_cone = Cone(mouse_pos[0]/ppu, mouse_pos[1]/ppu, 'right', left_cones, right_cones)
                 right_cones.append(right_cone)
                 mouse_pos_list.append(mouse_pos)
     
     
     
-    #if CTRL + c then clear screen
+    # if CTRL + c then clear screen
     if pressed[pygame.K_LCTRL] and pressed[pygame.K_c]:
         #resetting most vars
-        targets  = []
+        targets = []
         non_passed_targets = []
         circles = []
         left_cones = []
@@ -117,8 +113,8 @@ def user_input(self,
         left_spline = []
         right_spline = []
         path_midpoints = []
-        right_spline_linked == False
-        left_spline_linked == False
+        right_spline_linked = False
+        left_spline_linked = False
         mouse_pos_list = []
         left_spline = 0
         right_spline = 0
@@ -131,74 +127,68 @@ def user_input(self,
         car_crashed = False
         self.total_reward = 0
         time_start_track = None
-        
-        
-    #if 2 is pressed, increasing cruising speed
-    #if 1 is pressed, decrease cruising speed
-    
+
     for event in events:
+
+        # if 2 is pressed, increasing cruising speed
+        # if 1 is pressed, decrease cruising speed
         if event.type == pygame.KEYDOWN and event.key == pygame.K_1:
             cruising_speed -= 0.05
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_2:
             cruising_speed += 0.05
-    
-        
-        
-    #if a pressed then toggle automatic driving
-    for event in events:
+
+        # if a pressed then toggle automatic driving
         if event.type == pygame.KEYUP and event.key == pygame.K_a: 
-            if car.auto == False:
-                car.auto  = True
+            if not car.auto:
+                car.auto = True
                 time_start_track = time.time()
             else:
-                car.auto  = False
+                car.auto = False
+
+        # if f pressed then toggle fullscreen
+        if event.type == pygame.KEYUP and event.key == pygame.K_f:
+            if not fullscreen:
+                fullscreen = True
+            else:
+                fullscreen = False
                 
-    #if 7 pressed then toggle SLAM
+    # if 7 pressed then toggle SLAM
     for event in events:
         if event.type == pygame.KEYUP and event.key == pygame.K_7: 
-            if car.slam == False:
-                car.slam  = True
+            if not car.slam:
+                car.slam = True
                 time_start_track = time.time()
             else:
-                car.slam  = False
-                
-    #if f pressed then toggle fullscreen
-    for event in events:
-        if event.type == pygame.KEYUP and event.key == pygame.K_f:
-            if fullscreen == False:
-                fullscreen  = True
-            else:
-                fullscreen  = False
-                
+                car.slam = False
     
-    #if h pressed then toggle headlight
+    # if h pressed then toggle headlight
     for event in events:
         if event.type == pygame.KEYUP and event.key == pygame.K_h:
-            if car.headlights == False:
+            if not car.headlights:
                 car.headlights = True
             else:
                 car.headlights = False
         
         
-    #if t pressed then set to track mode
+    # if t pressed then set to track mode
     for event in events:
         if event.type == pygame.KEYUP and event.key == pygame.K_t: 
-            if track == False:
+            if not track:
                 track = True
             else:
                 track = False
                 
                 
-    #if S then save map
-    if  pressed[pygame.K_s]:
+    # if S then save map
+    if pressed[pygame.K_s]:
         pp_functions.utils.save_map(left_cones, right_cones)
         
         
-    #if D then load map
-    if  pressed[pygame.K_d]:
+    # if D then load map
+    if pressed[pygame.K_d]:
         
-        #resetting most vars before loading
-        targets  = []
+        # resetting most variables before loading
+        targets = []
         non_passed_targets = []
         circles = []
         left_cones = []
@@ -208,8 +198,8 @@ def user_input(self,
         left_spline = []
         right_spline = []
         path_midpoints = []
-        right_spline_linked == False
-        left_spline_linked == False
+        right_spline_linked = False
+        left_spline_linked = False
         mouse_pos_list = []
         left_spline = 0
         right_spline = 0
@@ -225,10 +215,10 @@ def user_input(self,
         
         left_cones, right_cones, mouse_pos_list = pp_functions.utils.load_map(mouse_pos_list, current_dir, Cone, ppu)
         
-    #dragging screen using left mouse butto
+    # dragging screen using left mouse button
     for event in events:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 or self.moving_view_offset == True:
-            if self.moving_view_offset == False:
+            if not self.moving_view_offset:
                 self.moving_view_offset = True
                 self.view_offset_mouse_pos_start = pygame.mouse.get_pos()
             mouse_pos = pygame.mouse.get_pos()
@@ -242,8 +232,8 @@ def user_input(self,
             self.prev_view_offset[1] = self.view_offset[1]
             self.moving_view_offset = False
 
-    #if CTRL + Z pressed then undo last left and right cone
-    if undo_done == False and pressed[pygame.K_LCTRL] and pressed[pygame.K_z]:
+    # if CTRL + Z pressed then undo last left and right cone
+    if not undo_done and pressed[pygame.K_LCTRL] and pressed[pygame.K_z]:
         undo_done = True
         if len(visible_left_cones) > 0:
             if left_cones[-1] == visible_left_cones[-1]:
@@ -276,7 +266,7 @@ def user_input(self,
             undo_done = False
 
 
-    #manual acceleration
+    # manual acceleration
     if pressed[pygame.K_UP]:
         if car.velocity.x < 0:
             car.acceleration = car.brake_deceleration
@@ -323,33 +313,17 @@ def user_input(self,
 #                     mouse_pos_list.append(mouse_pos)
 # =============================================================================
                 
-                
-    return self, \
-           targets, \
-           non_passed_targets, \
-           circles, \
-           left_cones, \
-           right_cones, \
-           visible_left_cones, \
-           visible_right_cones, \
-           left_spline, \
-           right_spline, \
-           path_midpoints, \
-           right_spline_linked, \
-           left_spline_linked, \
-           mouse_pos_list, \
-           left_spline, \
-           right_spline, \
-           path_midpoints_spline, \
-           first_visible_left_cone, \
-           first_visible_right_cone, \
-           first_right_cone_found, \
-           first_left_cone_found, \
-           track_number_changed, \
-           car_crashed, \
-           car, \
-           track, \
-           cruising_speed, \
-           fullscreen, \
-           time_start_track, \
-           undo_done
+    return self, targets, non_passed_targets, circles, left_cones, right_cones, visible_left_cones, \
+        visible_right_cones, left_spline, right_spline, path_midpoints, right_spline_linked, left_spline_linked,\
+        mouse_pos_list, left_spline, right_spline, path_midpoints_spline, first_visible_left_cone,\
+        first_visible_right_cone, \
+        first_right_cone_found, \
+        first_left_cone_found, \
+        track_number_changed, \
+        car_crashed, \
+        car, \
+        track, \
+        cruising_speed, \
+        fullscreen, \
+        time_start_track, \
+        undo_done
