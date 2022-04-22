@@ -15,14 +15,14 @@ def car_crash_mechanic(self, left_cones, right_cones, car, time_start_sim):
         
         #checking left cones for crash
         for i in range(len(left_cones)):
-            if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [left_cones[i].position.x, left_cones[i].position.y]))) < 0.4:
+            if np.linalg.norm(tuple(x-y for x,y in zip([car.true_position.x, car.true_position.y], [left_cones[i].true_position.x, left_cones[i].true_position.y]))) < 0.4:
                 car_crashed = True
                 break
             
         #crashing right cones
         if car_crashed == False:
             for i in range(len(right_cones)):
-                if np.linalg.norm(tuple(x-y for x,y in zip([car.position.x, car.position.y], [right_cones[i].position.x, right_cones[i].position.y]))) < 0.4:
+                if np.linalg.norm(tuple(x-y for x,y in zip([car.true_position.x, car.true_position.y], [right_cones[i].true_position.x, right_cones[i].true_position.y]))) < 0.4:
                     car_crashed = True
                     break
                 

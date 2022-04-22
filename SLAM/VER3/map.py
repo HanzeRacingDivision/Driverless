@@ -57,9 +57,9 @@ class Map:
         def update(self, car, ppu, car_angle):
             """ Determines whether a Cone becomes visible or not, based on its distance and angle relative to car """
             # distance to car
-            self.dist_car = np.linalg.norm(self.position - car.position)
+            self.dist_car = np.linalg.norm(self.position - car.true_position)
             # calculating angle between car angle and cone
-            if np.linalg.norm(self.position - car.position) < car.fov / ppu and not self.visible and car.auto:
+            if np.linalg.norm(self.position - car.true_position) < car.fov / ppu and not self.visible and car.auto:
                 self.alpha = get_angle_between(self, car, car_angle)
                 # if cone within car fov, set to visible
                 if np.abs(self.alpha) < car.fov_range:
@@ -76,15 +76,15 @@ class Map:
 
         def update(self, car, ppu, car_angle):
             # distance to car
-            self.dist_car = np.linalg.norm(self.position - car.position)
+            self.dist_car = np.linalg.norm(self.position - car.true_position)
 
             # if within 20 pixels of car, target has been 'passed' by the car
-            if not self.passed and np.linalg.norm(self.position - car.position) <= 20 / ppu:
+            if not self.passed and np.linalg.norm(self.position - car.true_position) <= 20 / ppu:
                 self.passed = True
                 self.visible = False
 
             # calculating angle between car angle and target
-            if np.linalg.norm(self.position - car.position) < car.fov / ppu:
+            if np.linalg.norm(self.position - car.true_position) < car.fov / ppu:
                 self.alpha = get_angle_between(self, car, car_angle)
                 # if the target is outside the car fov, it is no longer visible
                 if np.abs(self.alpha) < car.fov_range and not self.passed:
@@ -96,7 +96,7 @@ class Map:
 
 
 def get_angle_between(obj_1, obj_2, obj_2_angle):
-    a_b = obj_1.position - obj_2.position
+    a_b = obj_1.true_position - obj_2.true_position
     a_b = np.transpose(np.array([a_b.x, -1 * a_b.y]))
 
     rotate = np.array([[np.cos(-obj_2_angle * np.pi / 180), -1 * np.sin(-obj_2_angle * np.pi / 180)],

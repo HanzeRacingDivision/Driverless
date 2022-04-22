@@ -28,8 +28,8 @@ class Path:
 				x = []
 				y = []
 				for cone in pp.cone.visible_cone_list[category]:
-					x_temp = cone.position.x
-					y_temp = cone.position.y
+					x_temp = cone.true_position.x
+					y_temp = cone.true_position.y
 					
 					x.append(x_temp)
 					y.append(y_temp)
@@ -62,9 +62,9 @@ class Path:
 			
 			for left_cone in pp.cone.in_fov_cone_list[Side.LEFT]:
 				for right_cone in pp.cone.in_fov_cone_list[Side.RIGHT]:
-					if np.linalg.norm((left_cone.position.x - right_cone.position.x, left_cone.position.y - right_cone.position.y)) < 4:
-						path_midpoints_x.append(np.mean([left_cone.position.x,right_cone.position.x]))
-						path_midpoints_y.append(np.mean([left_cone.position.y,right_cone.position.y]))
+					if np.linalg.norm((left_cone.true_position.x - right_cone.true_position.x, left_cone.true_position.y - right_cone.true_position.y)) < 4:
+						path_midpoints_x.append(np.mean([left_cone.true_position.x, right_cone.true_position.x]))
+						path_midpoints_y.append(np.mean([left_cone.true_position.y, right_cone.true_position.y]))
 						
 			path_midpoints = [path_midpoints_x,path_midpoints_y]
 			
@@ -74,7 +74,7 @@ class Path:
 
 			#couple each midpoint with its distance to the car	
 			for i in range(len(path_midpoints[0])):
-				dist_car = np.linalg.norm(Vector2(path_midpoints[0][i],path_midpoints[1][i]) - pp.car.position)
+				dist_car = np.linalg.norm(Vector2(path_midpoints[0][i],path_midpoints[1][i]) - pp.car.true_position)
 				path_to_sort.append([dist_car, path_midpoints[0][i], path_midpoints[1][i]])
 						
 			#ordering the path_midpoints by distance from car            
@@ -95,7 +95,7 @@ class Path:
 			path_midpoints = path_midpoints_visible            
 			
 			if len(path_midpoints[0]) == 1:
-				path_midpoints = [[pp.car.position.x ,path_midpoints[0][0]], [pp.car.position.y, path_midpoints[1][0]]]
+				path_midpoints = [[pp.car.true_position.x , path_midpoints[0][0]], [pp.car.true_position.y, path_midpoints[1][0]]]
 				
 				tck, u = splprep(path_midpoints, s=1, k = 1)
 				unew = np.arange(0, 1.01, 0.5/(len(pp.cone.visible_cone_list[Side.LEFT])**0.4)) #more cones  = less final var

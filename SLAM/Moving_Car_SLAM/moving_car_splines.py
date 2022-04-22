@@ -56,17 +56,17 @@ class Target:
     def update(self, car, time_running, ppu, car_angle): 
         
         #distance to car
-        self.dist_car = np.linalg.norm(self.position-car.position)
+        self.dist_car = np.linalg.norm(self.position - car.true_position)
         
         # if within 20 pixels of car, target has been 'passed' by the car
-        if self.passed == False and np.linalg.norm(self.position-car.position) <= 20/ppu: 
+        if self.passed == False and np.linalg.norm(self.position-car.true_position) <= 20/ppu:
             self.passed = True
             self.visible = False
             
         #calculating angle between car angle and target
-        if np.linalg.norm(self.position-car.position) < car.fov/ppu:
+        if np.linalg.norm(self.position-car.true_position) < car.fov/ppu:
             
-            a_b = self.position-car.position
+            a_b = self.position-car.true_position
             a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
             
             rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
@@ -99,12 +99,12 @@ class Cone:
     def update(self, car, time_running, ppu, car_angle): 
         
         #distance to car
-        self.dist_car = np.linalg.norm(self.position-car.position)
+        self.dist_car = np.linalg.norm(self.position - car.true_position)
         
         #calculating angle between car angle and cone
-        if np.linalg.norm(self.position-car.position) < car.fov/ppu and self.visible == False and car.auto == True:
+        if np.linalg.norm(self.position-car.true_position) < car.fov/ppu and self.visible == False and car.auto == True:
             
-            a_b = self.position-car.position
+            a_b = self.position-car.true_position
             a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
             
             rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
@@ -264,13 +264,13 @@ class PathPlanning:
             name = input()
         
             for i in range(len(left_cones)):
-                cone_x.append(left_cones[i].position.x)
-                cone_y.append(left_cones[i].position.y)
+                cone_x.append(left_cones[i].true_position.x)
+                cone_y.append(left_cones[i].true_position.y)
                 cone_type.append('LEFT')
                 
             for i in range(len(right_cones)):
-                cone_x.append(right_cones[i].position.x)
-                cone_y.append(right_cones[i].position.y)
+                cone_x.append(right_cones[i].true_position.x)
+                cone_y.append(right_cones[i].true_position.y)
                 cone_type.append('RIGHT')       
                 
                 

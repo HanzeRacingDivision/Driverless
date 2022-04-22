@@ -36,8 +36,8 @@ def compute_boundaries(car,
         x = []
         y = []
         for left_cone in visible_left_cones:
-            x_temp = left_cone.position.x
-            y_temp = left_cone.position.y
+            x_temp = left_cone.true_position.x
+            y_temp = left_cone.true_position.y
             
             x.append(x_temp)
             y.append(y_temp)
@@ -70,8 +70,8 @@ def compute_boundaries(car,
         x = []
         y = []
         for right_cone in visible_right_cones:
-            x_temp = right_cone.position.x
-            y_temp = right_cone.position.y
+            x_temp = right_cone.true_position.x
+            y_temp = right_cone.true_position.y
             
             x.append(x_temp)
             y.append(y_temp)
@@ -126,9 +126,9 @@ def generate_midpoint_path(car,
         
         for left_cone in visible_left_cones:
             for right_cone in visible_right_cones:
-                if np.linalg.norm((left_cone.position.x - right_cone.position.x, left_cone.position.y - right_cone.position.y)) < 4:
-                    path_midpoints_x.append(np.mean([left_cone.position.x,right_cone.position.x]))
-                    path_midpoints_y.append(np.mean([left_cone.position.y,right_cone.position.y]))
+                if np.linalg.norm((left_cone.true_position.x - right_cone.true_position.x, left_cone.true_position.y - right_cone.true_position.y)) < 4:
+                    path_midpoints_x.append(np.mean([left_cone.true_position.x, right_cone.true_position.x]))
+                    path_midpoints_y.append(np.mean([left_cone.true_position.y, right_cone.true_position.y]))
                     
         path_midpoints = [path_midpoints_x,path_midpoints_y]
         
@@ -139,12 +139,12 @@ def generate_midpoint_path(car,
         #find all 'visible' midpoints - this may be inefficient
         for i in range(len(path_midpoints[0])):
           #  print(i)
-            dist_car = np.linalg.norm(Vector2(path_midpoints[0][i],path_midpoints[1][i])-car.position)
+            dist_car = np.linalg.norm(Vector2(path_midpoints[0][i],path_midpoints[1][i]) - car.true_position)
     
             #calculating angle between car angle and midpoint
             if dist_car < car.fov/ppu:
                 
-                a_b = Vector2(path_midpoints[0][i],path_midpoints[1][i])-car.position
+                a_b = Vector2(path_midpoints[0][i],path_midpoints[1][i])-car.true_position
                 a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
                 
                 rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
@@ -181,7 +181,7 @@ def generate_midpoint_path(car,
         path_midpoints = path_midpoints_visible            
         
         if len(path_midpoints[0]) == 1:
-            path_midpoints = [[car.position.x ,path_midpoints[0][0]], [car.position.y, path_midpoints[1][0]]]
+            path_midpoints = [[car.true_position.x , path_midpoints[0][0]], [car.true_position.y, path_midpoints[1][0]]]
             
             tck, u = splprep(path_midpoints, s=1, k = 1)
             unew = np.arange(0, 1.01, 0.5/(len(visible_left_cones)**0.4)) #more cones  = less final var

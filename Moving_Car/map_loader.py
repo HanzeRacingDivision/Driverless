@@ -14,13 +14,13 @@ def save_map(left_cones, right_cones):
          name = input()
      
          for i in range(len(left_cones)):
-             cone_x.append(left_cones[i].position.x)
-             cone_y.append(left_cones[i].position.y)
+             cone_x.append(left_cones[i].true_position.x)
+             cone_y.append(left_cones[i].true_position.y)
              cone_type.append('LEFT')
              
          for i in range(len(right_cones)):
-             cone_x.append(right_cones[i].position.x)
-             cone_y.append(right_cones[i].position.y)
+             cone_x.append(right_cones[i].true_position.x)
+             cone_y.append(right_cones[i].true_position.y)
              cone_type.append('RIGHT')       
              
              
