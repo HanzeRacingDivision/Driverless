@@ -17,7 +17,7 @@ class PathPlanning:
     def __init__(self):
         self.target = Target(-1000, -1000)  # could this be a an empty list instead?
         self.car = Car(7, 10)
-        self.cone = Cone(-1000, -1000, Side.LEFT)  # could this be a an empty list instead?
+        self.cone = Cone(-1000, -1000, Side.LEFT, 0)  # could this be a an empty list instead?
         self.path = Path()
         self.LEVEL_ID = 'None'
         self.initialize_images()
@@ -60,7 +60,7 @@ class PathPlanning:
 
         # SLAM variables
         self.slam_active = True
-        matrix_size = 300
+        matrix_size = 110
         self.mu = np.zeros(matrix_size)
         self.mu[0] = self.car.true_position.x
         self.mu[1] = self.car.true_position.y
@@ -216,12 +216,16 @@ class PathPlanning:
         car.angle = self.mu[2]
 
         for left_cone in left_cones:
-            left_cone.position.x = self.mu[2 * left_cone.id + 3]
-            left_cone.position.y = self.mu[2 * left_cone.id + 4]
+            if self.mu[2 * left_cone.id + 3] != 0:
+                left_cone.position.x = self.mu[2 * left_cone.id + 3]
+            if self.mu[2 * left_cone.id + 4] != 0:
+                left_cone.position.y = self.mu[2 * left_cone.id + 4]
 
         for right_cone in right_cones:
-            right_cone.position.x = self.mu[2 * right_cone.id + 3]
-            right_cone.position.y = self.mu[2 * right_cone.id + 4]
+            if self.mu[2 * right_cone.id + 3] != 0:
+                right_cone.position.x = self.mu[2 * right_cone.id + 3]
+            if self.mu[2 * right_cone.id + 4] != 0:
+                right_cone.position.y = self.mu[2 * right_cone.id + 4]
 
         # print('Updated location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(self.mu[0], self.mu[1], self.mu[2]))
 
@@ -254,7 +258,8 @@ class PathPlanning:
         self.path.spline_image[Side.RIGHT] = pygame.image.load(image_path6)
 
     def initialize_map(self):
-        random_number = random.randint(1, 7)
+        # random_number = random.randint(1, 7)
+        random_number = 8
         self.LEVEL_ID = f"MAP_{random_number}"
 
         left_cones, right_cones = pp_functions.utils.load_existing_map(self.LEVEL_ID)

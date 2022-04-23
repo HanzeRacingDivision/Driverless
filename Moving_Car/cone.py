@@ -11,7 +11,7 @@ class Side(Enum):
 
 
 class Cone:
-    def __init__(self, x, y, category):
+    def __init__(self, x, y, category, id_number):
         self.true_position = Vector2(x, y)
         self.position = Vector2(x, y)
         self.image = {Side.LEFT: None, Side.RIGHT: None}
@@ -21,13 +21,12 @@ class Cone:
         self.true_dist_car = 10 ** 10
         self.dist_car = 10 ** 10
         self.alpha = 0
+        self.id = id_number
 
         self.cone_list = {Side.LEFT: [], Side.RIGHT: []}
         self.polar_cone_list = []
         self.visible_cone_list = {Side.LEFT: [], Side.RIGHT: []}
         self.in_fov_cone_list = {Side.LEFT: [], Side.RIGHT: []}
-
-        self.id = len(self.cone_list[Side.LEFT]) + len(self.cone_list[Side.RIGHT]) + 2
 
         self.new_visible_cone_flag = {Side.LEFT: False, Side.RIGHT: False}
         self.first_cone_found = {Side.LEFT: False, Side.RIGHT: False}
@@ -122,6 +121,7 @@ class Cone:
 
         # distance to car
         self.true_dist_car = np.linalg.norm(self.true_position - pp.car.true_position)
+        self.dist_car = np.linalg.norm(self.position - pp.car.position)
 
         # calculating angle between car angle and cone (alpha)
         a_b = self.true_position - pp.car.true_position

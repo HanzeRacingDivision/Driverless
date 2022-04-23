@@ -5,18 +5,21 @@ import numpy as np
 from cone import Side
 from pp_functions.utils import bound_angle_180
 
+NOISE = 0 # noise constant for SLAM variables
+
 
 class Car:
     def __init__(self, x, y, angle=0, length=2, max_steering=80, max_acceleration=4.0):
-        self.true_position = Vector2(x, y)
-        self.position = Vector2(x, y)
+        self.true_position = Vector2(x, y)  # ground truth
+        self.position = Vector2(x, y)  # perceived position with errors
         self.velocity = Vector2(0.0, 0.0)
         self.angular_velocity = 0
         self.angle = angle
+        # self.true_angle = angle
         self.length = length
         self.max_acceleration = max_acceleration
         self.max_steering = max_steering
-        self.max_velocity = 5
+        self.max_velocity = 1  # 5
         self.brake_deceleration = 4
         self.free_deceleration = 1
         self.car_image = None
@@ -86,7 +89,11 @@ class Car:
         else:
             self.angular_velocity = 0
 
-        self.true_position += self.velocity.rotate(-self.angle) * dt
-        self.position = self.true_position + Vector2(np.random.normal(loc=0, scale=1e-10),
-                                                     np.random.normal(loc=0, scale=1e-10))
+        self.position += self.velocity.rotate(-self.angle) * dt
         self.angle += degrees(self.angular_velocity) * dt
+
+        self.true_position += self.velocity.rotate(-self.angle) * dt
+
+        # adding noise to SLAM variables
+        self.position += Vector2(np.random.normal(loc=0, scale=NOISE), np.random.normal(loc=0, scale=NOISE))
+        self.angle += np.random.normal(loc=0, scale=NOISE)

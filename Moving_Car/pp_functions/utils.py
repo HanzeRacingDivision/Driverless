@@ -26,12 +26,12 @@ def load_existing_map(name):
     for i in range(len(map_file.iloc[:, 0])):
         if map_file['Cone_Type'].iloc[i] == 'LEFT':
 
-            left_cone = Cone(map_file['Cone_X'].iloc[i], map_file['Cone_Y'].iloc[i], Side.LEFT)
+            left_cone = Cone(map_file['Cone_X'].iloc[i], map_file['Cone_Y'].iloc[i], Side.LEFT, i+2)
             left_cones.append(left_cone)
             # mouse_pos_list.append((map_file['Cone_X'].iloc[i]*ppu,map_file['Cone_Y'].iloc[i]*ppu))             
 
         else:
-            right_cone = Cone(map_file['Cone_X'].iloc[i], map_file['Cone_Y'].iloc[i], Side.RIGHT)
+            right_cone = Cone(map_file['Cone_X'].iloc[i], map_file['Cone_Y'].iloc[i], Side.RIGHT, i+2)
             right_cones.append(right_cone)
             # mouse_pos_list.append((map_file['Cone_X'].iloc[i]*ppu,map_file['Cone_Y'].iloc[i]*ppu))
 
@@ -73,14 +73,15 @@ def load_map(mouse_pos_list, ppu):
     map_file = pd.read_csv(map_path)
 
     for i in range(len(map_file.iloc[:, 0])):
+        print(i)
         if map_file['Cone_Type'].iloc[i] == 'LEFT':
 
-            left_cone = Cone(map_file['Cone_X'].iloc[i], map_file['Cone_Y'].iloc[i], 'left')
+            left_cone = Cone(map_file['Cone_X'].iloc[i], map_file['Cone_Y'].iloc[i], 'left', i+2)
             left_cones.append(left_cone)
             mouse_pos_list.append((map_file['Cone_X'].iloc[i] * ppu, map_file['Cone_Y'].iloc[i] * ppu))
 
         else:
-            right_cone = Cone(map_file['Cone_X'].iloc[i], map_file['Cone_Y'].iloc[i], 'right')
+            right_cone = Cone(map_file['Cone_X'].iloc[i], map_file['Cone_Y'].iloc[i], 'right', i+2)
             right_cones.append(right_cone)
             mouse_pos_list.append((map_file['Cone_X'].iloc[i] * ppu, map_file['Cone_Y'].iloc[i] * ppu))
 
