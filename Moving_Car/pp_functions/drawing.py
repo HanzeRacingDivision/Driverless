@@ -38,23 +38,23 @@ def draw_line_dashed(surface, color, start_pos, end_pos, offset, width=1, dash_l
 
 def render(pp):
     pp.screen.fill((0, 0, 0))
-    rotated = pygame.transform.rotate(pp.car.car_image, pp.car.angle)
+    rotated = pygame.transform.rotate(pp.car.car_image, pp.car.true_angle)
     rect = rotated.get_rect()
 
-    pos_temp = pp.car.true_position * pp.ppu
+    pos_temp = pp.car.position * pp.ppu
     pos_1 = int(pos_temp.x)
     pos_2 = int(pos_temp.y)
 
     def apply_view_offset(item):
         if pp.car_centre:
-            return item + (pp.view_offset[0] + pp.car.true_position.x * pp.ppu + pp.width / 2,
-                           pp.view_offset[1] + pp.car.true_position.y * pp.ppu + pp.height / 2)
+            return item + (pp.view_offset[0] + pp.car.position.x * pp.ppu + pp.width / 2,
+                           pp.view_offset[1] + pp.car.position.y * pp.ppu + pp.height / 2)
         else:
             return item + (pp.view_offset[0], pp.view_offset[1])
 
     if pp.car_centre:
-        offset = [pp.view_offset[0] + pp.car.true_position.x * pp.ppu + pp.width / 2,
-                  pp.view_offset[1] + pp.car.true_position.y * pp.ppu + pp.height / 2]
+        offset = [pp.view_offset[0] + pp.car.position.x * pp.ppu + pp.width / 2,
+                  pp.view_offset[1] + pp.car.position.y * pp.ppu + pp.height / 2]
     else:
         offset = [pp.view_offset[0], pp.view_offset[1]]
 
@@ -63,7 +63,7 @@ def render(pp):
         for target in pp.target.targets:
             if target in pp.target.non_passed_targets:
                 pass
-                pp.screen.blit(pp.target.image, apply_view_offset(target.true_position * pp.ppu - (3, 3)))
+                pp.screen.blit(pp.target.image, apply_view_offset(target.position * pp.ppu - (3, 3)))
             else:
                 pass
                 # pp.screen.blit(target_image_g, target.position * ppu - (3,3))
@@ -72,20 +72,16 @@ def render(pp):
                 # pp_functions.utils.draw_line_dashed(pp.screen, (150,150,150),(pos_1,pos_2) , target.position * ppu , width = 1, dash_length = 10, exclude_corners = True)
 
     for category in Side:
-
+        # true position of cones as an empty circle
         for cone in pp.cone.cone_list[category]:
-            # pp.screen.blit(pp.cone.image[category], apply_view_offset(cone.true_position * pp.ppu - (3, 3)))
             pygame.draw.circle(pp.screen, (200, 200, 0), apply_view_offset(cone.true_position * pp.ppu), 5, 1)
-
+        # SLAM-identified position of cones as a picture of a cone
         for cone in pp.cone.visible_cone_list[category]:
-        #     pygame.draw.circle(pp.screen, (200, 200, 0), apply_view_offset(cone.true_position * pp.ppu - (3, 3)), 5, 1)
             pp.screen.blit(pp.cone.image[category], apply_view_offset(cone.position * pp.ppu - (3, 3)))
-
-
-        # Draw lines to cones == headlights
+        # lines to cones which are in field-of-view
         for cone in pp.cone.in_fov_cone_list[category]:
             if cone.in_fov:
-                draw_line_dashed(pp.screen, (150, 150, 150), (pos_1, pos_2), cone.true_position * pp.ppu, offset,
+                draw_line_dashed(pp.screen, (150, 150, 150), (pos_1, pos_2), cone.position * pp.ppu, offset,
                                  width=1, dash_length=10, exclude_corners=True)
 
         if pp.path.splines[category] != 0 and len(pp.path.splines[category]) > 0:

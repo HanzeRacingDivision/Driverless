@@ -77,8 +77,8 @@ def search(car,cone, max_R, angle_bound):
 	v1_y = cone.y - car.y
 	v1 = [v1_x,v1_y]
 
-	v2_x = 30*np.cos(np.radians(car.angle%360))
-	v2_y = -30*np.sin(np.radians(car.angle%360))
+	v2_x = 30*np.cos(np.radians(car.true_angle % 360))
+	v2_y = -30*np.sin(np.radians(car.true_angle % 360))
 	v2 = [v2_x,v2_y]
 	R = np.sqrt(v1_x**2 + v1_y**2)
 	theta = getAngle(v1,v2)
