@@ -17,7 +17,7 @@ import pp_functions.utils
 
 
 def enable_dragging_screen(pp, events):
-    # dragging screen using left mouse butto
+    # dragging screen using left mouse button
     for event in events:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 or pp.moving_view_offset:
             if not pp.moving_view_offset:
@@ -68,7 +68,8 @@ def user_input(pp, events, dt):
                     break
 
             if make_cone:
-                left_cone = Cone(mouse_pos[0] / pp.ppu, mouse_pos[1] / pp.ppu, 'left')
+                cone_id = len(pp.cone.cone_list[Side.RIGHT]) + len(pp.cone.cone_list[Side.LEFT]) + 2
+                left_cone = Cone(mouse_pos[0] / pp.ppu, mouse_pos[1] / pp.ppu, 'left', cone_id)
                 pp.cone.cone_list[Side.LEFT].append(left_cone)
                 pp.mouse_pos_list.append(mouse_pos)
 
@@ -86,8 +87,9 @@ def user_input(pp, events, dt):
                     make_cone = False
                     break
 
-            if make_cone == True:
-                right_cone = Cone(mouse_pos[0] / pp.ppu, mouse_pos[1] / pp.ppu, 'right')
+            if make_cone:
+                cone_id = len(pp.cone.cone_list[Side.RIGHT]) + len(pp.cone.cone_list[Side.LEFT]) + 2
+                right_cone = Cone(mouse_pos[0] / pp.ppu, mouse_pos[1] / pp.ppu, 'right', cone_id)
                 pp.cone.cone_list[Side.RIGHT].append(right_cone)
                 pp.mouse_pos_list.append(mouse_pos)
 
@@ -117,35 +119,28 @@ def user_input(pp, events, dt):
         pp.car.crashed = False
         pp.total_reward = 0
 
-    # if 2 is pressed, increasing cruising speed
-    # if 1 is pressed, decrease cruising speed
-
     for event in events:
+        # if 2 is pressed, increasing cruising speed
+        # if 1 is pressed, decrease cruising speed
         if event.type == pygame.KEYDOWN and event.key == pygame.K_1:
             pp.cruising_speed -= 0.05
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_2:
             pp.cruising_speed += 0.05
-
-    # if a pressed then toggle automatic driving
-    for event in events:
+        # if a pressed then toggle automatic driving
         if event.type == pygame.KEYUP and event.key == pygame.K_a:
-            if pp.car.auto == False:
+            if not pp.car.auto:
                 pp.car.auto = True
             else:
                 pp.car.auto = False
-
-    # if f pressed then toggle pp.fullscreen
-    for event in events:
+        # if f pressed then toggle pp.fullscreen
         if event.type == pygame.KEYUP and event.key == pygame.K_f:
-            if pp.fullscreen == False:
+            if not pp.fullscreen:
                 pp.fullscreen = True
             else:
                 pp.fullscreen = False
-
-    # if t pressed then set to pp.track mode
-    for event in events:
+        # if t pressed then set to pp.track mode
         if event.type == pygame.KEYUP and event.key == pygame.K_t:
-            if pp.track == False:
+            if not pp.track:
                 pp.track = True
             else:
                 pp.track = False

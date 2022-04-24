@@ -3,3 +3,4 @@
 **/.idea/
 desktop.ini
 .idea/
+*.pyc

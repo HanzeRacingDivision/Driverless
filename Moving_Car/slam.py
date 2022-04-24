@@ -1,10 +1,11 @@
 from path import *
 
+
 class Slam:
     def __init__(self, matrix_size, car):
         self.mu = np.zeros(matrix_size)
-        self.mu[0] = car.true_position.x
-        self.mu[1] = car.true_position.y
+        self.mu[0] = car.position.x
+        self.mu[1] = car.position.y
 
         self.cov = np.zeros((matrix_size, matrix_size))
         for i in range(3, matrix_size):
@@ -15,6 +16,10 @@ class Slam:
         self.obs = []
         self.c_prob = []
         self.Qt = np.zeros((2, 2))
+
+        # FPS control variables
+        self.frame_limit = 1
+        self.avg_fps = []
 
     def update_slam_vars(self, visible_left_cones, visible_right_cones, car):
         '''
@@ -30,7 +35,7 @@ class Slam:
         self.obs = []
         self.c_prob = np.ones(len(self.mu))
         for i in range(len(visible_left_cones)):
-            observed_car_dist = visible_left_cones[i].true_dist_car + np.random.normal(loc=0, scale=1e-10)
+            observed_car_dist = visible_left_cones[i].dist_car + np.random.normal(loc=0, scale=1e-10)
             observed_alpha = visible_left_cones[i].alpha + np.random.normal(loc=0, scale=1e-10)
 
             self.obs.append([observed_car_dist, observed_alpha, visible_left_cones[i].id])
@@ -38,7 +43,7 @@ class Slam:
             cone_angles.append(observed_alpha)
 
         for i in range(len(visible_right_cones)):
-            observed_car_dist = visible_right_cones[i].true_dist_car + np.random.normal(loc=0, scale=1e-10)
+            observed_car_dist = visible_right_cones[i].dist_car + np.random.normal(loc=0, scale=1e-10)
             observed_alpha = visible_right_cones[i].alpha + np.random.normal(loc=0, scale=1e-10)
 
             self.obs.append([observed_car_dist, observed_alpha, visible_right_cones[i].id])
@@ -91,8 +96,7 @@ class Slam:
         # print('Predicted location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(mu_bar[0][0], mu_bar[1][0],
         #                                                                               mu_bar[2][0])
 
-
-    def EKF_update(self, car, left_cones, right_cones):
+    def EKF_update(self, car, cones):
         """
         The update step of the Extended Kalman Filter
         Threshold for observed before is currently 1e6 (this number has to be high, as the uncertainty
@@ -150,28 +154,27 @@ class Slam:
 
                 # update state vector and covariance matrix
                 self.mu = self.mu + K.dot(z_dif)[:, 0]
+
                 self.cov = (np.eye(N) - K.dot(H)).dot(self.cov)
 
+
         # using SLAM to update landmark + car positions
-        car.position.x = self.mu[0]
-        car.position.y = self.mu[1]
+        car.position = Vector2(self.mu[0], self.mu[1])
         car.angle = self.mu[2]
 
-        for left_cone in left_cones:
-            if self.mu[2 * left_cone.id + 3] != 0:
-                left_cone.position.x = self.mu[2 * left_cone.id + 3]
-            if self.mu[2 * left_cone.id + 4] != 0:
-                left_cone.position.y = self.mu[2 * left_cone.id + 4]
-
-        for right_cone in right_cones:
-            if self.mu[2 * right_cone.id + 3] != 0:
-                right_cone.position.x = self.mu[2 * right_cone.id + 3]
-            if self.mu[2 * right_cone.id + 4] != 0:
-                right_cone.position.y = self.mu[2 * right_cone.id + 4]
+        for category in Side:
+            for cone in cones[category]:
+                cone.cov = Vector2(self.cov[2 * cone.id + 3, 2 * cone.id + 3], self.cov[2 * cone.id + 4, 2 * cone.id + 4])
+                if self.mu[2 * cone.id + 3] != 0:
+                    cone.position.x = self.mu[2 * cone.id + 3]
+                if self.mu[2 * cone.id + 4] != 0:
+                    cone.position.y = self.mu[2 * cone.id + 4]
 
         # print('Updated location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(self.mu[0], self.mu[1], self.mu[2]))
 
-    def run(self, car, visible_left_cones, visible_right_cones, left_cones, right_cones, dt):
-        self.update_slam_vars(visible_left_cones, visible_right_cones, car)
+    def run(self, pp, dt):
+        self.avg_fps = np.append(self.avg_fps, 1 / (dt + 10 ** -10))
+        self.update_slam_vars(pp.cone.visible_cone_list[Side.LEFT], pp.cone.visible_cone_list[Side.RIGHT], pp.car)
         self.EKF_predict(dt)
-        self.EKF_update(car, left_cones, right_cones)
+        if pp.num_steps % self.frame_limit == 0:
+            self.EKF_update(pp.car, pp.cone.cone_list)

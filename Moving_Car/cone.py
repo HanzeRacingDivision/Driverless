@@ -23,6 +23,8 @@ class Cone:
         self.alpha = 0
         self.id = id_number
 
+        self.cov = Vector2(x, y)
+
         self.cone_list = {Side.LEFT: [], Side.RIGHT: []}
         self.polar_cone_list = []
         self.visible_cone_list = {Side.LEFT: [], Side.RIGHT: []}
@@ -106,8 +108,9 @@ class Cone:
                     a_b = Vector2(self.boundary_sample[category][0][i],
                                   self.boundary_sample[category][1][i]) - pp.car.true_position
                     a_b = np.transpose(np.matrix([a_b.x, -1 * a_b.y]))
-                    rotate = np.matrix([[np.cos(-pp.car.true_angle * np.pi / 180), -1 * np.sin(-pp.car.true_angle * np.pi / 180)],
-                                        [np.sin(-pp.car.true_angle * np.pi / 180), np.cos(-pp.car.true_angle * np.pi / 180)]])
+                    rotate = np.matrix(
+                        [[np.cos(-pp.car.true_angle * np.pi / 180), -1 * np.sin(-pp.car.true_angle * np.pi / 180)],
+                         [np.sin(-pp.car.true_angle * np.pi / 180), np.cos(-pp.car.true_angle * np.pi / 180)]])
                     a_b = rotate * a_b
                     a = a_b[0]
                     b = a_b[1]

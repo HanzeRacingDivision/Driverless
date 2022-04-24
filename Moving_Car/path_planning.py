@@ -6,7 +6,6 @@ import numpy as np
 
 from car import Car
 from cone import *
-from path import *
 from slam import *
 
 import pp_functions.manual_controls
@@ -86,7 +85,8 @@ class PathPlanning:
         self.path.spline_image[Side.RIGHT] = pygame.image.load(image_path6)
 
     def initialize_map(self):
-        random_number = random.randint(1, 7)
+        # random_number = random.randint(1, 7)
+        random_number = 6
         self.LEVEL_ID = f"MAP_{random_number}"
 
         left_cones, right_cones = pp_functions.utils.load_existing_map(self.LEVEL_ID)
@@ -211,7 +211,7 @@ class PathPlanning:
 
         return observation
 
-    def run(self, method, slam):
+    def run(self, method, slam_active):
 
         self.initialize_images()
 
@@ -241,9 +241,8 @@ class PathPlanning:
                 pp_functions.manual_controls.user_input(self, events, dt)
 
             # SLAM
-            if slam:
-                self.slam.run(self.car, self.cone.visible_cone_list[Side.LEFT], self.cone.visible_cone_list[Side.RIGHT],
-                          self.cone.cone_list[Side.LEFT], self.cone.cone_list[Side.RIGHT], dt)
+            if slam_active:
+                self.slam.run(self, dt)
 
             # Defining the time running since simulation started
             self.time_running = time.time() - time_start
@@ -288,7 +287,7 @@ class PathPlanning:
             self.implement_main_logic(dt)
 
             # Drawing
-            pp_functions.drawing.render(self)
+            pp_functions.drawing.render(self, dt)
 
             self.clock.tick(self.ticks)
 
@@ -302,4 +301,4 @@ if __name__ == '__main__':
     #   1) autonomous: no user inputs, only screen dragging
     #   2) user: old simulation with user inputs
     # SLAM activated True/False
-    sim.run(method="autonomous", slam=True)
+    sim.run(method="autonomous", slam_active=True)

@@ -36,7 +36,13 @@ def draw_line_dashed(surface, color, start_pos, end_pos, offset, width=1, dash_l
             for n in range(int(exclude_corners), dash_amount - int(exclude_corners), 2)]
 
 
-def render(pp):
+def draw_rect_alpha(surface, color, rect):
+    shape_surf = pygame.Surface(pygame.Rect(rect).size, pygame.SRCALPHA)
+    pygame.draw.rect(shape_surf, color, shape_surf.get_rect())
+    surface.blit(shape_surf, rect)
+
+
+def render(pp, dt):
     pp.screen.fill((0, 0, 0))
     rotated = pygame.transform.rotate(pp.car.car_image, pp.car.true_angle)
     rect = rotated.get_rect()
@@ -75,9 +81,13 @@ def render(pp):
         # true position of cones as an empty circle
         for cone in pp.cone.cone_list[category]:
             pygame.draw.circle(pp.screen, (200, 200, 0), apply_view_offset(cone.true_position * pp.ppu), 5, 1)
-        # SLAM-identified position of cones as a picture of a cone
+        # SLAM-identified position of cones
         for cone in pp.cone.visible_cone_list[category]:
+            # picture of a cone
             pp.screen.blit(pp.cone.image[category], apply_view_offset(cone.position * pp.ppu - (3, 3)))
+            # uncertainty of the cone
+            x, y = apply_view_offset(cone.position * pp.ppu - (3, 3)) - Vector2(cone.cov.x / 2, cone.cov.y / 2)
+            pygame.draw.rect(pp.screen, (200, 200, 0), pygame.Rect(x, y, cone.cov.x, cone.cov.y), 1)
         # lines to cones which are in field-of-view
         for cone in pp.cone.in_fov_cone_list[category]:
             if cone.in_fov:
@@ -92,8 +102,8 @@ def render(pp):
     if pp.cone.first_visible_cone[Side.LEFT] != 0 and pp.cone.first_visible_cone[Side.RIGHT] != 0:
         draw_line_dashed(pp.screen, (255, 51, 0), (pp.cone.first_visible_cone[Side.LEFT].true_position.x * pp.ppu,
                                                    pp.cone.first_visible_cone[Side.LEFT].true_position.y * pp.ppu), (
-                         pp.cone.first_visible_cone[Side.RIGHT].true_position.x * pp.ppu,
-                         pp.cone.first_visible_cone[Side.RIGHT].true_position.y * pp.ppu), offset, width=2,
+                             pp.cone.first_visible_cone[Side.RIGHT].true_position.x * pp.ppu,
+                             pp.cone.first_visible_cone[Side.RIGHT].true_position.y * pp.ppu), offset, width=2,
                          dash_length=5, exclude_corners=True)
 
     # if path_midpoints != 0 and len(path_midpoints) > 0:
@@ -108,7 +118,8 @@ def render(pp):
     # draw the car sprite
     # pygame.draw.rect(pp.screen, (200,200,200), (car.position * ppu - ((rect.width / 2),(rect.height / 2)), (rect.width, rect.height))) #draws a little box around the car sprite (just for debug)
     if not pp.car.crashed:
-        pp.screen.blit(rotated, apply_view_offset(pp.car.position * pp.ppu - ((rect.width / 2), (rect.height / 2))))  # draw car
+        pp.screen.blit(rotated,
+                       apply_view_offset(pp.car.position * pp.ppu - ((rect.width / 2), (rect.height / 2))))  # draw car
         pygame.draw.circle(pp.screen, (255, 0, 0), apply_view_offset(pp.car.true_position * pp.ppu), 7, 1)
 
     # else:
@@ -140,6 +151,7 @@ def render(pp):
             pp.screen.blit(text_surf, text_pos)
     """
 
+    line_offset = 20
     if not pp.fullscreen:
         text_font = pygame.font.Font(None, 30)
         #   text_surf = text_font.render(f'Angle to target : {round(alpha,1)}', 1, (255, 255, 255))
@@ -150,8 +162,24 @@ def render(pp):
         # text_pos = [10, 15]
         # pp.screen.blit(text_surf, text_pos)
 
+        text_surf = text_font.render(
+            f'SLAM position error : {round(np.linalg.norm(pp.car.true_position - pp.car.position), 3)}',
+            True, (255, 255, 255))
+        text_pos = [10, 1 * line_offset]
+        pp.screen.blit(text_surf, text_pos)
+
+        text_surf = text_font.render(
+            f'SLAM angle error : {round(np.linalg.norm(radians(pp.car.angle - pp.car.true_angle)), 3)}', True,
+            (255, 255, 255))
+        text_pos = [10, 2 * line_offset]
+        pp.screen.blit(text_surf, text_pos)
+
+        text_surf = text_font.render(f'{str(round(1 / (dt + 10 ** -10), 0))[:2]} FPS', True, (155, 155, 155))
+        text_pos = [1200, 15]
+        pp.screen.blit(text_surf, text_pos)
+
         text_surf = text_font.render(f'Reward: {pp.reward}', True, (255, 255, 255))
-        text_pos = [10, 15]
+        text_pos = [10, 3 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         # text_surf = text_font.render(f'offset : {round(pp.view_offset[0],1)}, {round(pp.view_offset[1],1)} ', 1, (255, 255, 255))
@@ -159,11 +187,11 @@ def render(pp):
         # pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Steering : {round(pp.car.steering_angle, 1)}', True, (255, 255, 255))
-        text_pos = [10, 35]
+        text_pos = [10, 4 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Speed : {round(pp.car.velocity.x, 1)}', True, (255, 255, 255))
-        text_pos = [10, 55]
+        text_pos = [10, 5 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         #   text_surf = text_font.render(f'Distance to target : {round(dist,2)}', 1, (255, 255, 255))
@@ -179,15 +207,11 @@ def render(pp):
         #   pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Track: {pp.track}', True, (255, 255, 255))
-        text_pos = [10, 100]
-        pp.screen.blit(text_surf, text_pos)
-
-        text_surf = text_font.render(f'Autonomous: {pp.car.auto}', True, (255, 255, 255))
-        text_pos = [10, 80]
+        text_pos = [10, 6 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Lap: {pp.track_number}', True, (255, 255, 255))
-        text_pos = [10, 120]
+        text_pos = [10, 7 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         #  text_surf = text_font.render(f'number of visible left cones: {len(visible_left_cones)}', 1, (255, 255, 255))
@@ -199,40 +223,40 @@ def render(pp):
         # pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render('Press 1 and 2 to alter car speed', True, (155, 155, 155))
-        text_pos = [10, 520]
+        text_pos = [10, 500 + 1 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
-        text_surf = text_font.render('Press A to toggle autonomous', True, (155, 155, 155))
-        text_pos = [10, 540]
-        pp.screen.blit(text_surf, text_pos)
+        # text_surf = text_font.render('Press A to toggle autonomous', True, (155, 155, 155))
+        # text_pos = [10, 540]
+        # pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render('Press L to place left cone', True, (155, 155, 155))
-        text_pos = [10, 560]
+        text_pos = [10, 500 + 2 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render('Press R to place right cone', True, (155, 155, 155))
-        text_pos = [10, 580]
+        text_pos = [10, 500 + 3 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render('Press T to make track', True, (155, 155, 155))
-        text_pos = [10, 600]
+        text_pos = [10, 500 + 4 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render('Press CTRL + C to clear', True, (155, 155, 155))
-        text_pos = [10, 620]
+        text_pos = [10, 500 + 5 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render('Press S to save map', True, (155, 155, 155))
-        text_pos = [10, 640]
+        text_pos = [10, 500 + 6 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render('Press D to load map', True, (155, 155, 155))
-        text_pos = [10, 660]
+        text_pos = [10, 500 + 7 * line_offset]
         pp.screen.blit(text_surf, text_pos)
     else:
         text_font = pygame.font.Font(None, 30)
         text_surf = text_font.render('Press F to exit Fullscreen', True, (80, 80, 80))
-        text_pos = [10, 690]
+        text_pos = [10, 500 + 8 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
     pygame.display.flip()
