@@ -1,4 +1,3 @@
-from math import sin, radians, degrees, copysign
 from pygame.math import Vector2
 import numpy as np
 from scipy.interpolate import splprep, splev
@@ -21,8 +20,7 @@ class Path:
 
         # cubic splines for left track boundaries
         for category in Side:
-            if len(pp.cone.visible_cone_list[category]) > 1 and pp.car.auto == True and pp.cone.new_visible_cone_flag[
-                category]:
+            if len(pp.cone.visible_cone_list[category]) > 1 and pp.car.auto and pp.cone.new_visible_cone_flag[category]:
                 if not pp.cone.first_cone_found[category]:
                     pp.cone.first_visible_cone[category] = pp.cone.visible_cone_list[category][0]
                     pp.cone.first_cone_found[category] = True
@@ -44,8 +42,7 @@ class Path:
                     K = 2
 
                 if len(pp.cone.visible_cone_list[category]) == len(pp.cone.cone_list[category]) and not \
-                self.spline_linked[
-                    category] and pp.track:
+                        self.spline_linked[category] and pp.track:
                     x.append(x[0])
                     y.append(y[0])
                     self.spline_linked[category] = True
@@ -61,14 +58,18 @@ class Path:
 
         if (len(pp.cone.in_fov_cone_list[Side.LEFT]) > 1
                 and len(pp.cone.in_fov_cone_list[Side.RIGHT]) > 1
-                and (pp.cone.new_visible_cone_flag[Side.LEFT] == True or pp.cone.new_visible_cone_flag[
-                    Side.RIGHT])):  # track_number == 0 and
+                and (pp.cone.new_visible_cone_flag[Side.LEFT] or pp.cone.new_visible_cone_flag[Side.RIGHT])):  # track_number == 0 and
 
             path_midpoints_x = []  # [car.position.x]
             path_midpoints_y = []  # [car.position.y]
 
+            # for category in Side:
+            #     for cone in pp.cone.in_fov_cone_list[category]:
+            #         print(cone.position)
+
             for left_cone in pp.cone.in_fov_cone_list[Side.LEFT]:
                 for right_cone in pp.cone.in_fov_cone_list[Side.RIGHT]:
+
                     # if np.linalg.norm((left_cone.true_position.x - right_cone.true_position.x, left_cone.true_position.y - right_cone.true_position.y)) < 4:
                     # 	path_midpoints_x.append(np.mean([left_cone.true_position.x, right_cone.true_position.x]))
                     # 	path_midpoints_y.append(np.mean([left_cone.true_position.y, right_cone.true_position.y]))

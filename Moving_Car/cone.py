@@ -9,26 +9,13 @@ class Side(Enum):
     LEFT = 1
     RIGHT = 2
 
-
-class Cone:
-    def __init__(self, x, y, category, id_number):
-        self.true_position = Vector2(x, y)
-        self.position = Vector2(x, y)
-        self.image = {Side.LEFT: None, Side.RIGHT: None}
-        self.visible = False
-        self.in_fov = False
-        self.category = category
-        self.true_dist_car = 10 ** 10
-        self.dist_car = 10 ** 10
-        self.alpha = 0
-        self.id = id_number
-
-        self.cov = Vector2(x, y)
-
+class Cones:
+    def __init__(self):
         self.cone_list = {Side.LEFT: [], Side.RIGHT: []}
         self.polar_cone_list = []
         self.visible_cone_list = {Side.LEFT: [], Side.RIGHT: []}
         self.in_fov_cone_list = {Side.LEFT: [], Side.RIGHT: []}
+        self.image = {Side.LEFT: None, Side.RIGHT: None}
 
         self.new_visible_cone_flag = {Side.LEFT: False, Side.RIGHT: False}
         self.first_cone_found = {Side.LEFT: False, Side.RIGHT: False}
@@ -119,6 +106,37 @@ class Cone:
                     angle = alpha[0, 0]
 
                     self.polar_boundary_sample[category].append([dist, angle])
+
+class Cone:
+    def __init__(self, x, y, category, id_number):
+        self.true_position = Vector2(x, y)
+        self.position = Vector2(x, y)
+        self.image = {Side.LEFT: None, Side.RIGHT: None}
+        self.visible = False
+        self.in_fov = False
+        self.category = category
+        self.true_dist_car = 10 ** 10
+        self.dist_car = 10 ** 10
+        self.alpha = 0
+        self.id = id_number
+
+        self.cov = Vector2(x, y)
+
+        # self.cone_list = {Side.LEFT: [], Side.RIGHT: []}
+        # self.polar_cone_list = []
+        # self.visible_cone_list = {Side.LEFT: [], Side.RIGHT: []}
+        # self.in_fov_cone_list = {Side.LEFT: [], Side.RIGHT: []}
+        #
+        # self.new_visible_cone_flag = {Side.LEFT: False, Side.RIGHT: False}
+        # self.first_cone_found = {Side.LEFT: False, Side.RIGHT: False}
+        # self.first_visible_cone = {Side.LEFT: 0, Side.RIGHT: 0}
+        #
+        # self.boundary_sample = {Side.LEFT: [[-100 for _ in range(5)], [-100 for _ in range(5)]],
+        #                         Side.RIGHT: [[-100 for _ in range(5)],
+        #                                      [-100 for _ in range(5)]]}  # [[x_pos_list], [y_pos_list]]
+        # self.polar_boundary_sample = {Side.LEFT: [], Side.RIGHT: []}  # [[r1, theta1], [r2, theta2], ...]
+
+
 
     def update(self, pp):
 

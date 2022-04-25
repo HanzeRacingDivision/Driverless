@@ -36,12 +36,6 @@ def draw_line_dashed(surface, color, start_pos, end_pos, offset, width=1, dash_l
             for n in range(int(exclude_corners), dash_amount - int(exclude_corners), 2)]
 
 
-def draw_rect_alpha(surface, color, rect):
-    shape_surf = pygame.Surface(pygame.Rect(rect).size, pygame.SRCALPHA)
-    pygame.draw.rect(shape_surf, color, shape_surf.get_rect())
-    surface.blit(shape_surf, rect)
-
-
 def render(pp, dt):
     pp.screen.fill((0, 0, 0))
     rotated = pygame.transform.rotate(pp.car.car_image, pp.car.true_angle)
@@ -86,18 +80,21 @@ def render(pp, dt):
             # picture of a cone
             pp.screen.blit(pp.cone.image[category], apply_view_offset(cone.position * pp.ppu - (3, 3)))
             # uncertainty of the cone
-            x, y = apply_view_offset(cone.position * pp.ppu - (3, 3)) - Vector2(cone.cov.x / 2, cone.cov.y / 2)
-            pygame.draw.rect(pp.screen, (200, 200, 0), pygame.Rect(x, y, cone.cov.x, cone.cov.y), 1)
+            # x, y = apply_view_offset(cone.position * pp.ppu - (3, 3)) - Vector2(cone.cov.x / 2, cone.cov.y / 2)
+            # pygame.draw.rect(pp.screen, (200, 200, 0), pygame.Rect(x, y, cone.cov.x, cone.cov.y), 1)
         # lines to cones which are in field-of-view
         for cone in pp.cone.in_fov_cone_list[category]:
             if cone.in_fov:
                 draw_line_dashed(pp.screen, (150, 150, 150), (pos_1, pos_2), cone.position * pp.ppu, offset,
                                  width=1, dash_length=10, exclude_corners=True)
 
+        x, y = apply_view_offset(Vector2(-1000, -1000))
+        pygame.draw.rect(pp.screen, (200, 200, 0), pygame.Rect(x, y, 50, 50), 1)
+
         if pp.path.splines[category] != 0 and len(pp.path.splines[category]) > 0:
             for i in range(len(pp.path.splines[category][0])):
                 pp.screen.blit(pp.path.spline_image[category], apply_view_offset(
-                    Vector2(pp.path.splines[category][0][i], pp.path.splines[category][1][i]) * pp.ppu - (3, 3)))
+                    Vector2(pp.path.splines[category][0][i], pp.path.splines[category][1][i]) * pp.ppu - Vector2(3, 3)))
 
     if pp.cone.first_visible_cone[Side.LEFT] != 0 and pp.cone.first_visible_cone[Side.RIGHT] != 0:
         draw_line_dashed(pp.screen, (255, 51, 0), (pp.cone.first_visible_cone[Side.LEFT].true_position.x * pp.ppu,
@@ -212,6 +209,10 @@ def render(pp, dt):
 
         text_surf = text_font.render(f'Lap: {pp.track_number}', True, (255, 255, 255))
         text_pos = [10, 7 * line_offset]
+        pp.screen.blit(text_surf, text_pos)
+
+        text_surf = text_font.render(f'SLAM error: {round(pp.slam.error(pp), 5)}', True, (255, 255, 255))
+        text_pos = [10, 8 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         #  text_surf = text_font.render(f'number of visible left cones: {len(visible_left_cones)}', 1, (255, 255, 255))

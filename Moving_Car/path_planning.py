@@ -14,10 +14,11 @@ from pp_functions.reward_function import calculate_reward
 
 
 class PathPlanning:
-    def __init__(self):
+    def __init__(self, slam_active):
         self.target = Target(-1000, -1000)  # could this be a an empty list instead?
         self.car = Car(7, 10)
-        self.cone = Cone(-1000, -1000, Side.LEFT, 0)  # could this be a an empty list instead?
+        # self.cone = Cone(-1000, -1000, Side.LEFT, 0)  # could this be a an empty list instead?
+        self.cone = Cones()
         self.path = Path()
         self.LEVEL_ID = 'None'
         self.initialize_images()
@@ -60,6 +61,7 @@ class PathPlanning:
 
         # SLAM variables
         self.slam = Slam(300, self.car)
+        self.slam_active = slam_active
 
     def initialize_images(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -85,8 +87,7 @@ class PathPlanning:
         self.path.spline_image[Side.RIGHT] = pygame.image.load(image_path6)
 
     def initialize_map(self):
-        # random_number = random.randint(1, 7)
-        random_number = 6
+        random_number = random.randint(1, 7)
         self.LEVEL_ID = f"MAP_{random_number}"
 
         left_cones, right_cones = pp_functions.utils.load_existing_map(self.LEVEL_ID)
@@ -157,7 +158,7 @@ class PathPlanning:
 
     def set_done(self, episode_time_running, episode_num, num_steps):
         self.path.compute_boundaries(self)
-        self.car.car_crash_mechanic(self.cone, self.path)
+        self.car.car_crash_mechanic(self.cone, self.path, self.slam_active)
         episode_ending = None
 
         if self.car.crashed:
@@ -211,7 +212,7 @@ class PathPlanning:
 
         return observation
 
-    def run(self, method, slam_active):
+    def run(self, method):
 
         self.initialize_images()
 
@@ -241,7 +242,7 @@ class PathPlanning:
                 pp_functions.manual_controls.user_input(self, events, dt)
 
             # SLAM
-            if slam_active:
+            if self.slam_active:
                 self.slam.run(self, dt)
 
             # Defining the time running since simulation started
@@ -275,7 +276,7 @@ class PathPlanning:
             self.track_logic()
 
             # car crash logic
-            self.car.car_crash_mechanic(self.cone, self.path)
+            self.car.car_crash_mechanic(self.cone, self.path, self.slam_active)
 
             # Calculate reward
             # self.reward = calculate_reward(self)
@@ -295,10 +296,10 @@ class PathPlanning:
 
 
 if __name__ == '__main__':
-    sim = PathPlanning()
+    sim = PathPlanning(slam_active=True)
 
     # 2 steering methods:
     #   1) autonomous: no user inputs, only screen dragging
     #   2) user: old simulation with user inputs
     # SLAM activated True/False
-    sim.run(method="autonomous", slam_active=True)
+    sim.run(method="autonomous")

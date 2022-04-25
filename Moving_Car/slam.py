@@ -1,15 +1,18 @@
 from path import *
+from math import radians, degrees
 
 
 class Slam:
     def __init__(self, matrix_size, car):
+
         self.mu = np.zeros(matrix_size)
         self.mu[0] = car.position.x
         self.mu[1] = car.position.y
 
+        # covariance matrix for respective covariance of each landmark car variables
         self.cov = np.zeros((matrix_size, matrix_size))
         for i in range(3, matrix_size):
-            self.cov[i, i] = 10 ** 10
+            self.cov[i, i] = 10 ** 10  # covariance with itself is high
 
         self.u = np.zeros(3)
         self.Rt = np.array([1e-6, 1e-6, 0])
@@ -18,24 +21,23 @@ class Slam:
         self.Qt = np.zeros((2, 2))
 
         # FPS control variables
-        self.frame_limit = 1
-        self.avg_fps = []
+        self.frame_limit = 1  # "run SLAM every frame_limit frames"
 
     def update_slam_vars(self, visible_left_cones, visible_right_cones, car):
-        '''
+        """
         This function updates the variables necessary to run SLAM
             - obs
             - c_prob
             - Qt
             - u
-        '''
+        """
         # updating obs, c_prob, and Qt
         cone_dists = []
         cone_angles = []
         self.obs = []
         self.c_prob = np.ones(len(self.mu))
         for i in range(len(visible_left_cones)):
-            observed_car_dist = visible_left_cones[i].dist_car + np.random.normal(loc=0, scale=1e-10)
+            observed_car_dist = visible_left_cones[i].true_dist_car + np.random.normal(loc=0, scale=1e-10)
             observed_alpha = visible_left_cones[i].alpha + np.random.normal(loc=0, scale=1e-10)
 
             self.obs.append([observed_car_dist, observed_alpha, visible_left_cones[i].id])
@@ -43,7 +45,7 @@ class Slam:
             cone_angles.append(observed_alpha)
 
         for i in range(len(visible_right_cones)):
-            observed_car_dist = visible_right_cones[i].dist_car + np.random.normal(loc=0, scale=1e-10)
+            observed_car_dist = visible_right_cones[i].true_dist_car + np.random.normal(loc=0, scale=1e-10)
             observed_alpha = visible_right_cones[i].alpha + np.random.normal(loc=0, scale=1e-10)
 
             self.obs.append([observed_car_dist, observed_alpha, visible_right_cones[i].id])
@@ -71,11 +73,11 @@ class Slam:
                            [dt * dtrans * -np.sin(radians(self.mu[2]))],  # change in y coordinate
                            [dt * degrees(drot1)]])  # change in theta
 
-        # This matrix is used to apply the new motion results to the mu matrix (such that only the first 3 rows are updated)
+        # This matrix is used to apply the new motion results to the mu matrix (update only the first 3 rows)
         F = np.append(np.eye(3), np.zeros((3, n_landmarks)), axis=1)
 
         # Define motion model Jacobian
-        # (derivative of the calculations for the motion.
+        # derivative of the calculations for the motion.
         J = np.array([[0, 0, dt * dtrans * -np.sin(radians(self.mu[2]))],
                       [0, 0, dt * dtrans * -np.cos(radians(self.mu[2]))],
                       [0, 0, 0]])
@@ -92,9 +94,6 @@ class Slam:
         R_t[1, 1] = self.Rt[1]
         R_t[2, 2] = self.Rt[2]
         self.cov = G.dot(self.cov).dot(G.T) + R_t  # slow line 2
-
-        # print('Predicted location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(mu_bar[0][0], mu_bar[1][0],
-        #                                                                               mu_bar[2][0])
 
     def EKF_update(self, car, cones):
         """
@@ -157,7 +156,6 @@ class Slam:
 
                 self.cov = (np.eye(N) - K.dot(H)).dot(self.cov)
 
-
         # using SLAM to update landmark + car positions
         car.position = Vector2(self.mu[0], self.mu[1])
         car.angle = self.mu[2]
@@ -165,15 +163,31 @@ class Slam:
         for category in Side:
             for cone in cones[category]:
                 cone.cov = Vector2(self.cov[2 * cone.id + 3, 2 * cone.id + 3], self.cov[2 * cone.id + 4, 2 * cone.id + 4])
+                # flicking cone at (0, 0) problem
                 if self.mu[2 * cone.id + 3] != 0:
                     cone.position.x = self.mu[2 * cone.id + 3]
                 if self.mu[2 * cone.id + 4] != 0:
                     cone.position.y = self.mu[2 * cone.id + 4]
+                # cone.position.x = self.mu[2 * cone.id + 3]
+                # cone.position.y = self.mu[2 * cone.id + 4]
 
-        # print('Updated location\t x: {0:.2f} \t y: {1:.2f} \t theta: {2:.2f}'.format(self.mu[0], self.mu[1], self.mu[2]))
+    def error(self, pp):
+        """ Returns average error per landmark. """
+        # number of initiated landmarks
+        size = 0
+        for x in self.mu:
+            if x != 0:
+                size += 1
+
+        # cumulative difference of positions for each landmark
+        difference = np.linalg.norm(pp.car.true_position - pp.car.position)
+        for category in Side:
+            for cone in pp.cone.cone_list[category]:
+                difference += np.linalg.norm(cone.true_position - cone.position)
+
+        return difference/size
 
     def run(self, pp, dt):
-        self.avg_fps = np.append(self.avg_fps, 1 / (dt + 10 ** -10))
         self.update_slam_vars(pp.cone.visible_cone_list[Side.LEFT], pp.cone.visible_cone_list[Side.RIGHT], pp.car)
         self.EKF_predict(dt)
         if pp.num_steps % self.frame_limit == 0:

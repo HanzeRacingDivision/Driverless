@@ -53,7 +53,7 @@ class Car:
     # self.steering_angle = max(-self.max_steering, min(self.steering_angle, self.max_steering))
 
     # Car crash mechanic
-    def car_crash_mechanic(self, cone_obj, path_obj):
+    def car_crash_mechanic(self, cone_obj, path_obj, slam_active):
         if len(cone_obj.cone_list[Side.LEFT]) > 0 or len(cone_obj.cone_list[Side.RIGHT]) > 0:
             self.crashed = False
 
@@ -70,14 +70,15 @@ class Car:
                     break
 
         # checking splines for crash
-        for category in Side:
-            if not self.crashed and path_obj.splines[category] != 0:
-                for i in range(len(path_obj.splines[category][0])):
-                    if np.linalg.norm(tuple(x - y for x, y in zip([self.true_position.x, self.true_position.y],
-                                                                  [path_obj.splines[category][0][i],
-                                                                   path_obj.splines[category][1][i]]))) < 0.25:
-                        self.crashed = True
-                        break
+        if not slam_active:
+            for category in Side:
+                if not self.crashed and path_obj.splines[category] != 0:
+                    for i in range(len(path_obj.splines[category][0])):
+                        if np.linalg.norm(tuple(x - y for x, y in zip([self.true_position.x, self.true_position.y],
+                                                                      [path_obj.splines[category][0][i],
+                                                                       path_obj.splines[category][1][i]]))) < 0.25:
+                            self.crashed = True
+                            break
 
     def update(self, dt):
         self.velocity += (self.acceleration * dt, 0)
