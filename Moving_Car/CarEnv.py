@@ -22,7 +22,7 @@ class CarEnv(gym.Env):
 
         self.num_steps = 0
         
-        self.pp = PathPlanning()
+        self.pp = PathPlanning(False)
 
         self.LEVEL_ID = self.pp.LEVEL_ID
 
@@ -37,7 +37,7 @@ class CarEnv(gym.Env):
         elif self.mode == "discrete":
             self.action_space = gym.spaces.Discrete(5)
 
-        self.num_obs = 2 + 5 * 2 * 2 # 2 car obs + 5 spline points * 2 (angle + dist) * 2 (left/right sides) (22)
+        self.num_obs = 2 + 5 * 2 * 2  # 2 car obs + 5 spline points * 2 (angle + dist) * 2 (left/right sides) (22)
 
         low = -1 * np.ones(self.num_obs)
         high = np.ones(self.num_obs)
@@ -50,7 +50,8 @@ class CarEnv(gym.Env):
         return [car_steering_angle, car_curr_velocity]
 
     def render(self, mode=None):
-        pp_functions.drawing.render(self.pp)
+        dt = self.clock.get_time() / 500
+        pp_functions.drawing.render(self.pp, dt)
         
     def step(self, action):
 
@@ -64,7 +65,7 @@ class CarEnv(gym.Env):
 
         self.num_steps += 1
 
-        if self.mode == "cont": 
+        if self.mode == "cont":
             self.pp.car.steering_angle = self.pp.car.max_steering * action[0]
 
         elif self.mode == "discrete":
@@ -94,13 +95,13 @@ class CarEnv(gym.Env):
         self.pp.car.config_angle()
 
         # update target list
-        self.pp.target.update_target_lists()
+        self.pp.targets.update_target_lists()
        
         # update cone list
-        self.pp.cone.update_cone_list(self.pp)
+        self.pp.cones.update_cone_list(self.pp)
         
         # calculate closest target
-        self.pp.target.update_closest_target()
+        self.pp.targets.update_closest_target()
 
         # reset targets for new lap
         # self.pp.reset_new_lap()
@@ -119,7 +120,7 @@ class CarEnv(gym.Env):
             self.data_logger['episode_end'].append(episode_end)
 
         reward = calculate_reward(self)
-        self.pp.reward = reward #this is only for drawing purposes
+        self.pp.reward = reward # this is only for drawing purposes
         self.total_reward += reward
 
         info = {}
@@ -129,7 +130,7 @@ class CarEnv(gym.Env):
         return observation, reward, done, info
 
     def reset(self):
-        self.pp = PathPlanning()
+        self.pp = PathPlanning(False)
 
         self.total_reward = 0
         self.num_steps = 0
@@ -138,7 +139,7 @@ class CarEnv(gym.Env):
         
         self.episode_time_start = time.time()
 
-        observation = np.zeros(self.num_obs)
+        observation = np.zeros(self.num_obs, dtype=np.float32)
         return observation
 
 if __name__ == "__main__":

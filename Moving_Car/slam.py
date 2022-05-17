@@ -4,15 +4,16 @@ from math import radians, degrees
 
 class Slam:
     def __init__(self, matrix_size, car):
-
+        # state vector we are predicting, denoted by Greek letter [mu]
+        # first 2 elements are car positions, others are landmark locations (x, y)
         self.mu = np.zeros(matrix_size)
         self.mu[0] = car.position.x
         self.mu[1] = car.position.y
 
-        # covariance matrix for respective covariance of each landmark car variables
+        # covariance matrix for respective uncertainty of pairs of landmarks and car variables
         self.cov = np.zeros((matrix_size, matrix_size))
         for i in range(3, matrix_size):
-            self.cov[i, i] = 10 ** 10  # covariance with itself is high
+            self.cov[i, i] = 10 ** 10  # covariance for each landmark with itself is high
 
         self.u = np.zeros(3)
         self.Rt = np.array([1e-6, 1e-6, 0])
@@ -182,13 +183,21 @@ class Slam:
         # cumulative difference of positions for each landmark
         difference = np.linalg.norm(pp.car.true_position - pp.car.position)
         for category in Side:
-            for cone in pp.cone.cone_list[category]:
+            for cone in pp.cones.list[category]:
                 difference += np.linalg.norm(cone.true_position - cone.position)
 
         return difference/size
 
-    def run(self, pp, dt):
-        self.update_slam_vars(pp.cone.visible_cone_list[Side.LEFT], pp.cone.visible_cone_list[Side.RIGHT], pp.car)
-        self.EKF_predict(dt)
-        if pp.num_steps % self.frame_limit == 0:
-            self.EKF_update(pp.car, pp.cone.cone_list)
+    def covariance(self, pp):
+        covariance = 0
+        for i in range(0, len(self.cov)):
+            for j in range(0, i):
+                covariance += abs(self.cov[i][j])
+
+        return covariance/len(self.cov)
+
+    # def run(self, pp, dt):
+    #     self.update_slam_vars(pp.cones.visible[Side.LEFT], pp.cones.visible[Side.RIGHT], pp.car)
+    #     self.EKF_predict(dt)
+    #     if pp.num_steps % self.frame_limit == 0:
+    #         self.EKF_update(pp.car, pp.cones.list)

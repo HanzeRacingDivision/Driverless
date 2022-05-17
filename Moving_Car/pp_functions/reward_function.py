@@ -10,8 +10,8 @@ def calculate_reward(self):
     reward += 0.01
 
     # reward for finding a new cone
-    for key in self.pp.cone.new_visible_cone_flag.keys():
-        if self.pp.cone.new_visible_cone_flag[key]:
+    for key in self.pp.cones.new_visible_cone_flag.keys():
+        if self.pp.cones.new_visible_cone_flag[key]:
             reward += 25
 
     # reward for completing the track

@@ -20,28 +20,26 @@ class Path:
 
         # cubic splines for left track boundaries
         for category in Side:
-            if len(pp.cone.visible_cone_list[category]) > 1 and pp.car.auto and pp.cone.new_visible_cone_flag[category]:
-                if not pp.cone.first_cone_found[category]:
-                    pp.cone.first_visible_cone[category] = pp.cone.visible_cone_list[category][0]
-                    pp.cone.first_cone_found[category] = True
+            if len(pp.cones.visible[category]) > 1 and pp.car.auto and pp.cones.new_visible_cone_flag[category]:
+                if not pp.cones.first_cone_found[category]:
+                    pp.cones.first_visible_cone[category] = pp.cones.visible[category][0]
+                    pp.cones.first_cone_found[category] = True
 
                 x = []
                 y = []
-                for cone in pp.cone.visible_cone_list[category]:
-                    # x_temp = cone.true_position.x
-                    # y_temp = cone.true_position.y
+                for cone in pp.cones.visible[category]:
                     x_temp = cone.position.x
                     y_temp = cone.position.y
 
                     x.append(x_temp)
                     y.append(y_temp)
 
-                if len(pp.cone.visible_cone_list[category]) == 2:
+                if len(pp.cones.visible[category]) == 2:
                     K = 1
                 else:
                     K = 2
 
-                if len(pp.cone.visible_cone_list[category]) == len(pp.cone.cone_list[category]) and not \
+                if len(pp.cones.visible[category]) == len(pp.cones.list[category]) and not \
                         self.spline_linked[category] and pp.track:
                     x.append(x[0])
                     y.append(y[0])
@@ -49,31 +47,20 @@ class Path:
 
                 tck, u = splprep([x, y], s=0, k=K)
                 unew = np.arange(0, 1.01, 0.25 / (
-                        len(pp.cone.visible_cone_list[category]) ** 1.2))  # more cones  = less final var
+                        len(pp.cones.visible[category]) ** 1.2))  # more cones  = less final var
                 self.splines[category] = splev(unew, tck)
 
     def generate_midpoint_path(self, pp):
 
         # auto generate path based on splines/cones
-
-        if (len(pp.cone.in_fov_cone_list[Side.LEFT]) > 1
-                and len(pp.cone.in_fov_cone_list[Side.RIGHT]) > 1
-                and (pp.cone.new_visible_cone_flag[Side.LEFT] or pp.cone.new_visible_cone_flag[Side.RIGHT])):  # track_number == 0 and
-
+        if (len(pp.cones.in_fov[Side.LEFT]) > 1
+                and len(pp.cones.in_fov[Side.RIGHT]) > 1):
+                #and (pp.cones.new_visible_cone_flag[Side.LEFT] or pp.cones.new_visible_cone_flag[Side.RIGHT])):  # track_number == 0 and
             path_midpoints_x = []  # [car.position.x]
             path_midpoints_y = []  # [car.position.y]
 
-            # for category in Side:
-            #     for cone in pp.cone.in_fov_cone_list[category]:
-            #         print(cone.position)
-
-            for left_cone in pp.cone.in_fov_cone_list[Side.LEFT]:
-                for right_cone in pp.cone.in_fov_cone_list[Side.RIGHT]:
-
-                    # if np.linalg.norm((left_cone.true_position.x - right_cone.true_position.x, left_cone.true_position.y - right_cone.true_position.y)) < 4:
-                    # 	path_midpoints_x.append(np.mean([left_cone.true_position.x, right_cone.true_position.x]))
-                    # 	path_midpoints_y.append(np.mean([left_cone.true_position.y, right_cone.true_position.y]))
-
+            for left_cone in pp.cones.in_fov[Side.LEFT]:
+                for right_cone in pp.cones.in_fov[Side.RIGHT]:
                     if np.linalg.norm((left_cone.position.x - right_cone.position.x,
                                        left_cone.position.y - right_cone.position.y)) < 4:
                         path_midpoints_x.append(np.mean([left_cone.position.x, right_cone.position.x]))
@@ -88,7 +75,6 @@ class Path:
             # couple each midpoint with its distance to the car
             for i in range(len(path_midpoints[0])):
                 dist_car = np.linalg.norm(Vector2(path_midpoints[0][i], path_midpoints[1][i]) - pp.car.position)
-                # dist_car = np.linalg.norm(Vector2(path_midpoints[0][i],path_midpoints[1][i]) - pp.car.true_position)
                 path_to_sort.append([dist_car, path_midpoints[0][i], path_midpoints[1][i]])
 
             # ordering the path_midpoints by distance from car
@@ -107,24 +93,23 @@ class Path:
             path_midpoints = path_midpoints_visible
 
             if len(path_midpoints[0]) == 1:
-                # path_midpoints = [[pp.car.true_position.x , path_midpoints[0][0]], [pp.car.true_position.y, path_midpoints[1][0]]]
                 path_midpoints = [[pp.car.position.x, path_midpoints[0][0]], [pp.car.position.y, path_midpoints[1][0]]]
 
                 tck, u = splprep(path_midpoints, s=1, k=1)
                 unew = np.arange(0, 1.01, 0.5 / (
-                        len(pp.cone.visible_cone_list[Side.LEFT]) ** 0.4))  # more cones  = less final var
+                        len(pp.cones.visible[Side.LEFT]) ** 0.4))  # more cones  = less final var
                 path_midpoints_spline = splev(unew, tck)
 
             elif len(path_midpoints[0]) == 2:
                 tck, u = splprep(path_midpoints, s=1, k=1)
                 unew = np.arange(0, 1.01, 0.5 / (
-                        len(pp.cone.visible_cone_list[Side.LEFT]) ** 0.4))  # more cones  = less final var
+                        len(pp.cones.visible[Side.LEFT]) ** 0.4))  # more cones  = less final var
                 path_midpoints_spline = splev(unew, tck)
 
             elif len(path_midpoints[0]) > 2:
                 tck, u = splprep(path_midpoints, s=1, k=2)
                 unew = np.arange(0, 1.01, 0.5 / (
-                        len(pp.cone.visible_cone_list[Side.LEFT]) ** 0.4))  # more cones  = less final var
+                        len(pp.cones.visible[Side.LEFT]) ** 0.4))  # more cones  = less final var
                 path_midpoints_spline = splev(unew, tck)
 
             else:
@@ -133,18 +118,18 @@ class Path:
             if len(path_midpoints_spline) > 0:
                 for i in range(len(path_midpoints_spline[0])):
                     new_target_loc = [path_midpoints_spline[0][i], path_midpoints_spline[1][i]]
-                    if new_target_loc in pp.target.target_locations:
+                    if new_target_loc in pp.targets.target_locations:
                         continue
                     else:
                         make_target = True
-                        for j in range(len(pp.target.target_locations)):
+                        for j in range(len(pp.targets.target_locations)):
                             if np.linalg.norm(
-                                    tuple(x - y for x, y in zip(pp.target.target_locations[j], new_target_loc))) < 1:
+                                    tuple(x - y for x, y in zip(pp.targets.target_locations[j], new_target_loc))) < 1:
                                 make_target = False
                                 break
 
-                        if make_target == True:
+                        if make_target:
                             new_target = Target(new_target_loc[0], new_target_loc[1])
-                            pp.target.targets.append(new_target)
-                            pp.target.non_passed_targets.append(new_target)
-                            pp.target.target_locations.append(new_target_loc)
+                            pp.targets.targets.append(new_target)
+                            pp.targets.non_passed_targets.append(new_target)
+                            pp.targets.target_locations.append(new_target_loc)

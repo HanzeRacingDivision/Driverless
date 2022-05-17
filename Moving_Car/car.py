@@ -19,7 +19,7 @@ class Car:
         self.length = length
         self.max_acceleration = max_acceleration
         self.max_steering = max_steering
-        self.max_velocity = 0.5  # 5
+        self.max_velocity = 3  # 5
         self.brake_deceleration = 4
         self.free_deceleration = 1
         self.car_image = None
@@ -54,14 +54,14 @@ class Car:
 
     # Car crash mechanic
     def car_crash_mechanic(self, cone_obj, path_obj, slam_active):
-        if len(cone_obj.cone_list[Side.LEFT]) > 0 or len(cone_obj.cone_list[Side.RIGHT]) > 0:
+        if len(cone_obj.list[Side.LEFT]) > 0 or len(cone_obj.list[Side.RIGHT]) > 0:
             self.crashed = False
 
             for category in Side:
-                for i in range(len(cone_obj.cone_list[category])):
+                for i in range(len(cone_obj.list[category])):
                     if np.linalg.norm(tuple(x - y for x, y in zip([self.true_position.x, self.true_position.y],
-                                                                  [cone_obj.cone_list[category][i].true_position.x,
-                                                                   cone_obj.cone_list[category][
+                                                                  [cone_obj.list[category][i].true_position.x,
+                                                                   cone_obj.list[category][
                                                                        i].true_position.y]))) < 0.4:
                         self.crashed = True
                         break

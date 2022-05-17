@@ -2,15 +2,8 @@ from pygame.math import Vector2
 import numpy as np
 
 
-class Target:
-    def __init__(self, x, y):
-        self.position = Vector2(x, y)
-        self.image = None
-        self.passed = False
-        self.dist_car = 10 ** 10
-        self.alpha = 0
-        self.visible = False
-
+class Targets:
+    def __init__(self):
         self.targets = []
         self.target_locations = []
         self.non_passed_targets = []
@@ -42,7 +35,40 @@ class Target:
         for target in self.non_passed_targets:
             if target.passed:
                 self.non_passed_targets.remove(target)
-        # print(len(self.non_passed_targets))
+
+        # if len(self.targets) > 15:
+        #     self.target_locations = self.target_locations[-15:]
+        #     self.targets = self.targets[-15:]
+
+    def reset_targets(self):
+        self.non_passed_targets = self.targets.copy()
+        for target in self.targets:
+            target.passed = False
+
+    def update_closest_target(self):
+        # define closest target
+        if len(self.visible_targets) > 0:
+            if len(self.visible_dists) == 0:
+                self.visible_targets = []
+            else:
+                # prev = self.closest_target
+                self.closest_target = self.visible_targets[np.array(self.visible_dists).argmin()]
+                # if self.closest_target != prev:
+                #     print('closest target changed')
+
+                # print(len(self.visible_targets))
+                # print(len(self.targets))
+
+
+class Target:
+    def __init__(self, x, y):
+        self.position = Vector2(x, y)
+        self.image = None
+        self.passed = False
+        self.dist_car = 10 ** 10
+        self.alpha = 0
+        self.visible = False
+        self.time_since_passed = 0
 
     def update(self, pp):
 
@@ -80,22 +106,3 @@ class Target:
                 self.visible = False
         else:
             self.visible = False
-
-    def update_closest_target(self):
-        # define closest target
-        if len(self.visible_targets) > 0:
-            if len(self.visible_dists) == 0:
-                self.visible_targets = []
-            else:
-                # prev = self.closest_target
-                self.closest_target = self.visible_targets[np.array(self.visible_dists).argmin()]
-                # if self.closest_target != prev:
-                #     print('closest target changed')
-
-                # print(len(self.visible_targets))
-                # print(len(self.targets))
-
-    def reset_targets(self):
-        self.non_passed_targets = self.targets.copy()
-        for target in self.targets:
-            target.passed = False

@@ -23,16 +23,33 @@ if __name__ == "__main__":
     if model_name == 'PPO' or model_name == 'PPO-cont':
         model = PPO.load(f"{models_dir}/car_model_{time_steps}")
     elif model_name == 'A2C' or model_name == 'A2C-cont':
-        model = A2C.load(f"{models_dir}/car_model_{time_steps}") 
+        model = A2C.load(f"{models_dir}/car_model_{time_steps}")
     elif model_name == 'DQN' or model_name == 'DQN-cont':
         model = DQN.load(f"{models_dir}/car_model_{time_steps}")
-        
+
     episodes = 1
+
+    actions1 = []
 
     for i in range(episodes):
         done = False
         observation = env.reset()
         while not done:
+
+            if env.pp.track_number > 0:
+                action, _states = model.predict(observation)
+                actions1.append(action)
+            else:
+                action = np.interp(env.pp.midpoint_steering_angle(), [-120, 120], [-1, 1])
+                action = [action]
+                observation, reward, done, info = env.step(action)
+                env.render()
+
+                if done:
+                    print(env.total_reward)
+                if env.pp.exit:
+                    break
+
             action, _states = model.predict(observation)
             observation, reward, done, info = env.step(action)
             env.render()

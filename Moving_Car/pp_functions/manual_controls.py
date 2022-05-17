@@ -9,10 +9,8 @@ import pandas as pd
 
 import os
 import sys
-
 sys.path.append(os.path.abspath(os.path.join('..', '')))
 from cone import *
-
 import pp_functions.utils
 
 
@@ -68,9 +66,9 @@ def user_input(pp, events, dt):
                     break
 
             if make_cone:
-                cone_id = len(pp.cone.cone_list[Side.RIGHT]) + len(pp.cone.cone_list[Side.LEFT]) + 2
+                cone_id = len(pp.cones.list[Side.RIGHT]) + len(pp.cones.list[Side.LEFT]) + 2
                 left_cone = Cone(mouse_pos[0] / pp.ppu, mouse_pos[1] / pp.ppu, 'left', cone_id)
-                pp.cone.cone_list[Side.LEFT].append(left_cone)
+                pp.cones.list[Side.LEFT].append(left_cone)
                 pp.mouse_pos_list.append(mouse_pos)
 
     # press r for right cone
@@ -88,22 +86,22 @@ def user_input(pp, events, dt):
                     break
 
             if make_cone:
-                cone_id = len(pp.cone.cone_list[Side.RIGHT]) + len(pp.cone.cone_list[Side.LEFT]) + 2
+                cone_id = len(pp.cones.list[Side.RIGHT]) + len(pp.cones.list[Side.LEFT]) + 2
                 right_cone = Cone(mouse_pos[0] / pp.ppu, mouse_pos[1] / pp.ppu, 'right', cone_id)
-                pp.cone.cone_list[Side.RIGHT].append(right_cone)
+                pp.cones.list[Side.RIGHT].append(right_cone)
                 pp.mouse_pos_list.append(mouse_pos)
 
     # if CTRL + c then clear screen
     if pressed[pygame.K_LCTRL] and pressed[pygame.K_c]:
         # resetting most vars
-        pp.target.targets = []
-        pp.target.non_passed_targets = []
-        pp.cone.cone_list[Side.LEFT] = []
-        pp.cone.cone_list[Side.RIGHT] = []
-        pp.cone.visible_cone_list[Side.LEFT] = []
-        pp.cone.visible_cone_list[Side.RIGHT] = []
-        pp.cone.in_fov_cone_list[Side.LEFT] = []
-        pp.cone.in_fov_cone_list[Side.RIGHT] = []
+        pp.targets.targets = []
+        pp.targets.non_passed_targets = []
+        pp.cones.list[Side.LEFT] = []
+        pp.cones.list[Side.RIGHT] = []
+        pp.cones.visible[Side.LEFT] = []
+        pp.cones.visible[Side.RIGHT] = []
+        pp.cones.in_fov[Side.LEFT] = []
+        pp.cones.in_fov[Side.RIGHT] = []
         pp.path.splines[Side.LEFT] = []
         pp.path.splines[Side.RIGHT] = []
         pp.path.spline_linked[Side.RIGHT] == False
@@ -111,10 +109,10 @@ def user_input(pp, events, dt):
         pp.mouse_pos_list = []
         pp.path.splines[Side.LEFT] = 0
         pp.path.splines[Side.RIGHT] = 0
-        pp.cone.first_visible_cone[Side.LEFT] = 0
-        pp.cone.first_visible_cone[Side.RIGHT] = 0
-        pp.cone.first_cone_found[Side.RIGHT] = False
-        pp.cone.first_cone_found[Side.LEFT] = False
+        pp.cones.first_visible_cone[Side.LEFT] = 0
+        pp.cones.first_visible_cone[Side.RIGHT] = 0
+        pp.cones.first_cone_found[Side.RIGHT] = False
+        pp.cones.first_cone_found[Side.LEFT] = False
         pp.track_number_changed = False
         pp.car.crashed = False
         pp.total_reward = 0
@@ -127,61 +125,61 @@ def user_input(pp, events, dt):
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_2:
             pp.cruising_speed += 0.05
         # if a pressed then toggle automatic driving
-        if event.type == pygame.KEYUP and event.key == pygame.K_a:
+        elif event.type == pygame.KEYUP and event.key == pygame.K_a:
             if not pp.car.auto:
                 pp.car.auto = True
             else:
                 pp.car.auto = False
         # if f pressed then toggle pp.fullscreen
-        if event.type == pygame.KEYUP and event.key == pygame.K_f:
+        elif event.type == pygame.KEYUP and event.key == pygame.K_f:
             if not pp.fullscreen:
                 pp.fullscreen = True
             else:
                 pp.fullscreen = False
         # if t pressed then set to pp.track mode
-        if event.type == pygame.KEYUP and event.key == pygame.K_t:
+        elif event.type == pygame.KEYUP and event.key == pygame.K_t:
             if not pp.track:
                 pp.track = True
             else:
                 pp.track = False
 
-    # if D then load map
-    if pressed[pygame.K_d]:
-        # resetting most vars before loading
-        pp.target.targets = []
-        pp.target.non_passed_targets = []
-        pp.cone.cone_list[Side.LEFT] = []
-        pp.cone.cone_list[Side.RIGHT] = []
-        pp.cone.visible_cone_list[Side.LEFT] = []
-        pp.cone.visible_cone_list[Side.RIGHT] = []
-        pp.cone.in_fov_cone_list[Side.LEFT] = []
-        pp.cone.in_fov_cone_list[Side.RIGHT] = []
-        pp.path.splines[Side.LEFT] = []
-        pp.path.splines[Side.RIGHT] = []
-        pp.path.spline_linked[Side.RIGHT] == False
-        pp.path.spline_linked[Side.LEFT] == False
-        pp.mouse_pos_list = []
-        pp.path.splines[Side.LEFT] = 0
-        pp.path.splines[Side.RIGHT] = 0
-        pp.cone.first_visible_cone[Side.LEFT] = 0
-        pp.cone.first_visible_cone[Side.RIGHT] = 0
-        pp.cone.first_cone_found[Side.RIGHT] = False
-        pp.cone.first_cone_found[Side.LEFT] = False
-        pp.track_number_changed = False
-        pp.car.crashed = False
-        pp.total_reward = 0
+        # if D then load map
+        if pressed[pygame.K_d]:
+            # resetting most vars before loading
+            pp.targets.targets = []
+            pp.targets.non_passed_targets = []
+            pp.cones.list[Side.LEFT] = []
+            pp.cones.list[Side.RIGHT] = []
+            pp.cones.visible[Side.LEFT] = []
+            pp.cones.visible[Side.RIGHT] = []
+            pp.cones.in_fov[Side.LEFT] = []
+            pp.cones.in_fov[Side.RIGHT] = []
+            pp.path.splines[Side.LEFT] = []
+            pp.path.splines[Side.RIGHT] = []
+            pp.path.spline_linked[Side.RIGHT] == False
+            pp.path.spline_linked[Side.LEFT] == False
+            pp.mouse_pos_list = []
+            pp.path.splines[Side.LEFT] = 0
+            pp.path.splines[Side.RIGHT] = 0
+            pp.cones.first_visible_cone[Side.LEFT] = 0
+            pp.cones.first_visible_cone[Side.RIGHT] = 0
+            pp.cones.first_cone_found[Side.RIGHT] = False
+            pp.cones.first_cone_found[Side.LEFT] = False
+            pp.track_number_changed = False
+            pp.car.crashed = False
+            pp.total_reward = 0
 
-        pp.cone.cone_list[Side.LEFT], pp.cone.cone_list[Side.RIGHT], pp.mouse_pos_list = pp_functions.utils.load_map(
-            pp.mouse_pos_list, pp.ppu)
+            pp.cones.list[Side.LEFT], pp.cones.list[Side.RIGHT], pp.mouse_pos_list = pp_functions.utils.load_map(
+                pp.mouse_pos_list, pp.ppu)
 
-    # if S then save map
-    if pressed[pygame.K_s]:
-        pp_functions.utils.save_map(pp.cone.cone_list[Side.LEFT], pp.cone.cone_list[Side.RIGHT])
+        # if S then save map
+        if pressed[pygame.K_s]:
+            pp_functions.utils.save_map(pp.cones.list[Side.LEFT], pp.cones.list[Side.RIGHT])
 
-    # dragging screen using left mouse butto
+    # dragging screen using left mouse button
     for event in events:
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 or pp.moving_view_offset == True:
-            if pp.moving_view_offset == False:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 or pp.moving_view_offset:
+            if not pp.moving_view_offset:
                 pp.moving_view_offset = True
                 pp.view_offset_mouse_pos_start = pygame.mouse.get_pos()
             mouse_pos = pygame.mouse.get_pos()
@@ -197,24 +195,24 @@ def user_input(pp, events, dt):
             pp.moving_view_offset = False
 
     # if CTRL + Z pressed then undo last left and right cone
-    if pp.undo_done == False and pressed[pygame.K_LCTRL] and pressed[pygame.K_z]:
+    if not pp.undo_done and pressed[pygame.K_LCTRL] and pressed[pygame.K_z]:
         pp.undo_done = True
         for side in Side:
-            if len(pp.cone.visible_cone_list[side]) > 0:
-                if pp.cone.cone_list[side][-1] == pp.cone.visible_cone_list[side][-1]:
-                    pp.mouse_pos_list.remove((pp.cone.cone_list[side][-1].true_position.x * pp.ppu,
-                                              pp.cone.cone_list[side][-1].true_position.y * pp.ppu))
-                    pp.cone.cone_list[side].pop(-1)
-                    pp.cone.visible_cone_list[side].pop(-1)
+            if len(pp.cones.visible[side]) > 0:
+                if pp.cones.list[side][-1] == pp.cones.visible[side][-1]:
+                    pp.mouse_pos_list.remove((pp.cones.list[side][-1].true_position.x * pp.ppu,
+                                              pp.cones.list[side][-1].true_position.y * pp.ppu))
+                    pp.cones.list[side].pop(-1)
+                    pp.cones.visible[side].pop(-1)
                 else:
-                    pp.mouse_pos_list.remove((pp.cone.cone_list[side][-1].true_position.x * pp.ppu,
-                                              pp.cone.cone_list[side][-1].true_position.y * pp.ppu))
-                    pp.cone.cone_list[side].pop(-1)
+                    pp.mouse_pos_list.remove((pp.cones.list[side][-1].true_position.x * pp.ppu,
+                                              pp.cones.list[side][-1].true_position.y * pp.ppu))
+                    pp.cones.list[side].pop(-1)
             else:
-                if len(pp.cone.cone_list[side]) > 0:
-                    pp.mouse_pos_list.remove((pp.cone.cone_list[side][-1].true_position.x * pp.ppu,
-                                              pp.cone.cone_list[side][-1].true_position.y * pp.ppu))
-                    pp.cone.cone_list[side].pop(-1)
+                if len(pp.cones.list[side]) > 0:
+                    pp.mouse_pos_list.remove((pp.cones.list[side][-1].true_position.x * pp.ppu,
+                                              pp.cones.list[side][-1].true_position.y * pp.ppu))
+                    pp.cones.list[side].pop(-1)
 
     for event in events:
         if event.type == pygame.KEYUP and event.key == pygame.K_z:

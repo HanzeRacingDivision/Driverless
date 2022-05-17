@@ -41,7 +41,7 @@ def render(pp, dt):
     rotated = pygame.transform.rotate(pp.car.car_image, pp.car.true_angle)
     rect = rotated.get_rect()
 
-    pos_temp = pp.car.position * pp.ppu
+    pos_temp = pp.car.true_position * pp.ppu
     pos_1 = int(pos_temp.x)
     pos_2 = int(pos_temp.y)
 
@@ -59,11 +59,11 @@ def render(pp, dt):
         offset = [pp.view_offset[0], pp.view_offset[1]]
 
     # draw targets
-    if len(pp.target.targets) > 0:
-        for target in pp.target.targets:
-            if target in pp.target.non_passed_targets:
+    if len(pp.targets.targets) > 0:
+        for target in pp.targets.targets:
+            if target in pp.targets.non_passed_targets:
                 pass
-                pp.screen.blit(pp.target.image, apply_view_offset(target.position * pp.ppu - (3, 3)))
+                pp.screen.blit(pp.targets.image, apply_view_offset(target.position * pp.ppu - (3, 3)))
             else:
                 pass
                 # pp.screen.blit(target_image_g, target.position * ppu - (3,3))
@@ -73,19 +73,19 @@ def render(pp, dt):
 
     for category in Side:
         # true position of cones as an empty circle
-        for cone in pp.cone.cone_list[category]:
+        for cone in pp.cones.list[category]:
             pygame.draw.circle(pp.screen, (200, 200, 0), apply_view_offset(cone.true_position * pp.ppu), 5, 1)
         # SLAM-identified position of cones
-        for cone in pp.cone.visible_cone_list[category]:
+        for cone in pp.cones.visible[category]:
             # picture of a cone
-            pp.screen.blit(pp.cone.image[category], apply_view_offset(cone.position * pp.ppu - (3, 3)))
+            pp.screen.blit(pp.cones.image[category], apply_view_offset(cone.position * pp.ppu - (3, 3)))
             # uncertainty of the cone
             # x, y = apply_view_offset(cone.position * pp.ppu - (3, 3)) - Vector2(cone.cov.x / 2, cone.cov.y / 2)
             # pygame.draw.rect(pp.screen, (200, 200, 0), pygame.Rect(x, y, cone.cov.x, cone.cov.y), 1)
         # lines to cones which are in field-of-view
-        for cone in pp.cone.in_fov_cone_list[category]:
+        for cone in pp.cones.in_fov[category]:
             if cone.in_fov:
-                draw_line_dashed(pp.screen, (150, 150, 150), (pos_1, pos_2), cone.position * pp.ppu, offset,
+                draw_line_dashed(pp.screen, (150, 150, 150), (pos_1, pos_2), cone.true_position * pp.ppu, offset,
                                  width=1, dash_length=10, exclude_corners=True)
 
         x, y = apply_view_offset(Vector2(-1000, -1000))
@@ -96,11 +96,11 @@ def render(pp, dt):
                 pp.screen.blit(pp.path.spline_image[category], apply_view_offset(
                     Vector2(pp.path.splines[category][0][i], pp.path.splines[category][1][i]) * pp.ppu - Vector2(3, 3)))
 
-    if pp.cone.first_visible_cone[Side.LEFT] != 0 and pp.cone.first_visible_cone[Side.RIGHT] != 0:
-        draw_line_dashed(pp.screen, (255, 51, 0), (pp.cone.first_visible_cone[Side.LEFT].true_position.x * pp.ppu,
-                                                   pp.cone.first_visible_cone[Side.LEFT].true_position.y * pp.ppu), (
-                             pp.cone.first_visible_cone[Side.RIGHT].true_position.x * pp.ppu,
-                             pp.cone.first_visible_cone[Side.RIGHT].true_position.y * pp.ppu), offset, width=2,
+    if pp.cones.first_visible_cone[Side.LEFT] != 0 and pp.cones.first_visible_cone[Side.RIGHT] != 0:
+        draw_line_dashed(pp.screen, (255, 51, 0), (pp.cones.first_visible_cone[Side.LEFT].true_position.x * pp.ppu,
+                                                   pp.cones.first_visible_cone[Side.LEFT].true_position.y * pp.ppu), (
+                             pp.cones.first_visible_cone[Side.RIGHT].true_position.x * pp.ppu,
+                             pp.cones.first_visible_cone[Side.RIGHT].true_position.y * pp.ppu), offset, width=2,
                          dash_length=5, exclude_corners=True)
 
     # if path_midpoints != 0 and len(path_midpoints) > 0:
