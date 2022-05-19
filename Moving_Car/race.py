@@ -26,8 +26,6 @@ if __name__ == "__main__":
         model = A2C.load(f"{models_dir}/car_model_{time_steps}")
     elif model_name == 'DQN' or model_name == 'DQN-cont':
         model = DQN.load(f"{models_dir}/car_model_{time_steps}")
-    else:
-        raise ValueError
 
     episodes = 1
 
@@ -35,17 +33,14 @@ if __name__ == "__main__":
 
     for i in range(episodes):
         done = False
-        env.activate_slam()  # assumes SLAM is active only before the RL
         observation = env.reset()
-
         while not done:
 
-            if env.pp.track_number >= 0:
-                env.deactivate_slam()
+            if env.pp.track_number > 0:
                 action, _states = model.predict(observation)
                 actions1.append(action)
             else:
-                action = np.interp(env.pp.midpoint_steering_angle, [-120, 120], [-1, 1])
+                action = np.interp(env.pp.midpoint_steering_angle(), [-120, 120], [-1, 1])
                 action = [action]
                 observation, reward, done, info = env.step(action)
                 env.render()

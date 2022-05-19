@@ -1,6 +1,8 @@
 import os
 import pygame
 import time
+import random
+import numpy as np
 
 from car import Car
 from cone import *
@@ -9,10 +11,11 @@ from slam import *
 
 import pp_functions.manual_controls
 import pp_functions.drawing
+from pp_functions.reward_function import calculate_reward
 
 
 class PathPlanning:
-    def __init__(self, slam_active: bool):
+    def __init__(self, slam_active):
         self.targets = Targets()
         self.car = Car(7, 10)
         self.cones = Cones()
@@ -279,11 +282,6 @@ class PathPlanning:
             self.clock.tick(self.ticks)
 
         pygame.quit()
-
-    @property
-    def midpoint_steering_angle(self):
-        return self.targets.closest_target
-        # return self.targets.closest_target.position - self.car.position
 
 
 if __name__ == '__main__':
