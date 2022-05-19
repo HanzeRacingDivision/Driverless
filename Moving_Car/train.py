@@ -15,6 +15,7 @@ import csv
 from collections import deque
 from stable_baselines3.common.vec_env import VecMonitor
 
+
 def linear_schedule(initial_value):
     """
     Linear learning rate schedule.
@@ -57,12 +58,14 @@ if __name__ == "__main__":
         model = A2C("MlpPolicy", env, learning_rate=linear_schedule(3e-4), verbose=1, tensorboard_log = log_dir)
     elif model_name == 'DQN' or model_name == 'DQN-cont':
         model = DQN("MlpPolicy", env, learning_rate=linear_schedule(3e-4), verbose=1, tensorboard_log = log_dir)
+    else:
+        raise ValueError
 
     timesteps = 10000
     for i in range(100):
-      model.learn(total_timesteps = timesteps, reset_num_timesteps = False, tb_log_name = f"{model_name}")
-      print(f"Saving model: {models_dir}/car_model_{timesteps * i}")
-      model.save(f"{models_dir}/car_model_{timesteps * i}")
+        model.learn(total_timesteps = timesteps, reset_num_timesteps = False, tb_log_name = f"{model_name}")
+        print(f"Saving model: {models_dir}/car_model_{timesteps * i}")
+        model.save(f"{models_dir}/car_model_{timesteps * i}")
 
     mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10)
     print(f"mean_reward:{mean_reward:.2f} +/- {std_reward:.2f}")

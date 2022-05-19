@@ -9,6 +9,7 @@ import pp_functions
 from pp_functions.reward_function import calculate_reward
 from stable_baselines3.common.env_checker import check_env
 
+
 class CarEnv(gym.Env):
     def __init__(self, mode = 'cont'):
         super(CarEnv, self).__init__()
@@ -53,7 +54,7 @@ class CarEnv(gym.Env):
         dt = self.clock.get_time() / 500
         pp_functions.drawing.render(self.pp, dt)
         
-    def step(self, action):
+    def step(self, step_action: np.ndarray):
 
         #for key in self.pp.cone.visible_cone_list.keys(): 
             #print(len(self.pp.cone.visible_cone_list[key]))
@@ -66,18 +67,18 @@ class CarEnv(gym.Env):
         self.num_steps += 1
 
         if self.mode == "cont":
-            self.pp.car.steering_angle = self.pp.car.max_steering * action[0]
+            self.pp.car.steering_angle = self.pp.car.max_steering * step_action[0]
 
         elif self.mode == "discrete":
-            if action == 0:
+            if step_action == 0:
                 self.pp.car.steering_angle = 0.5 * self.pp.car.max_steering
-            elif action == 1:
+            elif step_action == 1:
                 self.pp.car.steering_angle = 0.5 * -1 * self.pp.car.max_steering
-            elif action == 2:
+            elif step_action == 2:
                 self.pp.car.steering_angle = 1  * self.pp.car.max_steering
-            elif action == 3:
+            elif step_action == 3:
                 self.pp.car.steering_angle = 1 * -1 * self.pp.car.max_steering
-            elif action == 4:
+            elif step_action == 4:
                 self.pp.car.steering_angle = 0 * self.pp.car.max_steering
             
         self.pp.car.velocity.x = 1
@@ -141,6 +142,12 @@ class CarEnv(gym.Env):
 
         observation = np.zeros(self.num_obs, dtype=np.float32)
         return observation
+
+    def activate_slam(self):
+        self.pp.slam_active = True
+
+    def deactivate_slam(self):
+        self.pp.slam_active = False
 
 if __name__ == "__main__":
     env = CarEnv()
