@@ -40,7 +40,7 @@ as for the wheel speed sensors...
 #pragma once
 
 //#define abs(x) ((x)>0?(x):-(x)) //makes abs() work with floats
-#include "thijsFIFO.h"   //a (temporary???) little class library for First In First Out arrays (should be semi-efficient)
+#include "FIFO.h"   //a (temporary???) little class library for First In First Out arrays (should be semi-efficient)
 #include <driver/dac.h>
 
 namespace throttle { //this is to make clear to other sketches where the variables come from (and now i can use the same variablename in different namespaces)

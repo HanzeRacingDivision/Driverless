@@ -19,8 +19,8 @@ creation date: 17 Jan 2022
 */
 #pragma once
 
-#include "thijsFIFO.h"   //a (temporary???) little class library for First In First Out arrays (should be semi-efficient)
-#include "AS5600_thijs.h" //TBD: let HARD know where they can get all these cool, hip, sick, custom libraries
+#include "FIFO.h"   //a (temporary???) little class library for First In First Out arrays (should be semi-efficient)
+#include "AS5600.h" //TBD: let HARD know where they can get all these cool, hip, sick, custom libraries
 
 namespace steering { //this is to make clear to other sketches where the variables come from (and now i can use the same variablename in different namespaces)
 
@@ -74,7 +74,7 @@ const bool quickCenterCalibDir = true; //whether to prefer positive or negative 
 
 
 //////////////////// sensor library init ////////////////////
-AS5600_thijs sensor;
+AS5600 sensor;
 ///////////////////////// variables //////////////////////////
 int32_t desiredPos = 0; //the desired (instructed) position of the servo)
 int32_t currentPos = 0; //the current position of the servo (may be replaced by posHistFIFO[0])
