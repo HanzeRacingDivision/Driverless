@@ -1,0 +1,3 @@
+full range: 6500~6800~7000 encoder ticks /=4096 = ~1.5 rotations
+clockwise: 3500
+CCW: -3400
