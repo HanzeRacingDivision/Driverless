@@ -48,7 +48,7 @@ class PathPlanning:
         self.undo_done = False
 
         self.track = False
-        self.track_number = -1
+        self.track_number = 0
         self.track_number_changed = False
         self.time_start_sim = None
 
@@ -171,9 +171,11 @@ class PathPlanning:
         elif np.linalg.norm(Vector2(7 * self.ppu, 10 * self.ppu) - self.car.true_position * self.ppu) < 40 and int(
                 episode_time_running) > 4:
             print("track complete! : " + self.LEVEL_ID)
-            self.done = True
+            # self.done = True
+            self.track_number += 1
             episode_ending = ('success', self.LEVEL_ID, episode_num, num_steps)
-            return True, episode_ending
+            # return True, episode_ending
+            return False, episode_ending
 
         elif int(episode_time_running) > 100:
             print('time limit reached : ' + self.LEVEL_ID)
@@ -184,6 +186,23 @@ class PathPlanning:
         else:
             self.done = False
             return False, episode_ending
+
+    def midpoint_steering_angle(self):
+        if (len(self.targets.visible_targets) > 0
+                and np.linalg.norm(self.targets.closest_target.position - self.car.position) < self.car.fov / self.ppu
+                and np.linalg.norm(self.targets.closest_target.position - self.car.position) > 20 / self.ppu
+                and self.car.auto == True
+                and self.targets.closest_target.passed == False):
+
+            dist = self.targets.closest_target.dist_car
+            alpha = self.targets.closest_target.alpha
+            midpoint_steering_angle = (self.car.max_steering * 2 / np.pi) * np.arctan(alpha / dist * self.car.turning_sharpness)
+        else:
+            midpoint_steering_angle = 0
+
+        midpoint_steering_angle = max(-self.car.max_steering, min(midpoint_steering_angle, self.car.max_steering))
+
+        return midpoint_steering_angle
 
     def get_observation(self, num_obs):
         observation = np.zeros(num_obs, dtype=np.float32)

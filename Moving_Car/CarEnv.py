@@ -79,10 +79,21 @@ class CarEnv(gym.Env):
                 self.pp.car.steering_angle = 1 * -1 * self.pp.car.max_steering
             elif action == 4:
                 self.pp.car.steering_angle = 0 * self.pp.car.max_steering
-            
+
+        self.pp.num_steps += 1
+
+        dt = self.pp.clock.get_time() / 500
+
+        # Event queue
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                self.pp.exit = True
+
+        self.clock.tick(self.pp.ticks)
         self.pp.car.velocity.x = 1
-        
-        dt = self.clock.get_time() / 500 
+
+        dt = self.clock.get_time() / 500
 
         events = pygame.event.get()
         for event in events:
@@ -96,18 +107,20 @@ class CarEnv(gym.Env):
 
         # update target list
         self.pp.targets.update_target_lists()
-       
+
         # update cone list
         self.pp.cones.update_cone_list(self.pp)
-        
+
         # calculate closest target
         self.pp.targets.update_closest_target()
 
+        self.pp.path.generate_midpoint_path(self.pp)
+
         # reset targets for new lap
-        # self.pp.reset_new_lap()
+        self.pp.reset_new_lap()
 
         # implement track logic
-        # self.pp.track_logic()
+        self.pp.track_logic()
 
         # Logic
         self.pp.implement_main_logic(dt)
@@ -118,6 +131,8 @@ class CarEnv(gym.Env):
         done, episode_end = self.pp.set_done(self.episode_time_running, self.episode_num, self.num_steps)
         if episode_end:
             self.data_logger['episode_end'].append(episode_end)
+            self.pp.track_number = 1
+        #done = False
 
         reward = calculate_reward(self)
         self.pp.reward = reward # this is only for drawing purposes
@@ -141,6 +156,18 @@ class CarEnv(gym.Env):
 
         observation = np.zeros(self.num_obs, dtype=np.float32)
         return observation
+
+    def deactivate_slam(self):
+        self.pp.slam_active = False
+
+    def change_mode(self, new_mode):
+        self.mode = new_mode
+
+        if self.mode == "cont":
+            self.action_space = gym.spaces.Box(low = -1, high = 1, shape=(1,), dtype=np.float32)
+        elif self.mode == "discrete":
+            self.action_space = gym.spaces.Discrete(5)
+
 
 if __name__ == "__main__":
     env = CarEnv()

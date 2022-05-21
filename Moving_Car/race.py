@@ -10,6 +10,20 @@ from stable_baselines3.common.evaluation import evaluate_policy
 
 from CarEnv import CarEnv
 
+
+def dics_to_cont(action):
+    if action == 0:
+        return 0.5
+    elif action == 1:
+        return -0.5
+    elif action == 2:
+        return 1
+    elif action == 3:
+        return -1
+    elif action == 4:
+        return 0
+
+
 if __name__ == "__main__":
 
     model_name = "PPO"
@@ -17,7 +31,7 @@ if __name__ == "__main__":
 
     models_dir = f'models/{model_name}-1649940839'
 
-    env = CarEnv(mode="discrete")
+    env = CarEnv(mode="cont")
     check_env(env)
 
     if model_name == 'PPO' or model_name == 'PPO-cont':
@@ -29,28 +43,23 @@ if __name__ == "__main__":
 
     episodes = 1
 
-    actions1 = []
-
     for i in range(episodes):
         done = False
         observation = env.reset()
         while not done:
 
             if env.pp.track_number > 0:
+                print(env.pp.cones.visible)
                 action, _states = model.predict(observation)
-                actions1.append(action)
+                action = dics_to_cont(action)
+                # action = np.interp(env.pp.midpoint_steering_angle(), [-120, 120], [-1, 1])
+                action = [action]
             else:
                 action = np.interp(env.pp.midpoint_steering_angle(), [-120, 120], [-1, 1])
                 action = [action]
-                observation, reward, done, info = env.step(action)
-                env.render()
 
-                if done:
-                    print(env.total_reward)
-                if env.pp.exit:
-                    break
+            print(action)
 
-            action, _states = model.predict(observation)
             observation, reward, done, info = env.step(action)
             env.render()
 
@@ -61,3 +70,4 @@ if __name__ == "__main__":
                 break
 
     pygame.quit()
+
