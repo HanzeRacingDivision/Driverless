@@ -46,11 +46,36 @@ class Car:
         self.breaks = True
         self.fov_range = 60
 
+        self.steering_max = 25.0 # (constant) (degrees) maximum steering deflection (in ackerman: atan(wheelbase / turning_radius), so NOT wheel deflection)
+        self.steering_simulated = 0.0
+        self.steering_velocity = 0.0
+        self.steering_accel_max = 1850 # (constant) steering acceleration at full motor power
+        self.steering_friction = 7.5 # (constant) as rotation speed increases, so does friction
+        self.steering_target_margin = 0.1 # (constant) acceptable margin of error for steering control loop
+        self.steerSimSubdt = 0.01 # (constant) delta time of steering sub-simulation loop
+
     def update(self, dt):
         self.velocity += (self.acceleration * dt, 0)
         self.velocity.x = max(-self.max_velocity, min(self.velocity.x, self.max_velocity))
 
-        if self.steering:
+        ## simulate steering motor
+        self.steering = min(max(self.steering, -self.steering_max), self.steering_max) # constrain steering target to within acceptable range
+        for _ in range(int(round(dt/self.steerSimSubdt, 0))): # run a whole-ass sub-simulation just for the steering motor
+            steerAbsDiff = abs(self.steering_simulated - self.steering) # absolute angle difference
+            # calculate ratio between time_remaining_if_you_start_braking_now and current_velocity using the area under the curve, 2*dist (2x because i'm thinking square, not triangle). note: doesnt use steering_friction!
+            steerRequiredDecel = (self.steering_velocity**2) / (2*steerAbsDiff) # see comment above
+            if((steerAbsDiff > self.steering_target_margin) or (steerRequiredDecel > (self.steering_accel_max * 0.25))):
+                steerAccel = (self.steering_accel_max if (self.steering > self.steering_simulated) else -self.steering_accel_max)
+                if(steerRequiredDecel > (self.steering_accel_max * 0.75)): # simulate the microcontroller's decision to start decelerating
+                    steerAccel = (-self.steering_accel_max if (self.steering_velocity > 0.0) else self.steering_accel_max) # brake steering motor
+                steerAccel -= self.steering_friction * self.steering_velocity # higher steering velocity means more friction.
+                self.steering_velocity += self.steerSimSubdt * steerAccel # update steering velocity
+                self.steering_simulated += self.steerSimSubdt * self.steering_velocity + ((self.steerSimSubdt**2)/2.0)*steerAccel # SUVAT applied to rotational distance
+            else:
+                break # if the steering system has reached its target (and there is no chance of overshoot), stop itterating (saves a little time)
+        ## TBD: simplify formulas for steering motor to approximate it more efficiently...
+
+        if(abs(self.steering_simulated) > 0.01): # fixed bad non-zero check! >:(
             turning_radius = self.length / sin(radians(self.steering))
             angular_velocity = self.velocity.x / turning_radius
         else:
