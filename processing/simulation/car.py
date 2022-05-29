@@ -9,7 +9,7 @@ NOISE = 1e-3  # noise constant for SLAM variables
 
 
 class Car:
-    def __init__(self, x, y, angle=0, length=2, max_steering=25, max_acceleration=4.0):
+    def __init__(self, x, y, angle=0, length=1.5, max_steering=25, max_acceleration=4.0):
         self.true_position = Vector2(x, y)  # ground truth
         self.position = Vector2(x, y)  # perceived position with errors
         self.velocity = Vector2(0.0, 0.0)
