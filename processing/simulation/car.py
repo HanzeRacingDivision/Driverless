@@ -36,7 +36,7 @@ class Car:
 
         self.steering_simulated = 0.0
         self.steering_velocity = 0.0
-        self.steering_accel_max = 1850 # (constant) steering acceleration at full motor power
+        self.steering_accel_max = 1850 # (constant) steering acceleration at full motor power (deg/sec^2)
         self.steering_friction = 7.5 # (constant) as rotation speed increases, so does friction
         self.steering_target_margin = 0.1 # (constant) acceptable margin of error for steering control loop
         self.steerSimSubdt = 0.01 # (constant) delta time of steering sub-simulation loop
