@@ -109,8 +109,8 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True,
             if(storeBlob):
                 blobList.append(blob)
             
-            if(blob['appendTimestamp'] < lastSLAMtime):
-                print("warning, blob older than lastSLAMtime:", lastSLAMtime - blob['appendTimestamp'])
+            #if(blob['appendTimestamp'] < lastSLAMtime):
+            #    print("warning, blob older than lastSLAMtime:", lastSLAMtime - blob['appendTimestamp'])
         else:
             newCones.append((measurementPos, blob['appendTimestamp'], blob))
     
@@ -135,11 +135,11 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True,
         #print("SLAM list sizes:", len(conePointers), len(newCones))
         calculatedLinearOffset, calculatedRotationalOffset, unshiftedConesOnlyLinear, unshiftedCones = calculateOffsets(mapToUse.car.position, knownCones, measuredCones, magnitudes)
         
-        if(hasattr(mapToUse.car, 'simulationVariables')):
-            if(type(mapToUse.car.simulationVariables) is list):
-                print("true offsets:", mapToUse.car.position - mapToUse.car.simulationVariables[0], mapToUse.car.angle - mapToUse.car.simulationVariables[1])
-            elif(mapToUse.car.simulationVariables is not None): #(type(initMap.car.simulationVariables) is SC.simCar):
-                print("true offsets:", mapToUse.car.position - mapToUse.car.simulationVariables.position, mapToUse.car.angle - mapToUse.car.simulationVariables.angle)
+        # if(hasattr(mapToUse.car, 'simulationVariables')):
+        #     if(type(mapToUse.car.simulationVariables) is list):
+        #         print("true offsets:", mapToUse.car.position - mapToUse.car.simulationVariables[0], mapToUse.car.angle - mapToUse.car.simulationVariables[1])
+        #     elif(mapToUse.car.simulationVariables is not None): #(type(initMap.car.simulationVariables) is SC.simCar):
+        #         print("true offsets:", mapToUse.car.position - mapToUse.car.simulationVariables.position, mapToUse.car.angle - mapToUse.car.simulationVariables.angle)
         
         if(GF.distAngleBetwPos(np.zeros(2), calculatedLinearOffset)[0] < MAX_SLAM_CORRECTION):
             for i in range(len(conePointers)):

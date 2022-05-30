@@ -1,0 +1,15 @@
+changed the main (ARCv0.py now) file (a lot) to once again become singlecore
+updated mapfile format to include ConeID column. map_loader.py was of course updated to accept both the new AND the previous types of mapfile, so all old ones should still work. I did this to make manual mapfile editing (like changing whether a cone is left or right) much easier and mapfiles less prone to error in general (note: requires small change to Map.py)
+removed coneConnecterPresent, pathFinderPresent, pathPlanningPresent and SLAMPresent from all code, because those are assumed to always be true
+small fixes drawDriverless and pygameUI and generalUI, but large changes (phasing out phantomMap???) are TBD
+added 'applyUpdate' to simulatedCar.update() function and changed what it returns (from True to the posDiff, angle)
+made simulatedLidar.py (which involved adding a .simulationVariables to the Map class)
+fixed simulatedLidar.py (because i messed up the un-drifted positions a bunch, and it's possible that lidarBlobsProcSimulated did as well...)
+
+next up: fix cone.slamData (that shit deserves a struct class)
+undetected cones from mapfile to (simulation only!) location
+pickle file map loading?
+automation (automatic first lap track construction)
+
+improved hardcoded auto-driving?
+improved UI for making maps?

@@ -23,7 +23,7 @@ def mapObjectToFile(mapToSave):
                              'Conn_B' : [(cone.connections[1].ID if (len(cone.connections)>1) else None) for cone in combinedConeList]})
     return(map_file)
 
-def mapFileToObject(map_file):
+def mapFileToObject(map_file, coneConnecterPresent=True):
     """convert pandas dataframe (map_file) to Map object"""
     mapObj = Map()
     if("ConeID" in map_file.columns): #storing the ConeID in the mapfile makes manual mapfile editing a lot easier and maploading in general less error-prone
@@ -36,6 +36,7 @@ def mapFileToObject(map_file):
             else:
                 print("maploader failed to add a cone:", coneToCovert['ConeID'], coneInList)
         ## now that all the cones are imported, their connections can be established
+        print("mapFileToObject debug:", )
         for i in range(len(connectionList)): # for every cone that has been loaded in
             LorRconeList = (mapObj.right_cone_list if connectionList[i][0].LorR else mapObj.left_cone_list) # alternatively, you could use a combinedConeList
             for connectedConeID in connectionList[i][1::]:
@@ -54,16 +55,17 @@ def mapFileToObject(map_file):
                 if(not np.isnan(coneIndex)):
                     combinedConeList[row].connections.append(combinedConeList[GF.findIndexByClassAttr(combinedConeList, 'ID', int(coneIndex))])
     
-    try:
-        import coneConnecting as CC
-        combinedConeList = mapObj.left_cone_list + mapObj.right_cone_list
-        for cone in combinedConeList:
-            for connectedCone in cone.connections:
-                dist, angle = GF.distAngleBetwPos(cone.position, connectedCone.position)
-                cone.coneConData.append(CC.coneConnection(angle, dist, -1.0))
-                #connectedCone.coneConData.append(CC.coneConnection(GF.radInv(angle), dist, -1.0)) #don't do this, becuase you'll do it double
-    except Exception as excep:
-        print("couldn't rebuild coneConData for connected cones, exception:", excep)
+    if(coneConnecterPresent):
+        try:
+            import coneConnecting as CC
+            combinedConeList = mapObj.left_cone_list + mapObj.right_cone_list
+            for cone in combinedConeList:
+                for connectedCone in cone.connections:
+                    dist, angle = GF.distAngleBetwPos(cone.position, connectedCone.position)
+                    cone.coneConData.append(CC.coneConnection(angle, dist, -1.0))
+                    #connectedCone.coneConData.append(CC.coneConnection(GF.radInv(angle), dist, -1.0)) #don't do this, becuase you'll do it double
+        except Exception as excep:
+            print("couldn't rebuild coneConData for connected cones, exception:", excep)
     return(mapObj)
 
 def generateFilename():
@@ -96,8 +98,9 @@ def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
         whereToLoad.finish_line_cones = returnMap.finish_line_cones
         #whereToLoad.clockSet(whereToLoad.clock) #a terrible hack that can be removed once the clock system is reworked
         try:
-            import pathPlanningTemp as PP
-            PP.makeBoundrySplines(whereToLoad)
+            if(whereToLoad.pathPlanningPresent):
+                import pathPlanningTemp as PP
+                PP.makeBoundrySplines(whereToLoad)
         except Exception as excep:
             print("couldn't makeBoundrySplines after loading map into", whereToLoad, ", exception:", excep)
     # try:
@@ -136,8 +139,8 @@ class mapLoader:
         return(mapObjectToFile(mapToSave))
     
     @staticmethod
-    def mapFileToObject(map_file):
-        return(mapFileToObject(map_file))
+    def mapFileToObject(map_file, coneConnecterPresent=True):
+        return(mapFileToObject(map_file, coneConnecterPresent))
     
     @staticmethod
     def generateFilename():

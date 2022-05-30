@@ -1,0 +1,1 @@
+#connection with the car's main ESP32 (handles throttle and steering)

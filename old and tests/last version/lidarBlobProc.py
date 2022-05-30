@@ -5,7 +5,7 @@
 ## it should(?) be possible to run the position update function with negative time, to better account for the delays in the communication pipeline(s) (both the serial connection from the lidar, and blobifying take time)
 ## the code would look something like 'lidarPos = intermitUpdate(dTime=(time_since_last_real_update - lidarCommDelayConstant))'
 
-RANGE_LIMIT = 1600 #lidar range limit in mm (blobs that partly exceed the limit will be cut off, so be careful
+RANGE_LIMIT = 1500 #lidar range limit in mm (blobs that partly exceed the limit will be cut off, so be careful
 PACKET_DELAY = 0.0 # time it takes for a packet to get be received and processed (used to get the exact position at the time the measurement (packet) was made)
 
 import camsense_X1 as CX

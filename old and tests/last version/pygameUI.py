@@ -91,9 +91,10 @@ def handleMousePress(pygameDrawerInput, phantomMap, buttonDown, button, pos, eve
                         # phantomMap._logDelete_((('right_cone_list' if overlappingCone.LorR else 'left_cone_list', coneListIndex),))
                     else:
                         pygameDrawerInput.mapToDraw.removeConeObj(overlappingCone)
-            import pathPlanningTemp as PP
-            PP.makeBoundrySplines(pygameDrawerInput.mapToDraw)
-            #TBD: phantomMap
+            if(pygameDrawerInput.mapToDraw.pathPlanningPresent):
+                import pathPlanningTemp as PP
+                PP.makeBoundrySplines(pygameDrawerInput.mapToDraw)
+                #TBD: phantomMap
         else:
             if((len(pygameDrawerInput.mapToDraw.finish_line_cones) < 2) if pygame.key.get_pressed()[pygame.K_f] else True):
                 posToPlace = pygameDrawerInput.pixelsToRealPos(pos)
@@ -111,7 +112,7 @@ def handleMousePress(pygameDrawerInput, phantomMap, buttonDown, button, pos, eve
                                 # phantomMap._put_((('finish_line_cones', len(pygameDrawerInput.mapToDraw.finish_line_cones)),), overlappingCone)
                         else:
                             print("can't set (existing) cone as finish, there's aready a "+("right" if leftOrRight else "left")+"-sided finish cone")
-                    else:
+                    elif(pygameDrawerInput.mapToDraw.coneConnecterPresent or pygameDrawerInput.isRemote):
                         import coneConnecting as CC
                         connectSuccess, winningCone = CC.connectCone(pygameDrawerInput.mapToDraw, overlappingCone)
                         #if(connectSuccess): #this check is only to avoid needless overhead on the master thread. If the (exact same) function says the cone can't connect here, there's no reason to try over on the master
@@ -142,7 +143,7 @@ def handleMousePress(pygameDrawerInput, phantomMap, buttonDown, button, pos, eve
                         conePlaceSuccess, coneInList = pygameDrawerInput.mapToDraw.addCone(posToPlace, leftOrRight, bool(pygame.key.get_pressed()[pygame.K_f]))
                         if(conePlaceSuccess):
                             connectSuccess=False; winningCone=None #init vars
-                            if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
+                            if(pygame.key.get_pressed()[pygame.K_LSHIFT] and pygameDrawerInput.mapToDraw.coneConnecterPresent):
                                 import coneConnecting as CC
                                 connectSuccess, winningCone = CC.connectCone(pygameDrawerInput.mapToDraw, coneInList)
                             if(phantomMap):
@@ -164,9 +165,10 @@ def handleMousePress(pygameDrawerInput, phantomMap, buttonDown, button, pos, eve
                                 #     # phantomMap._put_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('coneConData',len(winningCone.coneConData)-1)), winningCone.coneConData[-1]) #overwrite only connection data
                                 #     phantomMap._append_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('connections', )), winningCone.connections) #overwrite only connection data
                                 #     phantomMap._append_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('coneConData', )), winningCone.coneConData) #overwrite only connection data
-                import pathPlanningTemp as PP
-                PP.makeBoundrySplines(pygameDrawerInput.mapToDraw)
-                #TBD: phantomMap?
+                if(pygameDrawerInput.mapToDraw.pathPlanningPresent):
+                    import pathPlanningTemp as PP
+                    PP.makeBoundrySplines(pygameDrawerInput.mapToDraw)
+                    #TBD: phantomMap?
         if(pygame.key.get_pressed()[pygame.K_f]): #flag cursor stuff
             pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3]) #smaller flag cursor
     elif(button==2): #middle mouse button
@@ -211,17 +213,18 @@ def handleKeyPress(pygameDrawerInput, phantomMap, keyDown, key, eventToHandle):
         if(key==pygame.K_p): # p
             if(phantomMap):
                 phantomMap._custom_(('PATH', -1), 0)
-            else:
+            elif(pygameDrawerInput.mapToDraw.pathFinderPresent):
                 import pathFinding    as PF
                 #PF.makePath(pygameDrawerInput.mapToDraw) #find a single path point
                 limitCounter = 0
                 while(PF.makePath(pygameDrawerInput.mapToDraw) and (limitCounter<25)): #stops when path can no longer be advanced
                     limitCounter += 1
-                import pathPlanningTemp as PP
-                PP.makePathSpline(pygameDrawerInput.mapToDraw)
+                if(pygameDrawerInput.mapToDraw.pathPlanningPresent):
+                    import pathPlanningTemp as PP
+                    PP.makePathSpline(pygameDrawerInput.mapToDraw)
         elif((key==pygame.K_a) or ((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)) or (key==pygame.K_MINUS)):
             if(key==pygame.K_a): # a
-                if(pygameDrawerInput.mapToDraw.car.pathFolData is not None):
+                if((pygameDrawerInput.mapToDraw.car.pathFolData is not None) and pygameDrawerInput.mapToDraw.pathPlanningPresent):
                     pygameDrawerInput.mapToDraw.car.pathFolData.auto = not pygameDrawerInput.mapToDraw.car.pathFolData.auto
                     if(not pygameDrawerInput.isRemote):
                         pygameDrawerInput.mapToDraw.car.desired_velocity = 0.0
@@ -235,12 +238,12 @@ def handleKeyPress(pygameDrawerInput, phantomMap, keyDown, key, eventToHandle):
                     #     phantomMap._put_(('car','desired_velocity'), 0.0)
                     #     phantomMap._put_(('car','desired_steering'), 0.0)
             elif((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)): # +
-                if(pygameDrawerInput.mapToDraw.car.pathFolData is not None):
+                if((pygameDrawerInput.mapToDraw.car.pathFolData is not None) and pygameDrawerInput.mapToDraw.pathPlanningPresent):
                     pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity += 0.25
                     # if(phantomMap):
                     #     phantomMap._put_(('car','pathFolData','targetVelocity'), pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity)
             elif(key==pygame.K_MINUS): # -
-                if(pygameDrawerInput.mapToDraw.car.pathFolData is not None):
+                if((pygameDrawerInput.mapToDraw.car.pathFolData is not None) and pygameDrawerInput.mapToDraw.pathPlanningPresent):
                     pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity -= 0.25
                     if(pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity < 0):
                         pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity = 0

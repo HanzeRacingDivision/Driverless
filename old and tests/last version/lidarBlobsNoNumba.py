@@ -2,7 +2,7 @@ from Map import Map  #used to get coneDiam
 import GF.generalFunctions as GF
 import numpy as np
 
-from numba import njit
+#from numba import njit
 
 
 global blobInProgress
@@ -13,10 +13,10 @@ blobInProgress = None
 
 adjustedConeDiam = Map.Cone.coneLidarDiam
 
-maxBlobPointCount = 25 #points, not angle
+maxBlobPointCount = 12 #points, not angle
 #maxBlobAverageGapSizeSqrd = 0.075**2 #if the average distance between points is larger than this, only applied if pointCount >= maxBlobAverageGapPoints
 #maxBlobAverageGapPoints = 3 #number of points in blob required to activate maxBlobAverageGapSizeSqrd check
-maxBlobSingleGap = adjustedConeDiam * 0.75 #if the distance between the new datapoint and the last blob-point is larger than this, don't append, (make a new blob)
+maxBlobSingleGap = adjustedConeDiam * 0.5 #if the distance between the new datapoint and the last blob-point is larger than this, don't append, (make a new blob)
 ## maxBlobSingleGap must equal adjustedConeDiam, because otherwise the np.arcsin() in blobToConePos() will fail to compute.
 
 MIN_BLOB_CONE_LEN = 3 #used for blobToConePos
@@ -31,7 +31,7 @@ blobType =np.dtype([('timestamp', np.float64),
                     ('lines', np.float64, (maxBlobPointCount-1,2)), #stores [dist, angle]
                     ('pointCount', np.uint8)])
 
-@njit
+#@njit
 def blobCreate(point, origin, timestamp):
     newBlob = np.zeros(1, dtype=blobType)[0] #create a new blob object (filled with all 0's)
     newBlob['timestamp'] = timestamp
@@ -41,7 +41,7 @@ def blobCreate(point, origin, timestamp):
     newBlob['pointCount'] = 1
     return(newBlob)
 
-@njit
+#@njit
 def blobAppend(blob, point, origin, timestamp):
     """attempt to append a datapoint to the blob, return whether successful"""
     distAngle = GF.distAngleBetwPos(blob['points'][blob['pointCount']-1], point) #get gap size (and angle, while you're at it)
@@ -83,7 +83,7 @@ def blobify(point, origin, timestamp, uponExist=None, uponExistArgs=None, uponEx
         blobInProgress = blobCreate(point, origin, timestamp)
     return(makeNewBlob, blobInProgress)
 
-@njit
+#@njit
 def blobToConePos(blob): #calculate the position the cone would have over here, to save some processing time on the main thread
     if(blob['pointCount'] < MIN_BLOB_CONE_LEN):
         #print("warning: blob too few points to make into cone")
@@ -107,39 +107,39 @@ def blobToConePos(blob): #calculate the position the cone would have over here, 
         conePos = GF.distAnglePosToPos(adjustedConeDiam, GF.get_norm_angle_between(blob['origins'][0], blob['points'][0], 0.0), blob['points'][0])
         return(True, conePos)
 
-def compileAll(verbose=False):
-    ## precompile things by running them once
-    print("precompiling njit lidarBlobs...")
-    import time
-    compileStartTime = time.time()
+# def compileAll(verbose=False):
+#     ## precompile things by running them once
+#     print("precompiling njit lidarBlobs...")
+#     import time
+#     compileStartTime = time.time()
     
-    aMap = Map()
-    aPoint = np.array([10.0, 10.0], dtype=np.float64)
-    #uponExistCallback = lambda blob, extraArgs : print(blobToConePos(blob), extraArgs)
-    blobify(aPoint, aMap.car.position, aMap.clock()) #runs blobCreate
-    aPoint[0] += 0.025;  aPoint[1] -= 0.045;
-    blobToConePos(blobify(aPoint, aMap.car.position, aMap.clock())[1])  #runs blobAppend and then blobToConePos
-    del(aMap);   global blobInProgress; blobInProgress = None
-    print("lidarBlobs njit compilation done! (took", round(time.time()-compileStartTime,1), "seconds)")
-    if(verbose):
-        def inspect(compiledFunction):
-            print(compiledFunction.__name__, compiledFunction.signatures, type(compiledFunction.signatures[0][0]))
-            compiledFunction.inspect_types(file)
-        ## verbose output of njit functions (to file)
-        print("verbose output of generalFunctions njit compilation:")
-        file = open("lidarBlobs njit verbose output.txt", "w+")
-        inspect(blobCreate)
-        inspect(blobAppend)
-        inspect(blobToConePos)
-        file.close()
+#     aMap = Map()
+#     aPoint = np.array([10.0, 10.0], dtype=np.float64)
+#     #uponExistCallback = lambda blob, extraArgs : print(blobToConePos(blob), extraArgs)
+#     blobify(aPoint, aMap.car.position, aMap.clock()) #runs blobCreate
+#     aPoint[0] += 0.025;  aPoint[1] -= 0.045;
+#     blobToConePos(blobify(aPoint, aMap.car.position, aMap.clock())[1])  #runs blobAppend and then blobToConePos
+#     del(aMap);   global blobInProgress; blobInProgress = None
+#     print("lidarBlobs njit compilation done! (took", round(time.time()-compileStartTime,1), "seconds)")
+#     if(verbose):
+#         def inspect(compiledFunction):
+#             print(compiledFunction.__name__, compiledFunction.signatures, type(compiledFunction.signatures[0][0]))
+#             compiledFunction.inspect_types(file)
+#         ## verbose output of njit functions (to file)
+#         print("verbose output of generalFunctions njit compilation:")
+#         file = open("lidarBlobs njit verbose output.txt", "w+")
+#         inspect(blobCreate)
+#         inspect(blobAppend)
+#         inspect(blobToConePos)
+#         file.close()
 
-try:
-    compileAll()
-except:
-    print("precompiling njit lidarBlobs failed (is generalFunctions not compiled?)")
-    print("falling back to lidarBlobsNoNumba")
-    del(blobCreate);  del(blobAppend);  del(blobToConePos);  del(compileAll)
-    from lidarBlobsNoNumba import *
+# try:
+#     compileAll()
+# except:
+#     print("precompiling njit lidarBlobs failed (is generalFunctions not compiled?)")
+#     print("falling back to lidarBlobsNoNumba")
+#     del(blobCreate);  del(blobAppend);  del(blobToConePos);  del(compileAll)
+#     from lidarBlobsNoNumba import *
 
 
 #if __name__ == "__main__":

@@ -1,0 +1,1 @@
+updated mapfile format to include ConeID column. map_loader.py was of course updated to accept both the new AND the previous types of mapfile, so all old ones should still work. I did this to make manual mapfile editing (like changing whether a cone is left or right) much easier and mapfiles less prone to error in general (note: requires small change to Map.py)

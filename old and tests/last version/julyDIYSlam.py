@@ -32,7 +32,7 @@ simulatePositionalDrift = True
 makeConesAfterMapload = False #whether to completely rely on the loaded map, or to allow for new cone detection
 ## TBD: stop cone creation after a drag-drop mapload (currently only cmdline argumented mapfiles stop cone creation)
 makeConesOnlyFirstLap = True #only works if pathPlanningPresent
-delaySLAMuntillDriving = True
+delaySLAMuntillDriving = False
 
 useRemote = False
 useDrawer = True

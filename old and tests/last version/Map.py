@@ -23,7 +23,11 @@ class Map:
         
         self.pathFolData = None #holds variables for pathPlanning (e.g. spline data), as pathPlannerMapData object
         
-        self.simulationVariables = None # holds simulatedLidar variables (and/or other: ...)
+        #(safe) defaults
+        self.coneConnecterPresent = False
+        self.pathFinderPresent = False
+        self.pathPlanningPresent = False
+        self.SLAMPresent = False
     
     def __repr__(self): #print map objects in a legible fashion
         return("Map(typ="+(self.__class__.__name__)+",LEFT:"+str(len(self.left_cone_list))+",RIGHT:"+str(len(self.right_cone_list))+",FINISH:"+str(len(self.finish_line_cones))+",TARGETS:"+str(len(self.target_list))+(",TARG_FULL_CIRC,"if self.targets_full_circle else ",")+str(self.car)+")")
@@ -34,8 +38,7 @@ class Map:
         wheelbase = 0.25 #meters
         chassis_length = 0.37 #meters
         chassis_width = 0.20 #meters
-        chassis_length_offset = 0.03 #(meters) car center + this = chassis center (mostly used for drawing)
-        lidarOffsets = (np.array([0.0, 0.0]), ) # the position of the lidar(s), as ((forward offset, perpendicular offset), for all lidars) from the car position (not chassis center)
+        chassis_length_offset = 0.03 #(meters) car center + this = chassis center
         maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept serial commands outside this range)
         
         def __init__(self):
@@ -71,9 +74,6 @@ class Map:
         
         def getChassisCenterPos(self):
             return(GF.distAnglePosToPos(float((self.wheelbase/2) + self.chassis_length_offset), float(self.angle), np.array(self.position)))
-
-        # def getLidarPos(self, lidarIndex, interpolation=False): #  ARC_TODO move function from simulateLidar to here?
-        #     return()
         
         #def update() was moved to simCar and realCar, because it should be replaced by SLAM (and/or only used as a quick update between (slower) SLAM updates
         

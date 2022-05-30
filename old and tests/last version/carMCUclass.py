@@ -350,6 +350,7 @@ class carMCUserial:
                 if(self.carMCUserial.is_open):
                     #convert floats to string ('\r' is not really needed)
                     dataString = ('{:.2f}'.format(round(float(speed), 2))) + ' ' + ('{:.1f}'.format(round(np.rad2deg(float(angle)), 1))) + '\n'
+                    #print("sending to car:", dataString)
                     #NOTE: the (current) serial formatting uses angles in degrees (for more precision per char (unless you start multiplying&dividing by powers of 10))
                     #print("sending:",dataString.encode())
                     try:

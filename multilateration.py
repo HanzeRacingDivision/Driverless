@@ -158,9 +158,11 @@ def secant(func, absErrorThresh, maxItt, lastOutput, lastInput, nextInput, itt=0
         return(nextInput)
     nextOutput = func(nextInput)
     if(absErrorThresh < abs(nextOutput)):
-        a = (nextOutput - lastOutput) / (nextInput - lastInput)
+        #if((nextInput - lastInput) != 0.0) #avoid divide by 0
+        a = (nextOutput - lastOutput) / (nextInput - lastInput) #the secant is dead-simple
+        #if(a != 0.0) #avoid divide by 0
         b = nextOutput - (a * nextInput)
-        zeroInput = -b / a
+        zeroInput = -b / a   #func(zeroInput) should be closer to 0 
         #zeroOutput = func(zeroInput)
         return(secant(func, absErrorThresh, maxItt, nextOutput, nextInput, zeroInput, itt + 1))
     else:
