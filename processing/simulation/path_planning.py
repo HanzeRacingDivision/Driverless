@@ -196,7 +196,7 @@ class PathPlanning:
 
             dist = self.targets.closest_target.dist_car
             alpha = self.targets.closest_target.alpha
-            midpoint_steering_angle = (self.car.max_steering * 2 / np.pi) * np.arctan(alpha / dist * self.car.turning_sharpness)
+            midpoint_steering_angle = (self.car.max_steering * 2 / np.pi) * np.arctan(alpha / dist ** self.car.turning_sharpness)
         else:
             midpoint_steering_angle = 0
 
