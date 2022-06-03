@@ -1,12 +1,6 @@
-import os
-import pygame
-from math import sin, radians, degrees, copysign
 from pygame.math import Vector2
-import time
 import numpy as np
-from PIL import Image, ImageDraw
 from scipy.interpolate import splprep, splev
-import pandas as pd
 
 
 def compute_boundaries(car,
@@ -26,10 +20,10 @@ def compute_boundaries(car,
                        first_visible_left_cone,
                        first_visible_right_cone):
     
-    #cubic splines for left track boundaries
-    if len(visible_left_cones) > 1 and car.auto == True and new_visible_left_cone_flag == True:
-      
-        if first_left_cone_found == False:
+    # cubic splines for left track boundaries
+    if len(visible_left_cones) > 1 and car.auto and new_visible_left_cone_flag:
+
+        if not first_left_cone_found:
             first_visible_left_cone = visible_left_cones[0]
             first_left_cone_found = True
         
@@ -53,17 +47,17 @@ def compute_boundaries(car,
             x.append(x[0])
             y.append(y[0])
             left_spline_linked = True
-            
+
         tck, u = splprep([x,y], s=0, k = K)
-        unew = np.arange(0, 1.01, 0.25/(len(visible_left_cones)**1.2)) #more cones  = less final var
+        unew = np.arange(0, 1.01, 0.25/(len(visible_left_cones)**1.2))  # more cones = less final var
         left_spline = splev(unew, tck)
         
     
-    #cubic splines for right track boundaries
+    # cubic splines for right track boundaries
     
     if len(visible_right_cones) > 1 and car.auto == True and new_visible_right_cone_flag == True:
         
-        if first_right_cone_found == False:
+        if not first_right_cone_found:
             first_visible_right_cone = visible_right_cones[0]
             first_right_cone_found = True
             
@@ -88,19 +82,13 @@ def compute_boundaries(car,
             x.append(x[0])
             y.append(y[0])
             right_spline_linked = True
-            
-        tck, u = splprep([x,y], s=0, k = K)
-        unew = np.arange(0, 1.01, 0.25/(len(visible_right_cones)**1.2)) #more cones  = less final var
+
+        tck, u = splprep([x,y], s=0, k=K)
+        unew = np.arange(0, 1.01, 0.25/(len(visible_right_cones)**1.2))  # more cones  = less final var
         right_spline = splev(unew, tck)
         
-    return left_spline, \
-           right_spline, \
-           first_left_cone_found, \
-           left_spline_linked, \
-           first_right_cone_found, \
-           right_spline_linked, \
-           first_visible_left_cone, \
-           first_visible_right_cone
+    return left_spline, right_spline, first_left_cone_found, left_spline_linked, first_right_cone_found,\
+        right_spline_linked, first_visible_left_cone, first_visible_right_cone
     
     
 def generate_midpoint_path(car,
@@ -117,34 +105,34 @@ def generate_midpoint_path(car,
 
     # auto generate path based on splines/cones
     
-    if (len(visible_left_cones) > 1 
-    and len(visible_right_cones) > 1 
-    and (new_visible_right_cone_flag == True or new_visible_left_cone_flag == True)): #track_number == 0 and
-      
-        path_midpoints_x = []#[car.position.x]
-        path_midpoints_y = []#[car.position.y]
+    if (len(visible_left_cones) > 1 and len(visible_right_cones) > 1
+            and (new_visible_right_cone_flag or new_visible_left_cone_flag)):  # track_number == 0 and
+
+        path_midpoints_x = []  # [car.position.x]
+        path_midpoints_y = []  # [car.position.y]
         
         for left_cone in visible_left_cones:
             for right_cone in visible_right_cones:
-                if np.linalg.norm((left_cone.true_position.x - right_cone.true_position.x, left_cone.true_position.y - right_cone.true_position.y)) < 4:
+                if np.linalg.norm((left_cone.true_position.x - right_cone.true_position.x,
+                                   left_cone.true_position.y - right_cone.true_position.y)) < 4:
                     path_midpoints_x.append(np.mean([left_cone.true_position.x, right_cone.true_position.x]))
                     path_midpoints_y.append(np.mean([left_cone.true_position.y, right_cone.true_position.y]))
                     
-        path_midpoints = [path_midpoints_x,path_midpoints_y]
+        path_midpoints = [path_midpoints_x, path_midpoints_y]
         
         path_midpoints_visible_x = []  
         path_midpoints_visible_y = []      
         path_to_sort = []
         
-        #find all 'visible' midpoints - this may be inefficient
+        # find all 'visible' midpoints - this may be inefficient
         for i in range(len(path_midpoints[0])):
-          #  print(i)
+            # print(i)
             dist_car = np.linalg.norm(Vector2(path_midpoints[0][i],path_midpoints[1][i]) - car.true_position)
     
-            #calculating angle between car angle and midpoint
+            # calculating angle between car angle and midpoint
             if dist_car < car.fov/ppu:
                 
-                a_b = Vector2(path_midpoints[0][i],path_midpoints[1][i])-car.true_position
+                a_b = Vector2(path_midpoints[0][i],path_midpoints[1][i]) - car.true_position
                 a_b = np.transpose(np.matrix([a_b.x,-1*a_b.y ]))
                 
                 rotate = np.matrix([[np.cos(-car_angle*np.pi/180),-1*np.sin(-car_angle*np.pi/180)],
@@ -159,44 +147,42 @@ def generate_midpoint_path(car,
                 alpha = beta + 90*(b/np.abs(b))*np.abs((a/np.abs(a)) - 1)
                 alpha = alpha[0,0]
                 
-                #if target within car fov, set to visible
+                # if target within car fov, set to visible
                 if np.abs(alpha) < car.fov_range:
                     path_to_sort.append([dist_car, path_midpoints[0][i], path_midpoints[1][i]])
                     
-        #ordering the path_midpoints by distance from car            
+        # ordering the path_midpoints by distance from car
         path_to_sort.sort()
         if len(path_to_sort) > 1:
             for i in range(len(path_to_sort)):
-                #if statement making sure we have no duplicate co-ordinates
+                # if statement making sure we have no duplicate co-ordinates
                 if path_to_sort[i][1] in path_midpoints_visible_x or path_to_sort[i][2] in path_midpoints_visible_y:
                     pass
                 else:
                     path_midpoints_visible_x.append(path_to_sort[i][1])
                     path_midpoints_visible_y.append(path_to_sort[i][2])
-                    
-                    
-                    
+
         path_midpoints_visible = [path_midpoints_visible_x, path_midpoints_visible_y]
-       # path_midpoints_visible.sort()
+        # path_midpoints_visible.sort()
         path_midpoints = path_midpoints_visible            
         
         if len(path_midpoints[0]) == 1:
             path_midpoints = [[car.true_position.x , path_midpoints[0][0]], [car.true_position.y, path_midpoints[1][0]]]
             
             tck, u = splprep(path_midpoints, s=1, k = 1)
-            unew = np.arange(0, 1.01, 0.5/(len(visible_left_cones)**0.4)) #more cones  = less final var
+            unew = np.arange(0, 1.01, 0.5/(len(visible_left_cones)**0.4))  # more cones  = less final var
             path_midpoints_spline = splev(unew, tck)
             
         elif len(path_midpoints[0]) == 2:
             tck, u = splprep(path_midpoints, s=1, k = 1)
-            unew = np.arange(0, 1.01, 0.5/(len(visible_left_cones)**0.4)) #more cones  = less final var
+            unew = np.arange(0, 1.01, 0.5/(len(visible_left_cones)**0.4))  # more cones  = less final var
             path_midpoints_spline = splev(unew, tck)
             
         elif len(path_midpoints[0]) > 2:
             tck, u = splprep(path_midpoints, s=1, k = 2)
-            unew = np.arange(0, 1.01, 0.5/(len(visible_left_cones)**0.4)) #more cones  = less final var
+            unew = np.arange(0, 1.01, 0.5/(len(visible_left_cones)**0.4))  # more cones  = less final var
             path_midpoints_spline = splev(unew, tck)
-            
+
         else:
             path_midpoints_spline = []
             
@@ -212,7 +198,7 @@ def generate_midpoint_path(car,
                             make_target = False
                             break
                     
-                    if make_target == True:                        
+                    if make_target:
                         new_target = Target(new_target_loc[0], new_target_loc[1])
                         targets.append(new_target)
                         non_passed_targets.append(new_target)

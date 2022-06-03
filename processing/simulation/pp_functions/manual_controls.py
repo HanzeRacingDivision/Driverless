@@ -1,17 +1,13 @@
 import pygame
-from math import sin, radians, degrees, copysign
-from pygame.math import Vector2
-import time
-import numpy as np
-from PIL import Image, ImageDraw
-from scipy.interpolate import splprep, splev
-import pandas as pd
+from math import copysign
+
+from cone import *
+import pp_functions.utils
 
 import os
 import sys
+
 sys.path.append(os.path.abspath(os.path.join('..', '')))
-from cone import *
-import pp_functions.utils
 
 
 def enable_dragging_screen(pp, events):
@@ -32,6 +28,31 @@ def enable_dragging_screen(pp, events):
             pp.prev_view_offset[0] = pp.view_offset[0]
             pp.prev_view_offset[1] = pp.view_offset[1]
             pp.moving_view_offset = False
+
+
+def reset_pp_variables(pp):
+    pp.targets.targets = []
+    pp.targets.non_passed_targets = []
+    pp.cones.list[Side.LEFT] = []
+    pp.cones.list[Side.RIGHT] = []
+    pp.cones.visible[Side.LEFT] = []
+    pp.cones.visible[Side.RIGHT] = []
+    pp.cones.in_fov[Side.LEFT] = []
+    pp.cones.in_fov[Side.RIGHT] = []
+    pp.path.splines[Side.LEFT] = []
+    pp.path.splines[Side.RIGHT] = []
+    pp.path.spline_linked[Side.RIGHT] = False
+    pp.path.spline_linked[Side.LEFT] = False
+    pp.mouse_pos_list = []
+    pp.path.splines[Side.LEFT] = 0
+    pp.path.splines[Side.RIGHT] = 0
+    pp.cones.first_visible_cone[Side.LEFT] = 0
+    pp.cones.first_visible_cone[Side.RIGHT] = 0
+    pp.cones.first_cone_found[Side.RIGHT] = False
+    pp.cones.first_cone_found[Side.LEFT] = False
+    pp.track_number_changed = False
+    pp.car.crashed = False
+    pp.total_reward = 0
 
 
 # User input
@@ -94,28 +115,7 @@ def user_input(pp, events, dt):
     # if CTRL + c then clear screen
     if pressed[pygame.K_LCTRL] and pressed[pygame.K_c]:
         # resetting most vars
-        pp.targets.targets = []
-        pp.targets.non_passed_targets = []
-        pp.cones.list[Side.LEFT] = []
-        pp.cones.list[Side.RIGHT] = []
-        pp.cones.visible[Side.LEFT] = []
-        pp.cones.visible[Side.RIGHT] = []
-        pp.cones.in_fov[Side.LEFT] = []
-        pp.cones.in_fov[Side.RIGHT] = []
-        pp.path.splines[Side.LEFT] = []
-        pp.path.splines[Side.RIGHT] = []
-        pp.path.spline_linked[Side.RIGHT] == False
-        pp.path.spline_linked[Side.LEFT] == False
-        pp.mouse_pos_list = []
-        pp.path.splines[Side.LEFT] = 0
-        pp.path.splines[Side.RIGHT] = 0
-        pp.cones.first_visible_cone[Side.LEFT] = 0
-        pp.cones.first_visible_cone[Side.RIGHT] = 0
-        pp.cones.first_cone_found[Side.RIGHT] = False
-        pp.cones.first_cone_found[Side.LEFT] = False
-        pp.track_number_changed = False
-        pp.car.crashed = False
-        pp.total_reward = 0
+        reset_pp_variables(pp)
 
     for event in events:
         # if 2 is pressed, increasing cruising speed
@@ -146,28 +146,7 @@ def user_input(pp, events, dt):
         # if D then load map
         if pressed[pygame.K_d]:
             # resetting most vars before loading
-            pp.targets.targets = []
-            pp.targets.non_passed_targets = []
-            pp.cones.list[Side.LEFT] = []
-            pp.cones.list[Side.RIGHT] = []
-            pp.cones.visible[Side.LEFT] = []
-            pp.cones.visible[Side.RIGHT] = []
-            pp.cones.in_fov[Side.LEFT] = []
-            pp.cones.in_fov[Side.RIGHT] = []
-            pp.path.splines[Side.LEFT] = []
-            pp.path.splines[Side.RIGHT] = []
-            pp.path.spline_linked[Side.RIGHT] == False
-            pp.path.spline_linked[Side.LEFT] == False
-            pp.mouse_pos_list = []
-            pp.path.splines[Side.LEFT] = 0
-            pp.path.splines[Side.RIGHT] = 0
-            pp.cones.first_visible_cone[Side.LEFT] = 0
-            pp.cones.first_visible_cone[Side.RIGHT] = 0
-            pp.cones.first_cone_found[Side.RIGHT] = False
-            pp.cones.first_cone_found[Side.LEFT] = False
-            pp.track_number_changed = False
-            pp.car.crashed = False
-            pp.total_reward = 0
+            reset_pp_variables(pp)
 
             pp.cones.list[Side.LEFT], pp.cones.list[Side.RIGHT], pp.mouse_pos_list = pp_functions.utils.load_map(
                 pp.mouse_pos_list, pp.ppu)
@@ -177,22 +156,7 @@ def user_input(pp, events, dt):
             pp_functions.utils.save_map(pp.cones.list[Side.LEFT], pp.cones.list[Side.RIGHT])
 
     # dragging screen using left mouse button
-    for event in events:
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 or pp.moving_view_offset:
-            if not pp.moving_view_offset:
-                pp.moving_view_offset = True
-                pp.view_offset_mouse_pos_start = pygame.mouse.get_pos()
-            mouse_pos = pygame.mouse.get_pos()
-            mouseDelta = [float(mouse_pos[0] - pp.view_offset_mouse_pos_start[0]),
-                          float(mouse_pos[1] - pp.view_offset_mouse_pos_start[1])]
-            pp.view_offset[0] = pp.prev_view_offset[0] + mouseDelta[0]
-            pp.view_offset[1] = pp.prev_view_offset[1] + mouseDelta[1]
-
-    for event in events:
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            pp.prev_view_offset[0] = pp.view_offset[0]
-            pp.prev_view_offset[1] = pp.view_offset[1]
-            pp.moving_view_offset = False
+    enable_dragging_screen(pp, events)
 
     # if CTRL + Z pressed then undo last left and right cone
     if not pp.undo_done and pressed[pygame.K_LCTRL] and pressed[pygame.K_z]:

@@ -1,12 +1,6 @@
-import gym
-import numpy as np
-import time
 import pygame
-import pp_functions
-from pp_functions.reward_function import calculate_reward
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3 import PPO, A2C, DQN
-from stable_baselines3.common.evaluation import evaluate_policy
 
 from CarEnv import CarEnv
 
@@ -26,7 +20,9 @@ if __name__ == "__main__":
         model = A2C.load(f"{models_dir}/car_model_{time_steps}") 
     elif model_name == 'DQN' or model_name == 'DQN-cont':
         model = DQN.load(f"{models_dir}/car_model_{time_steps}")
-        
+    else:
+        raise ValueError(f"{model_name} not recognized as valid model name")
+
     episodes = 1
 
     for i in range(episodes):

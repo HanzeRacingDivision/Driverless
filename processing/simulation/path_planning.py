@@ -1,17 +1,15 @@
 import os
 import pygame
 import time
-import random
-import numpy as np
 
 from car import Car
 from cone import *
 from target import *
 from slam import *
 
+import pp_functions
 import pp_functions.manual_controls
 import pp_functions.drawing
-from pp_functions.reward_function import calculate_reward
 
 
 class PathPlanning:
@@ -116,15 +114,15 @@ class PathPlanning:
 
             # Incrementing lap number by 1
             elif (np.linalg.norm(
-                    Vector2(self.path.start_midpoint_x, self.path.start_midpoint_y) - self.car.true_position) < 20 / self.ppu
+                    Vector2(self.path.start_midpoint_x,
+                            self.path.start_midpoint_y) - self.car.true_position) < 20 / self.ppu
                   and not self.track_number_changed and self.track):
                 self.track_number += 1
-                lap_reward = True
                 self.track_number_changed = True
 
             # Setting track_number_changed to false when not on finishing line
-            elif (np.linalg.norm(
-                    (self.path.start_midpoint_x, self.path.start_midpoint_y) - self.car.true_position) > 20 / self.ppu
+            elif (np.linalg.norm((self.path.start_midpoint_x - self.car.true_position[0],
+                                  self.path.start_midpoint_y - self.car.true_position[1])) > 20 / self.ppu
                   and self.track):
                 self.track_number_changed = False
 
@@ -189,14 +187,15 @@ class PathPlanning:
 
     def midpoint_steering_angle(self):
         if (len(self.targets.visible_targets) > 0
-                and np.linalg.norm(self.targets.closest_target.position - self.car.position) < self.car.fov / self.ppu
-                and np.linalg.norm(self.targets.closest_target.position - self.car.position) > 20 / self.ppu
+                and self.car.fov / self.ppu > np.linalg.norm(
+                    self.targets.closest_target.position - self.car.position) > 20 / self.ppu
                 and self.car.auto == True
                 and self.targets.closest_target.passed == False):
 
             dist = self.targets.closest_target.dist_car
             alpha = self.targets.closest_target.alpha
-            midpoint_steering_angle = (self.car.max_steering * 2 / np.pi) * np.arctan(alpha / dist ** self.car.turning_sharpness)
+            midpoint_steering_angle = (self.car.max_steering * 2 / np.pi) * np.arctan(
+                alpha / dist ** self.car.turning_sharpness)
         else:
             midpoint_steering_angle = 0
 
