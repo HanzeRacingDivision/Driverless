@@ -15,9 +15,13 @@ import pp_functions.drawing
 class PathPlanning:
     def __init__(self, slam_active):
         self.targets = Targets()
-        self.car = Car(7, 10)
+        self.car = Car(7, 10, noise=1e-3)
         self.cones = Cones()
         self.path = Path()
+        self.slam = Slam(self.car, matrix_size=120, noise=1e-3)
+        self.slam_active = slam_active
+
+
         self.LEVEL_ID = 'None'
         self.initialize_images()
         self.initialize_map()  # comment this if you want to start with blank sheet map
@@ -57,10 +61,6 @@ class PathPlanning:
 
         self.episode_num = None
         self.num_steps = 0
-
-        # SLAM variables
-        self.slam = Slam(250, self.car)
-        self.slam_active = slam_active
 
     def initialize_images(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -229,6 +229,8 @@ class PathPlanning:
 
         time_start = time.time()
 
+        time_prev = time.time()
+
         while not self.exit and not self.done:
 
             self.num_steps += 1
@@ -249,6 +251,7 @@ class PathPlanning:
 
             # Defining the time running since simulation started
             self.time_running = time.time() - time_start
+            
             self.episode_time_running = self.time_running  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
             # redefining the car angle so that it is in (-180,180)
@@ -265,7 +268,7 @@ class PathPlanning:
                 self.slam.update_slam_vars(self.cones.visible[Side.LEFT], self.cones.visible[Side.RIGHT], self.car)
                 self.slam.EKF_predict(dt)
                 if self.num_steps % self.slam.frame_limit == 0 or self.num_steps < 5:
-                    self.slam.EKF_update(self.car, self.cones.list)
+                    self.slam.EKF_update(self.car, self.cones.visible)
 
                     # calculate closest target
                     self.targets.update_closest_target()
