@@ -18,15 +18,13 @@ class CarEnv(gym.Env):
 
         self.episode_num = 0
 
-        self.clock = pygame.time.Clock()
-
         self.num_steps = 0
         
         self.pp = PathPlanning(False)
 
         self.LEVEL_ID = self.pp.LEVEL_ID
 
-        self.episode_time_start = time.time()
+        self.episode_time_start = self.pp.clock.get_time_running()
         self.episode_time_running = 0
         self.total_reward = 0
 
@@ -50,7 +48,7 @@ class CarEnv(gym.Env):
         return [car_steering_angle, car_curr_velocity]
 
     def render(self, mode=None):
-        dt = self.clock.get_time() / 500
+        dt = self.pp.clock.get_dt()
         pp_functions.drawing.render(self.pp, dt)
         
     def step(self, action):
@@ -74,15 +72,15 @@ class CarEnv(gym.Env):
             elif action == 1:
                 self.pp.car.steering_angle = 0.5 * -1 * self.pp.car.max_steering
             elif action == 2:
-                self.pp.car.steering_angle = 1  * self.pp.car.max_steering
+                self.pp.car.steering_angle = 1 * self.pp.car.max_steering
             elif action == 3:
                 self.pp.car.steering_angle = 1 * -1 * self.pp.car.max_steering
             elif action == 4:
                 self.pp.car.steering_angle = 0 * self.pp.car.max_steering
 
         self.pp.num_steps += 1
-
-        dt = self.pp.clock.get_time() / 500
+        self.pp.clock.update()
+        dt = self.pp.clock.get_dt()
 
         # Event queue
         events = pygame.event.get()
@@ -90,10 +88,10 @@ class CarEnv(gym.Env):
             if event.type == pygame.QUIT:
                 self.pp.exit = True
 
-        self.clock.tick(self.pp.ticks)
+        self.pp.clock.update()
         self.pp.car.velocity.x = 1
 
-        dt = self.clock.get_time() / 500
+
 
         events = pygame.event.get()
         for event in events:
@@ -101,7 +99,7 @@ class CarEnv(gym.Env):
                 self.pp.exit = True
         pp_functions.manual_controls.enable_dragging_screen(self.pp, events)
 
-        self.episode_time_running = time.time() - self.episode_time_start
+        self.episode_time_running = self.pp.clock.get_time_running() - self.episode_time_start
 
         self.pp.car.config_angle()
 
@@ -132,15 +130,12 @@ class CarEnv(gym.Env):
         if episode_end:
             self.data_logger['episode_end'].append(episode_end)
             self.pp.track_number = 1
-        #done = False
 
         reward = calculate_reward(self)
         self.pp.reward = reward # this is only for drawing purposes
         self.total_reward += reward
 
         info = {}
-
-        self.clock.tick(self.pp.ticks)
 
         return observation, reward, done, info
 
@@ -152,7 +147,7 @@ class CarEnv(gym.Env):
 
         self.episode_num += 1
         
-        self.episode_time_start = time.time()
+        self.episode_time_start = self.pp.clock.get_time_running()
 
         observation = np.zeros(self.num_obs, dtype=np.float32)
         return observation

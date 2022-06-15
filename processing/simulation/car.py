@@ -19,7 +19,7 @@ class Car:
         self.length = length
         self.max_acceleration = max_acceleration
         self.max_steering = max_steering
-        self.max_velocity = 0.5  # 5
+        self.max_velocity = 1
         self.brake_deceleration = 4
         self.free_deceleration = 1
         self.car_image = None
