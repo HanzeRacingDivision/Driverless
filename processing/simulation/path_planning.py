@@ -20,10 +20,14 @@ class PathPlanning:
         """
 
         self.targets = Targets()
-        self.car = Car(7, 10)
+        self.car = Car(7, 10, noise=1e-3)
         self.cones = Cones()
         self.path = Path()
         self.clock = Clock()
+
+        self.slam = Slam(self.car, matrix_size=120, noise=1e-3)
+        self.slam_active = slam_active
+
         self.LEVEL_ID = 'None'
         self.initialize_images()
         if not blank_map:
@@ -62,10 +66,6 @@ class PathPlanning:
 
         self.episode_num = None
         self.num_steps = 0
-
-        # SLAM variables
-        self.slam = Slam(250, self.car)
-        self.slam_active = slam_active
 
     def initialize_images(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -268,7 +268,7 @@ class PathPlanning:
                 self.slam.update_slam_vars(self.cones.visible[Side.LEFT], self.cones.visible[Side.RIGHT], self.car)
                 self.slam.EKF_predict(self.clock.get_dt())
                 if self.num_steps % self.slam.frame_limit == 0 or self.num_steps < 5:
-                    self.slam.EKF_update(self.car, self.cones.list)
+                    self.slam.EKF_update(self.car, self.cones.visible)
 
                     # calculate closest target
                     self.targets.update_closest_target()
