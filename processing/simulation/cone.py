@@ -92,7 +92,7 @@ class Cones:
                     # print('dist: ', dist)
                     # calculating angle between car angle and sample point (alpha)
                     a_b = Vector2(self.boundary_sample[category][0][i],
-                                   self.boundary_sample[category][1][i]) - pp.car.position
+                                  self.boundary_sample[category][1][i]) - pp.car.position
                     a_b = np.transpose(np.matrix([a_b.x, -1 * a_b.y]))
                     rotate = np.matrix(
                         [[np.cos(-pp.car.angle * np.pi / 180), -1 * np.sin(-pp.car.angle * np.pi / 180)],

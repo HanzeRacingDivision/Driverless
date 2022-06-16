@@ -1,4 +1,5 @@
 import random
+from typing import Union, List, Optional
 
 import gym
 import numpy as np
@@ -9,12 +10,25 @@ import pp_functions
 from pp_functions.reward_function import calculate_reward
 from stable_baselines3.common.env_checker import check_env
 
+
 class CarEnv(gym.Env):
-    def __init__(self, mode = 'cont'):
+    def __init__(self, mode: str = 'cont', noise: Optional[float] = 0.05):
+        """
+        Initiates the car environment,
+
+        @param mode: 'cont' or 'disc'; describes the observation type
+        @param noise: None or float; default = 0.05; standard deviation of normal noise distribution (mean 1),
+                      multiplied with observations to reflect real conditions better;
+                      could be extended to noise specific to each part of the observation
+        """
+
         super(CarEnv, self).__init__()
 
         self.mode = mode
-        self.num_envs = 1
+
+        if noise is None:
+            noise = 0
+        self.noise = noise
 
         self.episode_num = 0
 
@@ -30,14 +44,14 @@ class CarEnv(gym.Env):
         self.episode_time_running = 0
         self.total_reward = 0
 
-        self.data_logger = {'episode_end' : []}
+        self.data_logger = {'episode_end': []}
 
         if self.mode == "cont":
-            self.action_space = gym.spaces.Box(low = -1, high = 1, shape=(1,), dtype=np.float32)
+            self.action_space = gym.spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
         elif self.mode == "discrete":
             self.action_space = gym.spaces.Discrete(5)
 
-        self.num_obs = 2 + 5 * 2 * 2  # 2 car obs + 5 spline points * 2 (angle + dist) * 2 (left/right sides) (22)
+        self.num_obs = 2 + 5 * 2 * 2  # 2 (car obs) + 5 (spline points) * 2 (angle + dist) * 2 (left/right sides) = 22
 
         low = -1 * np.ones(self.num_obs)
         high = np.ones(self.num_obs)
@@ -49,19 +63,19 @@ class CarEnv(gym.Env):
         car_curr_velocity = self.pp.cruising_speed
         return [car_steering_angle, car_curr_velocity]
 
-    def render(self, mode=None):
+    def render(self, mode=None) -> None:
         dt = self.clock.get_time() / 500
         pp_functions.drawing.render(self.pp, dt)
-        
-    def step(self, action):
 
-        #for key in self.pp.cone.visible_cone_list.keys(): 
-            #print(len(self.pp.cone.visible_cone_list[key]))
+    def step(self, action: Union[np.ndarray, int, List[int]]):
 
-        #print(self.num_steps)
+        # for key in self.pp.cone.visible_cone_list.keys():
+        #   print(len(self.pp.cone.visible_cone_list[key]))
 
-        #print(self.pp.car.position.x, self.pp.car.position.y)
-        #print(self.episode_time_running)
+        # print(self.num_steps)
+
+        # print(self.pp.car.position.x, self.pp.car.position.y)
+        # print(self.episode_time_running)
 
         self.num_steps += 1
 
@@ -74,7 +88,7 @@ class CarEnv(gym.Env):
             elif action == 1:
                 self.pp.car.steering_angle = 0.5 * -1 * self.pp.car.max_steering
             elif action == 2:
-                self.pp.car.steering_angle = 1  * self.pp.car.max_steering
+                self.pp.car.steering_angle = 1 * self.pp.car.max_steering
             elif action == 3:
                 self.pp.car.steering_angle = 1 * -1 * self.pp.car.max_steering
             elif action == 4:
@@ -82,7 +96,7 @@ class CarEnv(gym.Env):
 
         self.pp.num_steps += 1
 
-        dt = self.pp.clock.get_time() / 500
+        # dt = self.pp.clock.get_time() / 500
 
         # Event queue
         events = pygame.event.get()
@@ -126,16 +140,16 @@ class CarEnv(gym.Env):
         self.pp.implement_main_logic(dt)
 
         # Retrieve observation
-        observation = self.pp.get_observation(self.num_obs)
+        observation = self.pp.get_observation(self.num_obs, noise_scale=self.noise)
 
         done, episode_end = self.pp.set_done(self.episode_time_running, self.episode_num, self.num_steps)
         if episode_end:
             self.data_logger['episode_end'].append(episode_end)
             self.pp.track_number = 1
-        #done = False
+        # done = False
 
         reward = calculate_reward(self)
-        self.pp.reward = reward # this is only for drawing purposes
+        self.pp.reward = reward  # this is only for drawing purposes
         self.total_reward += reward
 
         info = {}
@@ -151,7 +165,7 @@ class CarEnv(gym.Env):
         self.num_steps = 0
 
         self.episode_num += 1
-        
+
         self.episode_time_start = time.time()
 
         observation = np.zeros(self.num_obs, dtype=np.float32)
@@ -164,23 +178,28 @@ class CarEnv(gym.Env):
         self.mode = new_mode
 
         if self.mode == "cont":
-            self.action_space = gym.spaces.Box(low = -1, high = 1, shape=(1,), dtype=np.float32)
+            self.action_space = gym.spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
         elif self.mode == "discrete":
             self.action_space = gym.spaces.Discrete(5)
+
+    def set_noise(self, new_noise_level: Optional[float] = None):
+        if new_noise_level is None:
+            new_noise_level = 0
+        self.noise = new_noise_level
 
 
 if __name__ == "__main__":
     env = CarEnv()
-    observation = env.reset()
+    obs = env.reset()
     check_env(env)
-    done = False
+    d = False
 
-    while not done:
-        action = env.action_space.sample()
-        observation, reward, done, info = env.step(action)
+    while not d:
+        a: np.ndarray = env.action_space.sample()
+        obs, r, d, inf = env.step(a)
         env.render()
 
-        if done:
+        if d:
             print(env.total_reward)
 
         if env.pp.exit:
