@@ -159,24 +159,12 @@ def render(pp, dt):
         # text_pos = [10, 15]
         # pp.screen.blit(text_surf, text_pos)
 
-        text_surf = text_font.render(
-            f'SLAM position error : {round(np.linalg.norm(pp.car.true_position - pp.car.position), 3)}',
-            True, (255, 255, 255))
-        text_pos = [10, 1 * line_offset]
-        pp.screen.blit(text_surf, text_pos)
-
-        text_surf = text_font.render(
-            f'SLAM angle error : {round(np.linalg.norm(radians(pp.car.angle - pp.car.true_angle)), 3)}', True,
-            (255, 255, 255))
-        text_pos = [10, 2 * line_offset]
-        pp.screen.blit(text_surf, text_pos)
-
         text_surf = text_font.render(f'{str(round(1 / (dt + 10 ** -10), 0))[:2]} FPS', True, (155, 155, 155))
         text_pos = [1200, 15]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Reward: {pp.reward}', True, (255, 255, 255))
-        text_pos = [10, 3 * line_offset]
+        text_pos = [10, 1 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         # text_surf = text_font.render(f'offset : {round(pp.view_offset[0],1)}, {round(pp.view_offset[1],1)} ', 1, (255, 255, 255))
@@ -184,11 +172,11 @@ def render(pp, dt):
         # pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Steering : {round(pp.car.steering_angle, 1)}', True, (255, 255, 255))
-        text_pos = [10, 4 * line_offset]
+        text_pos = [10, 2 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Speed : {round(pp.car.velocity.x, 1)}', True, (255, 255, 255))
-        text_pos = [10, 5 * line_offset]
+        text_pos = [10, 3 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         #   text_surf = text_font.render(f'Distance to target : {round(dist,2)}', 1, (255, 255, 255))
@@ -204,14 +192,26 @@ def render(pp, dt):
         #   pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Track: {pp.track}', True, (255, 255, 255))
-        text_pos = [10, 6 * line_offset]
+        text_pos = [10, 4 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Lap: {pp.track_number}', True, (255, 255, 255))
+        text_pos = [10, 5 * line_offset]
+        pp.screen.blit(text_surf, text_pos)
+
+        text_surf = text_font.render(f'SLAM average landmark error: {round(pp.slam.error(pp), 5)}', True, (255, 255, 255))
+        text_pos = [10, 6 * line_offset]
+        pp.screen.blit(text_surf, text_pos)
+
+        text_surf = text_font.render(
+            f'SLAM car position error : {round(np.linalg.norm(pp.car.true_position - pp.car.position), 3)}',
+            True, (255, 255, 255))
         text_pos = [10, 7 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
-        text_surf = text_font.render(f'SLAM error: {round(pp.slam.error(pp), 5)}', True, (255, 255, 255))
+        text_surf = text_font.render(
+            f'SLAM car angle error : {round(radians(pp.car.angle % 360 - pp.car.true_angle % 360), 3)}', True,
+            (255, 255, 255))
         text_pos = [10, 8 * line_offset]
         pp.screen.blit(text_surf, text_pos)
 
