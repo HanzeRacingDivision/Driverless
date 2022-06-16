@@ -36,7 +36,8 @@ def draw_line_dashed(surface, color, start_pos, end_pos, offset, width=1, dash_l
             for n in range(int(exclude_corners), dash_amount - int(exclude_corners), 2)]
 
 
-def render(pp, dt):
+def render(pp):
+    dt = pp.clock.get_dt()
     pp.screen.fill((0, 0, 0))
     rotated = pygame.transform.rotate(pp.car.car_image, pp.car.true_angle)
     rect = rotated.get_rect()

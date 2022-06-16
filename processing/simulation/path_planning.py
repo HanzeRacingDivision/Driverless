@@ -140,8 +140,8 @@ class PathPlanning:
         self.car.acceleration = max(-self.car.max_acceleration, min(self.car.acceleration, self.car.max_acceleration))
         self.car.steering_angle = max(-self.car.max_steering, min(self.car.steering_angle, self.car.max_steering))
 
-    def implement_main_logic(self, dt):
-        self.car.update(dt)
+    def implement_main_logic(self):
+        self.car.update(self.clock.get_dt())
 
         for target in self.targets.targets:
             target.update(self)
@@ -188,7 +188,7 @@ class PathPlanning:
         if (len(self.targets.visible_targets) > 0
                 and self.car.fov / self.ppu > np.linalg.norm(
                     self.targets.closest_target.position - self.car.position) > 20 / self.ppu
-                and self.car.auto == True
+                and self.car.auto
                 and self.targets.closest_target.passed == False):
 
             dist = self.targets.closest_target.dist_car
@@ -231,7 +231,6 @@ class PathPlanning:
             self.num_steps += 1
             # Time variables
             self.clock.update()
-            dt = self.clock.get_dt()
 
             # Event queue
             events = pygame.event.get()
@@ -243,7 +242,7 @@ class PathPlanning:
                 pp_functions.manual_controls.enable_dragging_screen(self, events)
             else:
                 # user inputs
-                pp_functions.manual_controls.user_input(self, events, dt)
+                pp_functions.manual_controls.user_input(self, events, self.clock.get_dt())
 
             self.episode_time_running = self.clock.get_time_running()  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
@@ -259,7 +258,7 @@ class PathPlanning:
             # SLAM
             if self.slam_active:
                 self.slam.update_slam_vars(self.cones.visible[Side.LEFT], self.cones.visible[Side.RIGHT], self.car)
-                self.slam.EKF_predict(dt)
+                self.slam.EKF_predict(self.clock.get_dt())
                 if self.num_steps % self.slam.frame_limit == 0 or self.num_steps < 5:
                     self.slam.EKF_update(self.car, self.cones.list)
 
@@ -288,10 +287,10 @@ class PathPlanning:
             self.set_done(self.clock.get_time_running(), self.episode_num, self.num_steps)
 
             # Logic
-            self.implement_main_logic(dt)
+            self.implement_main_logic()
 
             # Drawing
-            pp_functions.drawing.render(self, dt)
+            pp_functions.drawing.render(self)
 
         pygame.quit()
 

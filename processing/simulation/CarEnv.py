@@ -48,8 +48,7 @@ class CarEnv(gym.Env):
         return [car_steering_angle, car_curr_velocity]
 
     def render(self, mode=None):
-        dt = self.pp.clock.get_dt()
-        pp_functions.drawing.render(self.pp, dt)
+        pp_functions.drawing.render(self.pp)
         
     def step(self, action):
 
@@ -88,10 +87,7 @@ class CarEnv(gym.Env):
             if event.type == pygame.QUIT:
                 self.pp.exit = True
 
-        self.pp.clock.update()
         self.pp.car.velocity.x = 1
-
-
 
         events = pygame.event.get()
         for event in events:
@@ -121,7 +117,7 @@ class CarEnv(gym.Env):
         self.pp.track_logic()
 
         # Logic
-        self.pp.implement_main_logic(dt)
+        self.pp.implement_main_logic()
 
         # Retrieve observation
         observation = self.pp.get_observation(self.num_obs)
