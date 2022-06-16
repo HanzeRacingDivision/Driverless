@@ -1,17 +1,12 @@
-import gym
 import numpy as np
-import time
 import pygame
-import pp_functions
-from pp_functions.reward_function import calculate_reward
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3 import PPO, A2C, DQN
-from stable_baselines3.common.evaluation import evaluate_policy
 
 from CarEnv import CarEnv
 
 
-def dics_to_cont(action):
+def disc_to_cont(action):
     if action == 0:
         return 0.5
     elif action == 1:
@@ -40,6 +35,8 @@ if __name__ == "__main__":
         model = A2C.load(f"{models_dir}/car_model_{time_steps}")
     elif model_name == 'DQN' or model_name == 'DQN-cont':
         model = DQN.load(f"{models_dir}/car_model_{time_steps}")
+    else:
+        raise ValueError(f"{model_name} not recognized as valid model name")
 
     episodes = 1
 
@@ -51,7 +48,7 @@ if __name__ == "__main__":
             if env.pp.track_number > 0:
                 print(env.pp.cones.visible)
                 action, _states = model.predict(observation)
-                action = dics_to_cont(action)
+                action = disc_to_cont(action)
                 # action = np.interp(env.pp.midpoint_steering_angle(), [-120, 120], [-1, 1])
                 action = [action]
             else:
@@ -70,4 +67,3 @@ if __name__ == "__main__":
                 break
 
     pygame.quit()
-

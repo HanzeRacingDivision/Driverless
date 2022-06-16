@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 
 
 def draw_line_dashed(surface, color, start_pos, end_pos, width=1, dash_length=10, exclude_corners=True):
-    'simply a function that draws dashed lines in pygame'
+    """simply a function that draws dashed lines in pygame"""
 
     # convert tuples to numpy arrays
     start_pos = np.array(start_pos)
@@ -72,7 +72,7 @@ class Target:
     def update(self, car, time_running, ppu, car_pos, car_angle):
         self.dist_car = np.linalg.norm(self.position - car_pos)
 
-        if self.passed == False and np.linalg.norm(self.position - car_pos) <= 30 / ppu and time_running > 2:
+        if not self.passed and np.linalg.norm(self.position - car_pos) <= 30 / ppu and time_running > 2:
             self.passed = True
             self.valid = False
 
@@ -94,7 +94,7 @@ class Target:
             alpha = beta + 90 * (b / np.abs(b)) * np.abs((a / np.abs(a)) - 1)
             self.alpha = alpha[0, 0]
 
-            if np.abs(self.alpha) < 60 and self.passed == False:
+            if np.abs(self.alpha) < 60 and not self.passed:
                 self.valid = True
             else:
                 self.valid = False
@@ -118,7 +118,7 @@ class Game:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         image_path = os.path.join(current_dir, "car_r_s.png")
         car_image = pygame.image.load(image_path)
-        img = pygame.image.load(image_path)
+        # img = pygame.image.load(image_path)
 
         image_path1 = os.path.join(current_dir, "target_s.png")
         target_image = pygame.image.load(image_path1)
@@ -179,10 +179,7 @@ class Game:
             # if s pressed then set to track mode
             for event in events:
                 if event.type == pygame.KEYUP and event.key == pygame.K_s:  # and track_toggle_temp == True
-                    if track == False:
-                        track = True
-                    else:
-                        track = False
+                    track = not track
 
             # manual acceleration
             if pressed[pygame.K_UP]:
@@ -190,7 +187,7 @@ class Game:
                     car.acceleration = car.brake_deceleration
                 else:
                     car.acceleration += 1 * dt
-            elif pressed[pygame.K_DOWN] and car.breaks == True:
+            elif pressed[pygame.K_DOWN] and car.breaks:
                 if car.velocity.x > 0:
                     car.acceleration = -car.brake_deceleration
                 else:
@@ -234,21 +231,21 @@ class Game:
                 non_passed_dists.append(target.dist_car)
                 dists.append(target.dist_car)
 
-                if target.visible == True:
+                if target.visible:
                     visible_targets.append(target)
 
-                if target.passed == True:
+                if target.passed:
                     non_passed_dists.remove(target.dist_car)
 
-                if target.valid == True:
+                if target.valid:
                     valid_targets.append(target)
                     valid_dists.append(target.dist_car)
 
             for target in non_passed_targets:
-                if target.passed == True:
+                if target.passed:
                     non_passed_targets.remove(target)
 
-            len_valid_targets = len(valid_targets)
+            # len_valid_targets = len(valid_targets)
 
             # define closest target
             if len(valid_targets) > 0:
@@ -258,11 +255,9 @@ class Game:
                     closest_target = valid_targets[np.array(valid_dists).argmin()]
                 # set up while loop here to find next target
 
-
-
             else:
                 # if currently no targets left and is a track, set all targets to non-passed and continue
-                if track == True:
+                if track:
                     non_passed_targets = targets.copy()
                     for target in targets:
                         target.passed = False
@@ -280,9 +275,8 @@ class Game:
 
             # automatic steering
 
-            elif len(valid_targets) > 0 and np.linalg.norm(
-                    closest_target.position - car_pos) < car.fov / ppu and np.linalg.norm(
-                    closest_target.position - car_pos) > 30 / ppu and time_running > 2 and closest_target.passed == False:
+            elif len(valid_targets) > 0 and car.fov / ppu > np.linalg.norm(
+                    closest_target.position - car_pos) > 30 / ppu and time_running > 2 and not closest_target.passed:
 
                 dist = closest_target.dist_car
                 alpha = closest_target.alpha
@@ -290,9 +284,9 @@ class Game:
                 car.velocity.x = 3
 
             else:
-                if (car.steering > (50 * dt)):
+                if car.steering > (50 * dt):
                     car.steering -= 120 * dt
-                elif (car.steering < -(50 * dt)):
+                elif car.steering < -(50 * dt):
                     car.steering += 120 * dt
                 else:
                     car.steering = 0
@@ -344,16 +338,17 @@ class Game:
             if len(targets) > 0:
                 for target in targets:
                     if target in non_passed_targets:
-                        self.screen.blit(target_image, target.position * ppu - (9, 10))
+                        self.screen.blit(target_image, target.position * ppu - Vector2(9, 10))
                     else:
-                        self.screen.blit(target_image_g, target.position * ppu - (9, 10))
-                    if target.visible == True:
+                        self.screen.blit(target_image_g, target.position * ppu - Vector2(9, 10))
+                    if target.visible:
                         draw_line_dashed(self.screen, (150, 150, 150), (pos_1, pos_2), target.position * ppu, width=1,
                                          dash_length=10, exclude_corners=True)
 
-            # draw the car sprite
-            # pygame.draw.rect(self.screen, (200,200,200), (car.position * ppu - ((rect.width / 2),(rect.height / 2)), (rect.width, rect.height))) #draws a little box around the car sprite (just for debug)
-            self.screen.blit(rotated, car.position * ppu - ((rect.width / 2), (rect.height / 2)))  # draw car
+            # draw the car sprite pygame.draw.rect(self.screen, (200,200,200), (car.position * ppu - ((rect.width /
+            # 2),(rect.height / 2)), (rect.width, rect.height))) #draws a little box around the car sprite (just for
+            # debug)
+            self.screen.blit(rotated, car.position * ppu - Vector2((rect.width / 2), (rect.height / 2)))  # draw car
 
             # draw dotted lines between car and valid targets
             if len(valid_targets) > 0:
@@ -367,48 +362,48 @@ class Game:
                              (10, 180, 12, dist * 20 - 20))
 
             text_font = pygame.font.Font(None, 30)
-            text_surf = text_font.render(f'Angle to target : {round(alpha, 1)}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Angle to target : {round(alpha, 1)}', True, (255, 255, 255))
             text_pos = [10, 10]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Car angle : {round(car_angle, 2)}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Car angle : {round(car_angle, 2)}', True, (255, 255, 255))
             text_pos = [10, 30]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Steering : {round(car.steering, 2)}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Steering : {round(car.steering, 2)}', True, (255, 255, 255))
             text_pos = [10, 50]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Distance to target : {round(dist, 2)}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Distance to target : {round(dist, 2)}', True, (255, 255, 255))
             text_pos = [10, 70]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Targets passed: {len(targets) - len(non_passed_targets)}', 1,
+            text_surf = text_font.render(f'Targets passed: {len(targets) - len(non_passed_targets)}', True,
                                          (255, 255, 255))
             text_pos = [10, 110]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Number of targets: {len(targets)}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Number of targets: {len(targets)}', True, (255, 255, 255))
             text_pos = [10, 130]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Track: {track}', 1, (255, 255, 255))
+            text_surf = text_font.render(f'Track: {track}', True, (255, 255, 255))
             text_pos = [10, 150]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Press T to place target', 1, (155, 155, 155))
+            text_surf = text_font.render(f'Press T to place target', True, (155, 155, 155))
             text_pos = [10, 620]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Press CTRL + C to clear', 1, (155, 155, 155))
+            text_surf = text_font.render(f'Press CTRL + C to clear', True, (155, 155, 155))
             text_pos = [10, 640]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Press S to make track', 1, (155, 155, 155))
+            text_surf = text_font.render(f'Press S to make track', True, (155, 155, 155))
             text_pos = [10, 680]
             self.screen.blit(text_surf, text_pos)
 
-            text_surf = text_font.render(f'Press arrow keys to steer manually', 1, (155, 155, 155))
+            text_surf = text_font.render(f'Press arrow keys to steer manually', True, (155, 155, 155))
             text_pos = [10, 660]
             self.screen.blit(text_surf, text_pos)
 

@@ -4,29 +4,33 @@ import os
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
 import time
+from typing import Union
 
 
-def linear_schedule(initial_value):
+def linear_schedule(initial_value: Union[float, str]):
     """
     Linear learning rate schedule.
     :param initial_value: (float or str)
     :return: (function)
     """
+
     if isinstance(initial_value, str):
         initial_value = float(initial_value)
 
-    def func(progress):
+    def func(progress: float):
         """
         Progress will decrease from 1 (beginning) to 0
         :param progress: (float)
         :return: (float)
         """
+
         return progress * initial_value
 
     return func
 
 
 if __name__ == "__main__":
+    mode = "cont"
     model_name = "PPO-cont"
 
     models_dir = f'models/{model_name}-{int(time.time())}'
@@ -38,7 +42,7 @@ if __name__ == "__main__":
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
-    env = CarEnv(mode="cont")
+    env = CarEnv(mode=mode)
     env = Monitor(env, log_dir)
 
     if model_name == 'PPO' or model_name == 'PPO-cont':

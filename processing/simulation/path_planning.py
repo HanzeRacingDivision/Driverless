@@ -13,7 +13,12 @@ import pp_functions.drawing
 
 
 class PathPlanning:
-    def __init__(self, slam_active):
+    def __init__(self, slam_active, blank_map=False):
+        """
+        @param slam_active: bool; True if SLAM is to be used
+        @param blank_map: bool; True if the map should be a blank sheet, False if a preset map is to be loaded
+        """
+
         self.targets = Targets()
         self.car = Car(7, 10)
         self.cones = Cones()
@@ -21,7 +26,8 @@ class PathPlanning:
         self.clock = Clock()
         self.LEVEL_ID = 'None'
         self.initialize_images()
-        self.initialize_map()  # comment this if you want to start with blank sheet map
+        if not blank_map:
+            self.initialize_map()
 
         pygame.init()
         pygame.display.set_caption("Car")
@@ -45,7 +51,7 @@ class PathPlanning:
         self.midpoint_created = False
         self.undo_done = False
 
-        self.track = False
+        self.track = True
         self.track_number = 0
         self.track_number_changed = False
         self.time_start_sim = None
@@ -188,8 +194,7 @@ class PathPlanning:
         if (len(self.targets.visible_targets) > 0
                 and self.car.fov / self.ppu > np.linalg.norm(
                     self.targets.closest_target.position - self.car.position) > 20 / self.ppu
-                and self.car.auto
-                and self.targets.closest_target.passed == False):
+                and self.car.auto and not self.targets.closest_target.passed):
 
             dist = self.targets.closest_target.dist_car
             alpha = self.targets.closest_target.alpha
@@ -202,7 +207,7 @@ class PathPlanning:
 
         return midpoint_steering_angle
 
-    def get_observation(self, num_obs):
+    def get_observation(self, num_obs: int, noise_scale: float = 0) -> np.ndarray:
         observation = np.zeros(num_obs, dtype=np.float32)
         observation[0] = np.interp(self.car.velocity.x, [0, self.car.max_velocity], [-1, 1])
         observation[1] = np.interp(self.car.angle, [-180, 180], [-1, 1])
@@ -214,6 +219,9 @@ class PathPlanning:
         for i, cone in enumerate(self.cones.polar_boundary_sample[Side.RIGHT]):
             observation[12 + 2 * i] = np.interp(cone[0], [0, self.car.fov / self.ppu], [-1, 1])
             observation[13 + 2 * i] = np.interp(cone[1], [-1 * self.car.fov_range, self.car.fov_range], [-1, 1])
+
+        # add noise
+        observation *= np.random.normal(1, noise_scale, num_obs)
 
         return observation
 
@@ -302,4 +310,4 @@ if __name__ == '__main__':
     #   1) autonomous: no user inputs, only screen dragging
     #   2) user: old simulation with user inputs
     # SLAM activated True/False
-    sim.run(method="autonomous")
+    sim.run(method="user")
