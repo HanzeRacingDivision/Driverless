@@ -1,11 +1,11 @@
 import os
 import pygame
-import time
 
 from car import Car
 from cone import *
 from target import *
 from slam import *
+from clock import *
 
 import pp_functions
 import pp_functions.manual_controls
@@ -23,9 +23,10 @@ class PathPlanning:
         self.car = Car(7, 10, noise=1e-3)
         self.cones = Cones()
         self.path = Path()
+        self.clock = Clock()
+
         self.slam = Slam(self.car, matrix_size=120, noise=1e-3)
         self.slam_active = slam_active
-
 
         self.LEVEL_ID = 'None'
         self.initialize_images()
@@ -39,7 +40,6 @@ class PathPlanning:
         self.height = 720
         self.screen = pygame.display.set_mode((self.width, self.height))
         self.fullscreen = False
-        self.clock = pygame.time.Clock()
         self.ticks = 60
         self.exit = False
         self.mouse_pos_list = []
@@ -60,7 +60,6 @@ class PathPlanning:
         self.track_number_changed = False
         self.time_start_sim = None
 
-        self.time_running = 0
         self.episode_time_running = 0  # THIS IS A FAKE VARIABLE!!!
         self.reward = 0
         self.done = False
@@ -147,8 +146,8 @@ class PathPlanning:
         self.car.acceleration = max(-self.car.max_acceleration, min(self.car.acceleration, self.car.max_acceleration))
         self.car.steering_angle = max(-self.car.max_steering, min(self.car.steering_angle, self.car.max_steering))
 
-    def implement_main_logic(self, dt):
-        self.car.update(dt)
+    def implement_main_logic(self):
+        self.car.update(self.clock.get_dt())
 
         for target in self.targets.targets:
             target.update(self)
@@ -235,15 +234,11 @@ class PathPlanning:
         else:
             self.car.auto = False
 
-        time_start = time.time()
-
-        time_prev = time.time()
-
         while not self.exit and not self.done:
 
             self.num_steps += 1
-
-            dt = self.clock.get_time() / 500
+            # Time variables
+            self.clock.update()
 
             # Event queue
             events = pygame.event.get()
@@ -255,12 +250,9 @@ class PathPlanning:
                 pp_functions.manual_controls.enable_dragging_screen(self, events)
             else:
                 # user inputs
-                pp_functions.manual_controls.user_input(self, events, dt)
+                pp_functions.manual_controls.user_input(self, events, self.clock.get_dt())
 
-            # Defining the time running since simulation started
-            self.time_running = time.time() - time_start
-            
-            self.episode_time_running = self.time_running  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
+            self.episode_time_running = self.clock.get_time_running()  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
             # redefining the car angle so that it is in (-180,180)
             self.car.config_angle()
@@ -271,10 +263,10 @@ class PathPlanning:
             # update cone list
             self.cones.update_cone_list(self)
 
-            # SLAM -- has to be after update cone list! otherwise we run on wrong coordinates
+            # SLAM
             if self.slam_active:
                 self.slam.update_slam_vars(self.cones.visible[Side.LEFT], self.cones.visible[Side.RIGHT], self.car)
-                self.slam.EKF_predict(dt)
+                self.slam.EKF_predict(self.clock.get_dt())
                 if self.num_steps % self.slam.frame_limit == 0 or self.num_steps < 5:
                     self.slam.EKF_update(self.car, self.cones.visible)
 
@@ -300,15 +292,13 @@ class PathPlanning:
             self.car.car_crash_mechanic(self.cones, self.path, self.slam_active)
 
             # checking exit conditions
-            self.set_done(self.time_running, self.episode_num, self.num_steps)
+            self.set_done(self.clock.get_time_running(), self.episode_num, self.num_steps)
 
             # Logic
-            self.implement_main_logic(dt)
+            self.implement_main_logic()
 
             # Drawing
-            pp_functions.drawing.render(self, dt)
-
-            self.clock.tick(self.ticks)
+            pp_functions.drawing.render(self)
 
         pygame.quit()
 
