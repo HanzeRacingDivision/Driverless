@@ -70,7 +70,7 @@ def generateFilename():
     """generate a unique filename using mapLoader.defaultFilename and datetime"""
     return(mapLoader.defaultFilename + datetime.datetime.now().strftime("%Y-%m-%d_%H;%M;%S") + mapLoader.fileExt)
 
-def save_map(mapToSave: Map, filename=None):
+def save_map(mapToSave: Map, filename=None, saveSimVarsMap=True):
     """save map to excel file
         if no filename is provided, one with be automatically generated using generateFilename()"""
     if(filename is None): #automatic file naming
@@ -78,18 +78,30 @@ def save_map(mapToSave: Map, filename=None):
     elif(not filename.endswith(mapLoader.fileExt)):
         filename += mapLoader.fileExt
     print("saving to file:", filename)
-    #print(map_file)
     saveStartTime = time.time()
     map_file = mapObjectToFile(mapToSave)
     print("save_map pandas conversion time:", round(time.time()-saveStartTime,2)); saveStartTime=time.time()
     map_file.to_excel(filename)
     print("save_map .to_excel time:", round(time.time()-saveStartTime,2))
-    return(filename, map_file)
+    # map_file_simVar = None
+    if(saveSimVarsMap and (mapToSave.simVars is not None)):
+        simVarMapFilename = "simVar_" + filename # add something to the start (so i dont have to deal with inserting before the file extension)
+        #save_map(mapToSave.simVars, simVarMapFilename, False) # recursively
+        print("saving simVar map to file:", simVarMapFilename)
+        saveStartTime = time.time()
+        map_file_simVar = mapObjectToFile(mapToSave.simVars)
+        print("save_map simVar pandas conversion time:", round(time.time()-saveStartTime,2)); saveStartTime=time.time()
+        map_file_simVar.to_excel(simVarMapFilename)
+        print("save_map simVar .to_excel time:", round(time.time()-saveStartTime,2))
+    return(filename, map_file) #, map_file_simVar)   # i think returning the mapFile came from an old version where it was sent to a remote client, i'm just gonna leave it...
 
 def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
     #print(map_file)
     returnMap = mapFileToObject(map_file)
     if(whereToLoad is not None):
+        # if(whereToLoad.simVars is not None): # MOVED to outside the funcion (drawDriverless (and the main file (ARCv0.py) for cmdLine loading))
+        #     print("loading mapfile into .simVars")
+        #     whereToLoad = whereToLoad.simVars
         #copyImportMap(whereToLoad, returnMap) #has problems with car objects and clocks and all that nastyness
         whereToLoad.left_cone_list = returnMap.left_cone_list
         whereToLoad.right_cone_list = returnMap.right_cone_list
@@ -99,7 +111,8 @@ def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
             import pathPlanningTemp as PP
             PP.makeBoundrySplines(whereToLoad)
         except Exception as excep:
-            print("couldn't makeBoundrySplines after loading map into", whereToLoad, ", exception:", excep)
+            doNothing = 0
+            #print("couldn't makeBoundrySplines after loading map into", whereToLoad, ", exception:", excep)
     # try:
     #     if(returnMap.pathPlanningPresent):
     #         import pathPlanningTemp as PP

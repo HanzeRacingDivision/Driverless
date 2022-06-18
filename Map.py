@@ -23,7 +23,7 @@ class Map:
         
         self.pathFolData = None #holds variables for pathPlanning (e.g. spline data), as pathPlannerMapData object
         
-        self.simulationVariables = None # holds simulatedLidar variables (and/or other: ...)
+        self.simVars = None # holds simulatedLidar variables (and/or other: ...)
     
     def __repr__(self): #print map objects in a legible fashion
         return("Map(typ="+(self.__class__.__name__)+",LEFT:"+str(len(self.left_cone_list))+",RIGHT:"+str(len(self.right_cone_list))+",FINISH:"+str(len(self.finish_line_cones))+",TARGETS:"+str(len(self.target_list))+(",TARG_FULL_CIRC,"if self.targets_full_circle else ",")+str(self.car)+")")
@@ -102,7 +102,8 @@ class Map:
     class Cone:
         """ a small class to hold all pertinent information about boundry cones (like position, left-or-right-ness, whether it's part of the finish line, etc) """
         coneDiam = 0.14 #cone diameter in meters (constant)
-        coneLidarDiam = 0.07
+        coneLidarDiam = 0.07 # TODO: make a little formula for this instead (requires knowing the slope)
+        ## cone connection spacing is set in coneConnecting.py
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
             self.position = np.array([pos[0], pos[1]], dtype=np.float64)
@@ -364,3 +365,10 @@ class Map:
         # if(overlaps):
         return(self.removeCone(coneObj.ID, coneObj.LorR))
 
+class mapSimVarClass(Map):
+    """(to go in Map.simVars)"""
+    def __init__(self):
+        Map.__init__(self) #init map class
+        self.car = None # put a simCar in this Map-like object only if positionalDrift is enabled
+        self.lidarSimVars = [] # store simulatedLidarVariables here
+        self.undiscoveredCones = True # whether newly added cones should be 'discovered' by (simulated) sensors (True), or instantly added (False)

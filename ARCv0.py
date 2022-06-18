@@ -1,9 +1,9 @@
-# see cahngelog and README for explenation
+# see changelog and README for explenation
 
 simulation = True
 
 bufferLandmarks = True
-simulatePositionalDrift = True
+simulatePositionalDrift = True # (only for simulations) the sensor data for steering&velocity have some error IRL, this simulates that (used to test SLAM)
 
 makeConesAfterMapload = False #whether to completely rely on the loaded map, or to allow for new cone detection
 ## TBD: stop cone creation after a drag-drop mapload (currently only cmdline argumented mapfiles stop cone creation)
@@ -20,14 +20,17 @@ import coneConnecting   as CC
 import pathFinding      as PF
 import pathPlanningTemp as PP    #autodriving and splines
 
-import SLAM_DIY as SLAM
+import SLAM_DIY as SLAM  # TODO: replace/improve SLAM_DIY
 
 if(simulation):
     import simulatedCar   as SC
     import simulatedLidar as SL
+    #import simulatedVision as SV  # simulated computerVision (at least useful to determine the color of detected cones)
+    from Map import mapSimVarClass
 else:
     import carMainConn    as RC
     import lidarConn      as RL
+    #import visionTBD      as RV   # real computerVision is TBD
 
 if(useDrawer):
     import drawDriverless as DD
@@ -47,7 +50,7 @@ class masterMapClass(Map):
         
         if(simulation):
             self.car = SC.simCar() #simCar has Map.Car as a parent class, so all regular Car stuff will still work
-            self.simulationVariables = [SL.simulatedLidarVariables() for _ in self.car.lidarOffsets]
+            self.simVars = mapSimVarClass()
         else:
             self.car = RC.realCar()
         
@@ -60,21 +63,31 @@ if __name__ == "__main__":
         masterMap = masterMapClass()
 
         makeNewCones = True #whether to allow the creation of cones at all (determined by things like makeConesAfterMapload)
+        if(simulation):
+            masterMap.simVars.undiscoveredCones = True # (only for simulations) load mapfiles into .simVars instead of directly into the masterMap, to simulate 'discovering' them
         
-        if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
-            print("found sys.argv[1], attempting to import:", sys.argv[1])
-            ML.mapLoader.load_map(sys.argv[1], masterMap)
-            if(not makeConesAfterMapload):
-                makeNewCones = False
-        
-        drawer = drawer3D = None
-        if(useDrawer):
+        drawer = drawer3D = None # init vars
+        if(useDrawer): # note: drawer initialization is moved above load_map with sys.argv specifically so it can save the map correctly
             resolution = [1280, 720]
             DD.pygameInit(resolution)
             drawer = DD.pygameDrawer(masterMap, DD.window, resolution)
             drawer3D = DD.pygameDrawer3D(masterMap, DD.window, resolution)
+
+        if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
+            print("found sys.argv[1], attempting to import:", sys.argv[1])
+            if(simulation and masterMap.simVars.undiscoveredCones):
+                ML.mapLoader.load_map(sys.argv[1], masterMap.simVars)
+            else:
+                ML.mapLoader.load_map(sys.argv[1], masterMap)
+            if(useDrawer):
+                import os
+                _, drawer.lastMapFilename = os.path.split(sys.argv[1]) # save the name of the loaded mapfile
+            if(not makeConesAfterMapload):
+                makeNewCones = False
         
-        if(not simulation):
+        if(simulation):
+            masterMap.simVars.lidarSimVars = [SL.simulatedLidarVariables() for _ in masterMap.car.lidarOffsets]
+        else:
             doNothing = 0
             #start car communication here
             #start lidar communication(s) here
@@ -92,9 +105,10 @@ if __name__ == "__main__":
         
         simDriftVelocityError = simDriftVelocityError = 0.0 # init var
         if(simulatePositionalDrift):
-            masterMap.car.simulationVariables = SC.simCar() # create a second virtual car to anker from (which will have no drift)
-            masterMap.car.simulationVariables.position = masterMap.car.position.copy() # copy initial conditions
-            masterMap.car.simulationVariables.angle = masterMap.car.angle
+            # store another simCar in masterMap.simVars.car and update its position without error
+            masterMap.simVars.car = SC.simCar() # create a second virtual car to anker from (which will have no drift)
+            masterMap.simVars.car.position = masterMap.car.position.copy() # copy initial conditions
+            masterMap.simVars.car.angle = masterMap.car.angle
             simDriftVelocityError = 0.1
             simDriftSteeringError = np.deg2rad(5)
         
@@ -112,36 +126,18 @@ if __name__ == "__main__":
             
             if(simulation):
                 if(simulatePositionalDrift):
-                    # using the simCar stored in car.simulationVariables
-                    masterMap.car.simulationVariables.desired_velocity = masterMap.car.desired_velocity;  masterMap.car.simulationVariables.desired_steering = masterMap.car.desired_steering
-                    masterMap.car.simulationVariables.simulateFeedback(loopStart - timeSinceLastUpdate)
-                    masterMap.car.simulationVariables.update(loopStart - timeSinceLastUpdate) #update (drifted) position/angle
-                    masterMap.car.simulationVariables.lastFeedbackTimestamp = loopStart
+                    # update() the masterMap.simVars.car without error and then add error for the masterMap.car update()
+                    masterMap.simVars.car.desired_velocity = masterMap.car.desired_velocity;  masterMap.simVars.car.desired_steering = masterMap.car.desired_steering
+                    masterMap.simVars.car.simulateFeedback(loopStart - timeSinceLastUpdate)
+                    masterMap.simVars.car.update(loopStart - timeSinceLastUpdate) #update (drifted) position/angle
+                    masterMap.simVars.car.lastFeedbackTimestamp = loopStart
                     ## now mess with the velocity/steering a little
-                    if(masterMap.car.simulationVariables.velocity > 0.01):
-                        masterMap.car.velocity = abs(np.random.normal(masterMap.car.simulationVariables.velocity, simDriftVelocityError)) #abs() is just to make sure it doesnt go negative
+                    if(masterMap.simVars.car.velocity > 0.01):
+                        masterMap.car.velocity = abs(np.random.normal(masterMap.simVars.car.velocity, simDriftVelocityError)) #abs() is just to make sure it doesnt go negative
                     else:
                         masterMap.car.velocity = 0.0
-                    masterMap.car.steering = np.random.normal(masterMap.car.simulationVariables.steering, simDriftSteeringError)
+                    masterMap.car.steering = np.random.normal(masterMap.simVars.car.steering, simDriftSteeringError)
                     masterMap.car.update(loopStart - timeSinceLastUpdate) #update true (hidden) position
-                    
-                    # ## using the data stored as a list in car.simulationVariables
-                    # masterMap.car.velocity = masterMap.car.simulationVariables[2];   masterMap.car.steering = masterMap.car.simulationVariables[3] #retrieve true (hidden) values
-                    # masterMap.car.simulateFeedback(loopStart - timeSinceLastUpdate)
-                    # masterMap.car.simulationVariables[2] = masterMap.car.velocity;   masterMap.car.simulationVariables[3] = masterMap.car.steering #store true (hidden) values
-                    
-                    # tempPos = masterMap.car.position;   tempAngle = masterMap.car.angle #store (drifted) position/angle in a temporary variable
-                    # masterMap.car.position = masterMap.car.simulationVariables[0];   masterMap.car.angle = masterMap.car.simulationVariables[1] #retrieve true (hidden) values
-                    # masterMap.car.update(loopStart - timeSinceLastUpdate) #update true (hidden) position
-                    # masterMap.car.simulationVariables[0] = masterMap.car.position;   masterMap.car.simulationVariables[1] = masterMap.car.angle #store true (hidden) values
-                    # masterMap.car.position = tempPos;   masterMap.car.angle = tempAngle #retrieve (drifted) position
-                    
-                    # ## now mess with the velocity/steering a little
-                    # if(masterMap.car.velocity > 0.01):
-                    #     masterMap.car.velocity = abs(np.random.normal(masterMap.car.velocity, simDriftVelocityError)) #abs() is just to make sure it doesnt go negative
-                    # masterMap.car.steering = np.random.normal(masterMap.car.steering, simDriftSteeringError)
-                    
-                    # masterMap.car.update(loopStart - timeSinceLastUpdate) #update (drifted) position/angle
                 else:
                     masterMap.car.simulateFeedback(loopStart - timeSinceLastUpdate)
                     masterMap.car.update(loopStart - timeSinceLastUpdate)
@@ -172,7 +168,7 @@ if __name__ == "__main__":
                     makeNewConesTemp = makeNewCones
                     if(makeConesOnlyFirstLap and makeNewCones):
                         makeNewConesTemp = (masterMap.car.pathFolData.laps < 1) #only on the first lap
-                    SLAM.updatePosition(masterMap, [lidarConeBuff, []], (1.0, 1.0), makeNewConesTemp, True)
+                    SLAM.updatePosition(masterMap, [lidarConeBuff, []], (1.0, 1.0), makeNewConesTemp)
                     #doNothing = 0
                 
                 lidarConeBuff = [] # empty the buffer
@@ -182,7 +178,8 @@ if __name__ == "__main__":
             
             if(useDrawer):
                 if(drawer.extraViewMode):
-                    drawer3D.drawTargetConeLines = drawer.drawTargetConeLines;  drawer3D.drawConeSlamData = drawer.drawConeSlamData #a manual fix for some multicore UI issues
+                    drawer3D.drawTargetConeLines = drawer.drawTargetConeLines #a manual fix for some UI badness (ARC_TODO improve 3D drawer integration?)
+                    drawer3D.drawConeSlamData = drawer.drawConeSlamData
                     drawer3D.redraw()
                 else:
                     drawer.redraw()

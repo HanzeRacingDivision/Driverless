@@ -34,8 +34,8 @@ the mouse can be used to:
  - move the viewpoint (hold MMB (scrollwheel) and drag mouse)
  - zoom (scroll)
  - place cones (LMB for left cones, RMB for right cones)
- - remove cones (hold 'R')
- - connect cones (click on an existing cone, or place while holding 'shift')
+ - remove cones (hold 'R') (hold SHIFT to erase simVars cone as well)
+ - connect cones (click on an existing cone, or place while holding SHIFT)
  - set the finish cones (hold 'F' and click on (or place) a cone)
 keyboard functions:
  - 'P' to create a path (automatically make a (limited) path
@@ -52,6 +52,7 @@ keyboard functions:
  - 'CTRL'+'V' toggle 3D view mode (camera overlay) note: currently missing camera footage
  - 'S' save current map to file
  - '[ and ]' (only for remote interface) increase/decrease packet rate
+ - 'M' (only for simulations) toggle undiscoveredCones (whether loaded/placed cones are added to the conelists or yet to be discovered)
 other:
  - you can drag & drop files onto the pygame window to load mapfiles
  - you can load mapfiles as an argument (in the commandline when starting python)

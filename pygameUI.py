@@ -1,9 +1,7 @@
 import pygame       #python game library, used for the visualization
 import time         #used for debugging
-import os #only used for loading the car sprite (os is used to get the filepath)\
 import numpy as np  #general math library
 
-from generalUI import UIparser   #useful for passthrough (if you're importing pygameUI, you dont need to also import generalUI)
 import drawDriverless as DD
 #note: coneConnecting, pathFinding and pathPlanningTemp are imported at runtime if/when needed
 
@@ -59,7 +57,7 @@ deleteCursorSet = False
 
 
 
-def handleMousePress(pygameDrawerInput, phantomMap, buttonDown, button, pos, eventToHandle):
+def handleMousePress(pygameDrawerInput, buttonDown, button, pos, eventToHandle):
     """(UI element) handle the mouse-press-events"""
     if(buttonDown and ((button == 1) or (button == 3))): #left/rigth mouse button pressed (down)
         pygame.event.set_grab(1)
@@ -70,103 +68,105 @@ def handleMousePress(pygameDrawerInput, phantomMap, buttonDown, button, pos, eve
             pygame.mouse.set_cursor(flagCurs16Data[0], flagCurs16Data[1], flagCurs16Data[2], flagCurs16Data[3]) #smaller flag cursor
     elif((button == 1) or (button == 3)): #if left/right mouse button released
         leftOrRight = (True if (button == 3) else False)
-        pygame.event.set_grab(0)
-        pygameDrawerInput.mouseCone = None
-        if(pygame.key.get_pressed()[pygame.K_r]):
-            overlaps, overlappingCone = pygameDrawerInput.mapToDraw.overlapConeCheck(pygameDrawerInput.pixelsToRealPos(pos))
+        pygame.event.set_grab(0) # allow the mouse to exit the window once again
+        pygameDrawerInput.mouseCone = None # stop drawing the hovering preview
+        posToPlace = pygameDrawerInput.pixelsToRealPos(pos) # convert to real units
+        
+        if(pygameDrawerInput.extraViewMode):
+            print("ignoring mouse click because of extraViewMode!")
+            return
+
+        normalMap = pygameDrawerInput.mapToDraw # just a more legible pointer
+        overlaps, overlappingCone = normalMap.overlapConeCheck(posToPlace)
+        allowFinish = (len(normalMap.finish_line_cones) < 2) and ((normalMap.finish_line_cones[0].LorR != (overlappingCone.LorR if overlaps else leftOrRight)) if (len(normalMap.finish_line_cones) > 0) else True)
+        allowConnect = ((len(overlappingCone.connections) < 2) if overlaps else True)
+
+        simMap = pygameDrawerInput.mapToDraw.simVars # either a map object or None
+        overlapsUndis, overlappingUndisCone = (simMap.overlapConeCheck(posToPlace) if (simMap is not None) else (False, None))
+        allowUndisFinish = ((len(simMap.finish_line_cones) < 2) and ((simMap.finish_line_cones[0].LorR != (overlappingUndisCone.LorR if overlapsUndis else leftOrRight)) if (len(simMap.finish_line_cones) > 0) else True) if (simMap is not None) else False)
+        allowUndisConnect = ((len(overlappingUndisCone.connections) < 2) if overlapsUndis else True)
+        prioritizeSimMap = (pygameDrawerInput.mapToDraw.simVars.undiscoveredCones if (simMap is not None) else False) # if 'undiscoveredCones' == True, then prioritize the simMap for certain things
+        
+        clickRequestRemove = pygame.key.get_pressed()[pygame.K_r]
+        clickRequestFinish = pygame.key.get_pressed()[pygame.K_f]
+        clickRequestConnect = pygame.key.get_pressed()[pygame.K_LSHIFT]
+
+        ## notes: it's pretty good, but connecting an undiscovered cone when there is a discovered cone on top of it is not possible 
+        ##  (i'd love to turn off the lidar temporarily, or even better; pause the whole damn simulation...)
+        ## same problem (presumably) for setting finish cones
+
+        ## mouse click UI logic for placing, removing, connecting and setting (cones) as finish:
+        if(clickRequestRemove): # if removing a cone
             if(overlaps):
                 deleting = True
                 for target in pygameDrawerInput.mapToDraw.target_list: #look through the entire list of targets (you could also just look at self.mapToDraw.target_list[-2])
                     if((overlappingCone.ID == target.coneConData.cones[overlappingCone.LorR].ID) if (target.coneConData is not None) else False): #if the only connected cone is ALSO (already) in the target_list, then you cant make any more path
-                        print("can't delete cone, it's in pathList") #just a lot easier, not impossible
+                        print("can't delete cone, it's in pathList") # note: this is temporary, will be possible at some point (when i stop being lazy)
                         deleting = False
                 if(deleting):
                     print("deleting cone:", overlappingCone.ID)
-                    if(phantomMap):
-                        #phantomMap._custom_(('DELET', overlappingCone), 1)
-                        phantomMap._custom_(('DELET', (overlappingCone.ID, overlappingCone.position)), 1)
-                        # coneList = (pygameDrawerInput.mapToDraw.right_cone_list if overlappingCone.LorR else pygameDrawerInput.mapToDraw.left_cone_list)
-                        # #coneListIndex = GF.findIndexByClassAttr(coneList, 'ID', overlappingCone.ID)
-                        # coneListIndex = coneList.index(overlappingCone)
-                        # phantomMap._logDelete_((('right_cone_list' if overlappingCone.LorR else 'left_cone_list', coneListIndex),))
+                    normalMap.removeConeObj(overlappingCone)
+            if(((not overlaps) or prioritizeSimMap) and overlapsUndis):
+                print("removing simVars cone")
+                simMap.removeConeObj(overlappingUndisCone)
+                ## loaded map was altered
+        else: # if placing, connecting or setting (cone) as finish
+            if(overlapsUndis and prioritizeSimMap): # if there's no normal cone, but there IS an undiscovered cone AND you explicitely want to interact with the simMap
+                if(clickRequestFinish):
+                    if(allowUndisFinish):
+                        print("setting simVars cone as finish:", overlappingUndisCone.ID)
+                        simMap.finish_line_cones.append(overlappingUndisCone)
                     else:
-                        pygameDrawerInput.mapToDraw.removeConeObj(overlappingCone)
-            import pathPlanningTemp as PP
-            PP.makeBoundrySplines(pygameDrawerInput.mapToDraw)
-            #TBD: phantomMap
-        else:
-            if((len(pygameDrawerInput.mapToDraw.finish_line_cones) < 2) if pygame.key.get_pressed()[pygame.K_f] else True):
-                posToPlace = pygameDrawerInput.pixelsToRealPos(pos)
-                overlaps, overlappingCone = pygameDrawerInput.mapToDraw.overlapConeCheck(posToPlace)
-                if(overlaps):
-                    if(pygame.key.get_pressed()[pygame.K_f]):
-                        if((pygameDrawerInput.mapToDraw.finish_line_cones[0].LorR != overlappingCone.LorR) if (len(pygameDrawerInput.mapToDraw.finish_line_cones) > 0) else True):
-                            overlappingCone.isFinish = True
-                            pygameDrawerInput.mapToDraw.finish_line_cones.append(overlappingCone)
-                            if(phantomMap):
-                                phantomMap._custom_(('SETFIN', overlappingCone), 0)
-                                # coneList = (pygameDrawerInput.mapToDraw.right_cone_list if overlappingCone.LorR else pygameDrawerInput.mapToDraw.left_cone_list)
-                                # coneListIndex = coneList.index(overlappingCone)
-                                # phantomMap._put_((('right_cone_list' if overlappingCone.LorR else 'left_cone_list', coneListIndex),'isFinish'), True)
-                                # phantomMap._put_((('finish_line_cones', len(pygameDrawerInput.mapToDraw.finish_line_cones)),), overlappingCone)
-                        else:
-                            print("can't set (existing) cone as finish, there's aready a "+("right" if leftOrRight else "left")+"-sided finish cone")
-                    else:
-                        import coneConnecting as CC
-                        connectSuccess, winningCone = CC.connectCone(pygameDrawerInput.mapToDraw, overlappingCone)
-                        #if(connectSuccess): #this check is only to avoid needless overhead on the master thread. If the (exact same) function says the cone can't connect here, there's no reason to try over on the master
-                        if(phantomMap):
-                            ## the custom-instruction way (much cleaner, especially for pointers and such)
-                            #phantomMap._custom_(('CONNEC', overlappingCone), 0)
-                            phantomMap._custom_(('CONNEC', (overlappingCone.ID, overlappingCone.position)), 1)
-                            ## the manual way
-                            # coneList = (pygameDrawerInput.mapToDraw.right_cone_list if overlappingCone.LorR else pygameDrawerInput.mapToDraw.left_cone_list)
-                            # #coneListIndex = GF.findIndexByClassAttr(coneList, 'ID', overlappingCone.ID)
-                            # coneListIndex = coneList.index(overlappingCone)
-                            # # # phantomMap._put_((('right_cone_list' if overlappingCone.LorR else 'left_cone_list', coneListIndex),), overlappingCone) #overwrite existing cone entirely
-                            # # phantomMap._put_((('right_cone_list' if overlappingCone.LorR else 'left_cone_list', coneListIndex),('connections',len(overlappingCone.connections)-1)), overlappingCone.connections[-1]) #overwrite only connection data
-                            # # phantomMap._put_((('right_cone_list' if overlappingCone.LorR else 'left_cone_list', coneListIndex),('connections',len(overlappingCone.coneConData)-1)), overlappingCone.coneConData[-1]) #overwrite only connection data
-                            # phantomMap._append_((('right_cone_list' if overlappingCone.LorR else 'left_cone_list', coneListIndex),('connections',)), overlappingCone.connections) #overwrite only connection data
-                            # phantomMap._append_((('right_cone_list' if overlappingCone.LorR else 'left_cone_list', coneListIndex),('coneConData',)), overlappingCone.coneConData) #overwrite only connection data
-                            
-                            # coneListIndex = coneList.index(winningCone)
-                            # # # phantomMap._put_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),), winningCone) #overwrite existing cone entirely
-                            # # phantomMap._put_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('connections',len(winningCone.connections)-1)), winningCone.connections[-1]) #overwrite only connection data
-                            # # phantomMap._put_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('connections',len(winningCone.coneConData)-1)), winningCone.coneConData[-1]) #overwrite only connection data
-                            # phantomMap._append_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('connections',)), winningCone.connections) #overwrite only connection data
-                            # phantomMap._append_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('coneConData',)), winningCone.coneConData) #overwrite only connection data
+                        print("could not set simVars finish cone!")
+                # if(clickRequestConnect): # clickRequestConnect is implicit from clicking on an existing cone, but i might use prioritizeSimMap to require it or something (idk)
                 else:
-                    # newConeID = GF.findMaxAttrIndex((pygameDrawerInput.mapToDraw.right_cone_list + pygameDrawerInput.mapToDraw.left_cone_list), 'ID')[1]
-                    # aNewCone = Map.Cone(newConeID+1, posToPlace, leftOrRight, bool(pygame.key.get_pressed()[pygame.K_f]))
-                    if(((pygameDrawerInput.mapToDraw.finish_line_cones[0].LorR != leftOrRight) if (len(pygameDrawerInput.mapToDraw.finish_line_cones) > 0) else True) if pygame.key.get_pressed()[pygame.K_f] else True):
-                        conePlaceSuccess, coneInList = pygameDrawerInput.mapToDraw.addCone(posToPlace, leftOrRight, bool(pygame.key.get_pressed()[pygame.K_f]))
-                        if(conePlaceSuccess):
-                            connectSuccess=False; winningCone=None #init vars
-                            if(pygame.key.get_pressed()[pygame.K_LSHIFT]):
-                                import coneConnecting as CC
-                                connectSuccess, winningCone = CC.connectCone(pygameDrawerInput.mapToDraw, coneInList)
-                            if(phantomMap):
-                                ## the custom-instruction way
-                                #phantomMap._custom_(('PLACE', coneInList, bool(pygame.key.get_pressed()[pygame.K_f])), 0)
-                                phantomMap._custom_(('PLACE', (posToPlace, leftOrRight, bool(pygame.key.get_pressed()[pygame.K_f])), bool(pygame.key.get_pressed()[pygame.K_LSHIFT])), 0)
-                                ## the manual way
-                                # coneList = (pygameDrawerInput.mapToDraw.right_cone_list if coneInList.LorR else pygameDrawerInput.mapToDraw.left_cone_list)
-                                # #coneListIndex = GF.findIndexByClassAttr(coneList, 'ID', coneInList.ID)
-                                # coneListIndex = coneList.index(coneInList)
-                                # phantomMap._put_((('right_cone_list' if coneInList.LorR else 'left_cone_list', coneListIndex),), coneInList)
-                                # if(coneInList.isFinish):
-                                #     # phantomMap._put_((('finish_line_cones', len(pygameDrawerInput.mapToDraw.finish_line_cones)-1),), coneInList)
-                                #     phantomMap._append_((('finish_line_cones', ),), pygameDrawerInput.mapToDraw.finish_line_cones)
-                                # if(connectSuccess):
-                                #     coneListIndex = coneList.index(winningCone)
-                                #     # # phantomMap._put_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),), winningCone) #overwrite existing cone entirely
-                                #     # phantomMap._put_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('connections',len(winningCone.connections)-1)), winningCone.connections[-1]) #overwrite only connection data
-                                #     # phantomMap._put_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('coneConData',len(winningCone.coneConData)-1)), winningCone.coneConData[-1]) #overwrite only connection data
-                                #     phantomMap._append_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('connections', )), winningCone.connections) #overwrite only connection data
-                                #     phantomMap._append_((('right_cone_list' if winningCone.LorR else 'left_cone_list', coneListIndex),('coneConData', )), winningCone.coneConData) #overwrite only connection data
-                import pathPlanningTemp as PP
-                PP.makeBoundrySplines(pygameDrawerInput.mapToDraw)
-                #TBD: phantomMap?
+                    if(allowUndisConnect):
+                        print("connecting simVars cone:", overlappingUndisCone.ID)
+                        import coneConnecting as CC
+                        connectSuccess, winningCone = CC.connectCone(simMap, overlappingUndisCone)
+                    else:
+                        print("could not simVars connect cone!")
+            elif(overlaps):
+                print("overlaps")
+                if(clickRequestFinish):
+                    if(allowFinish):
+                        print("setting cone as finish:", overlappingCone.ID)
+                        normalMap.finish_line_cones.append(overlappingCone)
+                    else:
+                        print("could not set finish cone!")
+                # if(clickRequestConnect): # clickRequestConnect is implicit from clicking on an existing cone, but i might use prioritizeSimMap to require it or something (idk)
+                else:
+                    if(allowConnect):
+                        print("connecting cone:", overlappingCone.ID)
+                        import coneConnecting as CC
+                        connectSuccess, winningCone = CC.connectCone(normalMap, overlappingCone)
+                    else:
+                        print("could not connect cone!")
+            else: # (there no normal cones or undiscovered cones where you clicked:) placing a new cone
+                if(prioritizeSimMap):
+                    conePlaceSuccess, coneInList = simMap.addCone(posToPlace, leftOrRight, clickRequestFinish) # addCone has its own 'allowFinish' checking
+                    if(clickRequestConnect and conePlaceSuccess):
+                        if(allowUndisConnect):
+                            print("connecting newly placed simVars cone:", coneInList.ID)
+                            import coneConnecting as CC
+                            connectSuccess, winningCone = CC.connectCone(simMap, coneInList)
+                        else:
+                            print("could not connect newly placed cone!")
+                else:
+                    conePlaceSuccess, coneInList = normalMap.addCone(posToPlace, leftOrRight, clickRequestFinish) # addCone has its own 'allowFinish' checking
+                    if(clickRequestConnect and conePlaceSuccess):
+                        if(allowConnect):
+                            print("connecting newly placed cone:", coneInList.ID)
+                            import coneConnecting as CC
+                            connectSuccess, winningCone = CC.connectCone(normalMap, coneInList)
+                        else:
+                            print("could not connect newply placed cone!")
+
+        try:
+            import pathPlanningTemp as PP
+            PP.makeBoundrySplines(normalMap)
+        except:
+            doNothing = 0
         if(pygame.key.get_pressed()[pygame.K_f]): #flag cursor stuff
             pygame.mouse.set_cursor(flagCurs24Data[0], flagCurs24Data[1], flagCurs24Data[2], flagCurs24Data[3]) #smaller flag cursor
     elif(button==2): #middle mouse button
@@ -183,7 +183,7 @@ def handleMousePress(pygameDrawerInput, phantomMap, buttonDown, button, pos, eve
             pygameDrawerInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
             pygameDrawerInput.movingViewOffset = False
 
-def handleKeyPress(pygameDrawerInput, phantomMap, keyDown, key, eventToHandle):
+def handleKeyPress(pygameDrawerInput, keyDown, key, eventToHandle):
     """(UI element) handle the key-press-events"""
     if(key==pygame.K_f): # f
         global flagCursorSet
@@ -209,47 +209,34 @@ def handleKeyPress(pygameDrawerInput, phantomMap, keyDown, key, eventToHandle):
             deleteCursorSet = False
     elif(keyDown): #most things only happen on keyDown, this just saves a few lines
         if(key==pygame.K_p): # p
-            if(phantomMap):
-                phantomMap._custom_(('PATH', -1), 0)
-            else:
-                import pathFinding    as PF
-                #PF.makePath(pygameDrawerInput.mapToDraw) #find a single path point
-                limitCounter = 0
-                while(PF.makePath(pygameDrawerInput.mapToDraw) and (limitCounter<25)): #stops when path can no longer be advanced
-                    limitCounter += 1
-                import pathPlanningTemp as PP
-                PP.makePathSpline(pygameDrawerInput.mapToDraw)
+            import pathFinding    as PF
+            #PF.makePath(pygameDrawerInput.mapToDraw) #find a single path point
+            limitCounter = 0
+            while(PF.makePath(pygameDrawerInput.mapToDraw) and (limitCounter<25)): #stops when path can no longer be advanced
+                limitCounter += 1
+            import pathPlanningTemp as PP
+            PP.makePathSpline(pygameDrawerInput.mapToDraw)
         elif((key==pygame.K_a) or ((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)) or (key==pygame.K_MINUS)):
             if(key==pygame.K_a): # a
                 if(pygameDrawerInput.mapToDraw.car.pathFolData is not None):
                     pygameDrawerInput.mapToDraw.car.pathFolData.auto = not pygameDrawerInput.mapToDraw.car.pathFolData.auto
-                    if(not pygameDrawerInput.isRemote):
-                        pygameDrawerInput.mapToDraw.car.desired_velocity = 0.0
-                        pygameDrawerInput.mapToDraw.car.desired_steering = 0.0
-                        try:
-                            pygameDrawerInput.mapToDraw.car.sendSpeedAngle(pygameDrawerInput.mapToDraw.car.desired_velocity, pygameDrawerInput.mapToDraw.car.desired_steering)
-                        except:
-                            print("couldn't send stopping insctruction")
-                    # if(phantomMap):
-                    #     phantomMap._put_(('car','pathFolData','auto'), pygameDrawerInput.mapToDraw.car.pathFolData.auto)
-                    #     phantomMap._put_(('car','desired_velocity'), 0.0)
-                    #     phantomMap._put_(('car','desired_steering'), 0.0)
+                    #if(not pygameDrawerInput.isRemote):
+                    pygameDrawerInput.mapToDraw.car.desired_velocity = 0.0
+                    pygameDrawerInput.mapToDraw.car.desired_steering = 0.0
+                    try:
+                        pygameDrawerInput.mapToDraw.car.sendSpeedAngle(pygameDrawerInput.mapToDraw.car.desired_velocity, pygameDrawerInput.mapToDraw.car.desired_steering)
+                    except:
+                        print("couldn't send stopping insctruction")
             elif((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)): # +
                 if(pygameDrawerInput.mapToDraw.car.pathFolData is not None):
                     pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity += 0.25
-                    # if(phantomMap):
-                    #     phantomMap._put_(('car','pathFolData','targetVelocity'), pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity)
             elif(key==pygame.K_MINUS): # -
                 if(pygameDrawerInput.mapToDraw.car.pathFolData is not None):
                     pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity -= 0.25
                     if(pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity < 0):
                         pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity = 0
-                    # if(phantomMap):
-                    #     phantomMap._put_(('car','pathFolData','targetVelocity'), pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity)
-            if(phantomMap):
-                phantomMap._custom_(('AUTO', pygameDrawerInput.mapToDraw.car.pathFolData.auto, pygameDrawerInput.mapToDraw.car.pathFolData.targetVelocity), 0)
         elif(key==pygame.K_q): # q (cubic splines sounds like 'q'-bic, also i suck at spelling)
-            pygameDrawerInput.drawQubicSplines = not pygameDrawerInput.drawQubicSplines #only has (the desired) effect if pyagmesimInput.mapToDraw.pathPlanningPresent == True
+            pygameDrawerInput.drawCubicSplines = not pygameDrawerInput.drawCubicSplines #only has (the desired) effect if pyagmesimInput.mapToDraw.pathPlanningPresent == True
         elif(key==pygame.K_t): # t
             pygameDrawerInput.drawTargetConeLines = not pygameDrawerInput.drawTargetConeLines #only has an effect if pyagmesimInput.mapToDraw.pathFinderPresent == True
         elif(key==pygame.K_l): # l
@@ -258,7 +245,43 @@ def handleKeyPress(pygameDrawerInput, phantomMap, keyDown, key, eventToHandle):
                 pygameDrawerInput.drawConeSlamData = 0
         elif(key==pygame.K_h): # h
             pygameDrawerInput.headlights = not pygameDrawerInput.headlights #only has an effect if car sprite is used (.carPolygonMode)
-#        elif(key==pygame.K_d): # d
+        elif(key==pygame.K_c): # c
+            # if(pygame.key.get_pressed()[pygame.K_LCTRL]): #causes too many problems, just restart the program or run pygameDrawerInput.__init__ again
+            #     #reset everything
+            pygameDrawerInput.carHistPoints = []
+            pygameDrawerInput.carHistTimer = pygameDrawerInput.mapToDraw.clock() #reset timer
+            pygameDrawerInput.drawCarHist = not pygameDrawerInput.drawCarHist
+        elif(key==pygame.K_v): # v
+            if(pygame.key.get_pressed()[pygame.K_LCTRL]):
+                pygameDrawerInput.extraViewMode = not pygameDrawerInput.extraViewMode
+            else:
+                pygameDrawerInput.carCam = not pygameDrawerInput.carCam
+                if(pygameDrawerInput.carCam and pygameDrawerInput.movingViewOffset): #if you switched to carCam while you were moving viewOffset, just stop moving viewOffset (same as letting go of MMB)
+                    pygame.event.set_grab(0)
+                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                    pygameDrawerInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
+                    pygameDrawerInput.movingViewOffset = False
+        # elif(key==pygame.K_RIGHTBRACKET):
+        #     if(pygameDrawerInput.isRemote):
+        #         pygameDrawerInput.remoteFPS += 2
+        # elif(key==pygame.K_LEFTBRACKET):
+        #     if(pygameDrawerInput.isRemote):
+        #         pygameDrawerInput.remoteFPS -= 2
+        #         if(pygameDrawerInput.remoteFPS <= 0):
+        #             pygameDrawerInput.remoteFPS = 1
+        elif(key==pygame.K_s): # s
+            try:
+                import map_loader as ML
+                saveStartTime = time.time()
+                mapfilename, _ = ML.save_map(pygameDrawerInput.mapToDraw) #currently, file name is auto-generated, because requesting UI text field input is a lot of effort, and python input() is blocking
+                pygameDrawerInput.lastMapFilename = mapfilename
+                print("save_map took", round(time.time()-saveStartTime, 2), "seconds")
+            except Exception as excep:
+                print("failed to save file, exception:", excep)
+        elif(key==pygame.K_m): # m
+            if(pygameDrawerInput.mapToDraw.simVars is not None):
+                pygameDrawerInput.mapToDraw.simVars.undiscoveredCones = not pygameDrawerInput.mapToDraw.simVars.undiscoveredCones # toggle
+#        elif(key==pygame.K_d): # d   (for debug)
 #            ## (debug) printing the pickle size of individual components in the map object
 #            import pickle
 #            print("total len:", len(pickle.dumps(pygameDrawerInput.mapToDraw)))
@@ -284,43 +307,8 @@ def handleKeyPress(pygameDrawerInput, phantomMap, keyDown, key, eventToHandle):
 #                    if(len(item)>2):
 #                        printComponentPickleSizes(item[2], _recursion+1)
 #            printComponentPickleSizes(getComponentPickleSize(pygameDrawerInput.mapToDraw, 2, 2000))
-        elif(key==pygame.K_c): # c
-            # if(pygame.key.get_pressed()[pygame.K_LCTRL]): #causes too many problems, just restart the program or run pygameDrawerInput.__init__ again
-            #     #reset everything
-            pygameDrawerInput.carHistPoints = []
-            pygameDrawerInput.carHistTimer = pygameDrawerInput.mapToDraw.clock() #reset timer
-            pygameDrawerInput.drawCarHist = not pygameDrawerInput.drawCarHist
-        elif(key==pygame.K_v): # v
-            if(pygame.key.get_pressed()[pygame.K_LCTRL]):
-                pygameDrawerInput.extraViewMode = not pygameDrawerInput.extraViewMode
-            else:
-                pygameDrawerInput.carCam = not pygameDrawerInput.carCam
-                if(pygameDrawerInput.carCam and pygameDrawerInput.movingViewOffset): #if you switched to carCam while you were moving viewOffset, just stop moving viewOffset (same as letting go of MMB)
-                    pygame.event.set_grab(0)
-                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-                    pygameDrawerInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
-                    pygameDrawerInput.movingViewOffset = False
-        elif(key==pygame.K_RIGHTBRACKET):
-            if(pygameDrawerInput.isRemote):
-                pygameDrawerInput.remoteFPS += 2
-                phantomMap._custom_(('FPSADJ', int(pygameDrawerInput.remoteFPS)), 2)
-        elif(key==pygame.K_LEFTBRACKET):
-            if(pygameDrawerInput.isRemote):
-                pygameDrawerInput.remoteFPS -= 2
-                if(pygameDrawerInput.remoteFPS <= 0):
-                    pygameDrawerInput.remoteFPS = 1
-                phantomMap._custom_(('FPSADJ', int(pygameDrawerInput.remoteFPS)), 2)
-        elif(key==pygame.K_s): # s
-            if(pygameDrawerInput.isRemote):
-                phantomMap._custom_(('MAPSAV', None), 2)
-            else:
-                try:
-                    import map_loader as ML
-                    saveStartTime = time.time()
-                    ML.save_map(pygameDrawerInput.mapToDraw) #currently, file name is auto-generated, because requesting UI text field input is a lot of effort, and python input() is blocking
-                    print("save_map took", round(time.time()-saveStartTime, 2), "seconds")
-                except Exception as excep:
-                    print("failed to save file, exception:", excep)
+
+
 # def currentpygameDrawerInput(pygameDrawerInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
 #     """(UI element) return the pygameDrawer that the mouse is hovering over, or the one you interacted with last"""
 #     if(len(pygameDrawerInputList) > 1):
@@ -340,7 +328,7 @@ def handleKeyPress(pygameDrawerInput, phantomMap, keyDown, key, eventToHandle):
 #     else:
 #         return(pygameDrawerInputList[0])
 
-def handleWindowEvent(pygameDrawerInput, phantomMap, eventToHandle):
+def handleWindowEvent(pygameDrawerInput, eventToHandle):
     """(UI element) handle general (pygame) window-event"""
     if(eventToHandle.type == pygame.QUIT):
         #global windowKeepRunning
@@ -373,35 +361,29 @@ def handleWindowEvent(pygameDrawerInput, phantomMap, eventToHandle):
     elif(eventToHandle.type == pygame.DROPFILE): #drag and drop files to import them
         #pygameDrawerInput = currentpygameDrawerInput(pygameDrawerInputList, None, False)
         print("attempting to load drag-dropped file:", eventToHandle.file)
-        if(phantomMap):
-            if(pygameDrawerInput.isRemote):
-                try:
-                    strippedFileName = os.path.basename(eventToHandle.file)
-                    print("sending map_file to remote client:", strippedFileName)
-                    phantomMap._custom_(('MAPLOD', strippedFileName, open(eventToHandle.file, "rb").read()), 2)
-                except Exception as excep:
-                    print("failed to read dropFile (to send to remote instance):", excep)
+        try:
+                #note: drag and drop functionality is a little iffy for multisim applications
+            import map_loader as ML
+            if((pygameDrawerInput.mapToDraw.simVars.undiscoveredCones) if (pygameDrawerInput.mapToDraw.simVars is not None) else False):
+                print("loading mapfile into .simVars!")
+                ML.load_map(eventToHandle.file, pygameDrawerInput.mapToDraw.simVars)
             else:
-                print("loading map_file (on another thread):", os.path.basename(eventToHandle.file))
-                phantomMap._custom_(('MAPLOD', eventToHandle.file), 2)
-        else:
-            try:
-                import map_loader as ML
-                ML.load_map(eventToHandle.file, pygameDrawerInput.mapToDraw) #note: drag and drop functionality is a little iffy for multisim applications
-                print("loaded file successfully")
-                #TBD: phantomMap
-            except Exception as excep:
-                print("failed to load drag-dropped file, exception:", excep)
+                ML.load_map(eventToHandle.file, pygameDrawerInput.mapToDraw)
+            import os
+            _, pygameDrawerInput.lastMapFilename = os.path.split(eventToHandle.file) # save the name of the loaded mapfile
+            print("loaded file successfully")
+        except Exception as excep:
+            print("failed to load drag-dropped file, exception:", excep)
     
     elif((eventToHandle.type == pygame.MOUSEBUTTONDOWN) or (eventToHandle.type == pygame.MOUSEBUTTONUP)):
         #print("mouse press", eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos)
         #handleMousePress(currentpygameDrawerInput(pygameDrawerInputList, eventToHandle.pos, True), eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos, eventToHandle)
-        handleMousePress(pygameDrawerInput, phantomMap, eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos, eventToHandle)
+        handleMousePress(pygameDrawerInput, eventToHandle.type == pygame.MOUSEBUTTONDOWN, eventToHandle.button, eventToHandle.pos, eventToHandle)
         
     elif((eventToHandle.type == pygame.KEYDOWN) or (eventToHandle.type == pygame.KEYUP)):
         #print("keypress:", eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, pygame.key.name(eventToHandle.key))
         #handleKeyPress(currentpygameDrawerInput(pygameDrawerInputList, None, True), eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, eventToHandle)
-        handleKeyPress(pygameDrawerInput, phantomMap, eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, eventToHandle)
+        handleKeyPress(pygameDrawerInput, eventToHandle.type == pygame.KEYDOWN, eventToHandle.key, eventToHandle)
     
     elif(eventToHandle.type == pygame.MOUSEWHEEL): #scroll wheel (zooming / rotating)
         #simToScale = currentpygameDrawerInput(pygameDrawerInputList, None, True)
@@ -421,7 +403,7 @@ def handleWindowEvent(pygameDrawerInput, phantomMap, eventToHandle):
             simToScale.viewOffset[0] -= dif[0]/2 #equalizes from the zoom to 'happen' from the middle of the screen
             simToScale.viewOffset[1] -= dif[1]/2
 
-def handleAllWindowEvents(pygameDrawerInput, phantomMap=None):
+def handleAllWindowEvents(pygameDrawerInput):
     """(UI element) loop through (pygame) window-events and handle all of them"""
     # pygameDrawerInputList = []
     # if(type(pygameDrawerInput) is list):
@@ -444,7 +426,7 @@ def handleAllWindowEvents(pygameDrawerInput, phantomMap=None):
     for eventToHandle in pygame.event.get(): #handle all events
         if(eventToHandle.type != pygame.MOUSEMOTION): #skip mousemotion events early (fast)
             #handleWindowEvent(pygameDrawerInputList, eventToHandle)
-            handleWindowEvent(pygameDrawerInput, phantomMap, eventToHandle)
+            handleWindowEvent(pygameDrawerInput, eventToHandle)
     
     # #the manual keyboard driving (tacked on here, because doing it with the event system would require more variables, and this is temporary anyway)
     # #simToDrive = currentpygameDrawerInput(pygameDrawerInputList, demandMouseFocus=False) #get the active sim within the window
@@ -485,6 +467,3 @@ def handleAllWindowEvents(pygameDrawerInput, phantomMap=None):
     #         else:
     #             carToDrive.steering = 0
     #     carToDrive.steering = max(np.deg2rad(-25), min(np.deg2rad(25), carToDrive.steering)) #limit speed
-    #     # if(phantomMap):
-    #     #     phantomMap._put_(('car','velocity'), carToDrive.velocity)
-    #     #     phantomMap._put_(('car','steering'), carToDrive.steering)

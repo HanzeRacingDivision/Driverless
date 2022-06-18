@@ -218,25 +218,30 @@ class pygameDrawer(pygameDrawerCommon):
                         invConeColor = [255-coneColor[0], 255-coneColor[1], 255-coneColor[2]]
                         
                         trueConePos = cone.slamData[0][0] #used to check if simulation is working correctly
-                        pygame.draw.ellipse(self.window, invConeColor, [GF.ASA(-(conePixelDiam/6), self.realToPixelPos(trueConePos)), [conePixelDiam/3, conePixelDiam/3]]) #draw cone
+                        #pygame.draw.ellipse(self.window, invConeColor, [GF.ASA(-(conePixelDiam/6), self.realToPixelPos(trueConePos)), [conePixelDiam/3, conePixelDiam/3]]) #draw cone
                         
                         try: #the blob does not HAVE to be stored in slamData (consider the extra pickling time), so if i end up removeing it, please also uncomment this
                             if(drawSlamData > 1):
                                 blob = cone.slamData[-1][2]
                                 adjustedConeDiam = Map.Cone.coneLidarDiam #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
+                                perpAdd = np.pi/2 # we can assume (or calculate only once) the direction of the perpendicular angle, by knowing the rotation direction of the lidar
                                 for i in range(blob['pointCount']-1):
-                                    superAdjustedConeRadius = np.cos(np.arcsin((blob['lines'][i][0]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
                                     pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blob['points'][i]), self.realToPixelPos(blob['points'][i+1]), self.coneConnectionLineWidth)
-                                    blobLineCenter = GF.distAnglePosToPos(blob['lines'][i][0]/2, blob['lines'][i][1], blob['points'][i])
-                                    blobLinePerpPos = GF.distAnglePosToPos(superAdjustedConeRadius, blob['lines'][i][1]+(np.pi/2), blobLineCenter)
-                                    pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blobLineCenter), self.realToPixelPos(blobLinePerpPos), self.coneConnectionLineWidth)
+                                    ## the indirect way:
+                                    # superAdjustedConeRadius = np.cos(np.arcsin((blob['lines'][i][0]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
+                                    # blobLineCenter = GF.distAnglePosToPos(blob['lines'][i][0]/2, blob['lines'][i][1], blob['points'][i])
+                                    # blobLinePerpPos = GF.distAnglePosToPos(superAdjustedConeRadius, blob['lines'][i][1]+perpAdd, blobLineCenter)
+                                    # pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blobLineCenter), self.realToPixelPos(blobLinePerpPos), self.coneConnectionLineWidth)
+                                    ## the direct way:
+                                    blobPointConePos = GF.distAnglePosToPos((adjustedConeDiam/2), blob['lines'][i][1] + perpAdd - np.arcsin(blob['lines'][i][0] / adjustedConeDiam), blob['points'][i]) # alt version (untested)
+                                    pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blob['points'][i]), self.realToPixelPos(blobPointConePos), self.coneConnectionLineWidth)
                         except:
                             doNothing = 0
                         
                         textStr = str(cone.slamData[-1][-1]) #get total-spotted-count
                         renderedText = self.pygameFont.render(textStr, False, invConeColor, coneColor)
                         coneTextPos = [conePos[0] - renderedText.get_size()[0]/2, conePos[1] - renderedText.get_size()[1]/2] #to topleft corner of text size
-                        self.window.blit(renderedText, coneTextPos)
+                        #self.window.blit(renderedText, coneTextPos)
                 else:
                     textStr = str(cone.ID) #get total-spotted-count
                     renderedText = self.pygameFont.render(textStr, False, [255-coneColor[0], 255-coneColor[1], 255-coneColor[2]], coneColor)

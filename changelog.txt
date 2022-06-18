@@ -3,13 +3,43 @@ updated mapfile format to include ConeID column. map_loader.py was of course upd
 removed coneConnecterPresent, pathFinderPresent, pathPlanningPresent and SLAMPresent from all code, because those are assumed to always be true
 small fixes drawDriverless and pygameUI and generalUI, but large changes (phasing out phantomMap???) are TBD
 added 'applyUpdate' to simulatedCar.update() function and changed what it returns (from True to the posDiff, angle)
-made simulatedLidar.py (which involved adding a .simulationVariables to the Map class)
+made simulatedLidar.py (which involved adding a .simVars to the Map class)
 fixed simulatedLidar.py (because i messed up the un-drifted positions a bunch, and it's possible that lidarBlobsProcSimulated did as well...)
+added mapSimVarClass to Map.py (to go in .simVars). this will store lidarSimVars and undetected cones
+updated map_loader to store the cones in Map.simVars
+the simCar object used for positionalDrift is now stored in the Map.simVars (instead of the within the masterMap.car)
+added undiscoveredCones to simulate 'discovering' cones through (simulated) sensor data
+removed phantomMap from code (and generalUI.py)
+renamed drawQubicSplines to drawCubicSplines (because it's grammatically correct)
+reworked drawCones() in drawDriverless.py to include undiscovered cones
+reworked pygameUI mouse click logic (made it hopefully more legible) and incorporated undiscovered cones
+small change in lidarBlobs(NoNumba) involving the way the cone position is calculated (just slightly faster math)
+save undiscoveredCones to a second mapfile
+in coneConnecting.py, changed coneConnectionThreshold to maxConnectionDist (becuase it more clearly exaplains its function)
+also in coneConnecting.py, added printDebug boolean option to connectCone functions
+added a dashed line function to drawDriverless (only in topdown, not 3D, for now)
+changed the way mousecones are drawn in drawDriverless (using connectCone() with applyResult=False)
+display loaded mapfile name in the corner of the screen
+cone.slamData now has a struct (see SLAM_DIY.py) instead of being a list
 
-next up: fix cone.slamData (that shit deserves a struct class)
-undetected cones from mapfile to (simulation only!) location
-pickle file map loading?
+next up:
+a (better?) warning when SLAM refuses to work (too much correction)
+make parameters and maps for big car (wheelbase, max lidar range, rules-compliant cone-connection stuff, the whole thing!)
+add/update function comments (""" """) to all changes
+bring (back?) zooming with an offset (based on mouse position) (so i can test with my trackpad)
+make simulatedVision (bad positions, good color data) to help simulatedLidar do its thing
+make use of the (now available) vision data in DIY_SLAM
+update target positions if cone positions change(?)
+basic DSP (filtering) on the steering?? idk man, it seems like there is a lot of predictable oscillation, maybe DSP will help (or not, if freq is too low)
+delaunay triangulation testing (make a basic implementation and draw it, then we'll figure out what to do with it later)
+button for toggling spline dots
+3d render engine undiscovered cones and splines and all that (just more stuff in general?)
+more efficient 3d rendering? (numpy/numba?)
 automation (automatic first lap track construction)
+pickle file map loading?
+making 'simulation' a boolean in the map class??? (instead of having to check the contents of .simVar and whatnot)
+
+note: lidar arduino blobs are still in MM, while blobs here are in meters (same unit as the rest of the code, makes things easier)
 
 improved hardcoded auto-driving?
 improved UI for making maps?

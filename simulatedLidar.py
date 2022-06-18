@@ -24,8 +24,8 @@ if(SIMULATE_SAMPLING):
 
 LIDAR_FULL_ROTATION_FREQ = 5 # 300 RPM == 5 RPS
 ## variables:
-class simulatedLidarVariables: #a class to go in Map.simulationVariables (these are the only varibles in simulatedLidar.py, this seemed cleaner than using global variables)
-    """some data to go in .simulationVariables of the Map"""
+class simulatedLidarVariables: #a class to go in Map.simVars (these are the only varibles in simulatedLidar.py, this seemed cleaner than using global variables)
+    """some data to go in .simVars.lidarSimVars of the Map"""
     def __init__(self):
         self.lidarSimulatedAngle = 0.0 # if the simulated lidar is sampled faster than LIDAR_FULL_ROTATION_FREQ, the lidar's current rotation angle determines what it has seens since last time
         self.lidarLastSampleTimestamp = 0.0
@@ -53,7 +53,7 @@ def getCones(mapToUse):
     rightNow = mapToUse.clock()
     returnList = []
     for lidarIndex in range(len(mapToUse.car.lidarOffsets)):
-        simVariables = mapToUse.simulationVariables[lidarIndex]
+        simVariables = mapToUse.simVars.lidarSimVars[lidarIndex]
         timeSinceLastSampling = rightNow - simVariables.lidarLastSampleTimestamp
         prevLidarAngle = simVariables.lidarSimulatedAngle
         simVariables.lidarSimulatedAngle = GF.radRoll((2*np.pi*LIDAR_FULL_ROTATION_FREQ)*rightNow) # absolute sinusoidal angle
@@ -61,18 +61,29 @@ def getCones(mapToUse):
         simVariables.lidarLastSampleTimestamp = rightNow
         
         # lidarPos = calcLidarPos(mapToUse, lidarIndex)
-        # if((mapToUse.car.simulationVariables is not None) if hasattr(mapToUse.car, 'simulationVariables') else False): # should always be true, but just to be sure
-        lidarPos = calcLidarPos(mapToUse, lidarIndex, carToUse=mapToUse.car.simulationVariables)
+        # if((mapToUse.simVars.car is not None) if (mapToUse.simVars is not None) else False): # should always be true, but just to be sure
+        lidarPos = calcLidarPos(mapToUse, lidarIndex, carToUse=mapToUse.simVars.car)
+
         ## i use distanceToCone() to easily filter the nearby cones, but the distAngle is incorrect (becuase the positions of the cones are incorrect)
-        nearbyConeList = mapToUse.distanceToCone(lidarPos, None, sortBySomething='SORTBY_ANGL', simpleThreshold=RANGE_LIMIT, angleThreshRange=([] if (timeSinceLastSampling < (1/LIDAR_FULL_ROTATION_FREQ)) else [prevLidarAngle, simVariables.lidarSimulatedAngle]))
+        nearbyConeList = None # init var
+        coneLists = mapToUse.left_cone_list + mapToUse.right_cone_list
+        if(mapToUse.simVars is not None): # should always be true
+            if(mapToUse.simVars.undiscoveredCones or ((len(mapToUse.simVars.left_cone_list) + len(mapToUse.simVars.right_cone_list)) > 0)): # undiscoveredCones is also used by UI stuff, so may not be entirely helpful
+                coneLists = mapToUse.simVars.left_cone_list + mapToUse.simVars.right_cone_list
+        if(timeSinceLastSampling < (1/LIDAR_FULL_ROTATION_FREQ)):
+            nearbyConeList = mapToUse.distanceToCone(lidarPos, coneLists, sortBySomething='SORTBY_ANGL', simpleThreshold=RANGE_LIMIT, angleThreshRange=[prevLidarAngle, simVariables.lidarSimulatedAngle])
+        else:
+            nearbyConeList = mapToUse.distanceToCone(lidarPos, coneLists, sortBySomething='SORTBY_ANGL', simpleThreshold=RANGE_LIMIT)
+            #nearbyConeList = mapToUse.distanceToConeSquared(lidarPos, None, sortByDistance=False, simpleSquaredThreshold=(RANGE_LIMIT**2)) # faster, but you cant sort by angle, which breaks the obscurity check later
+        
         returnList.append([])
         for i in range(len(nearbyConeList)): # a forloop to check for obscu
-            cone, distAngle = nearbyConeList[i]
+            cone, _ = nearbyConeList[i]
             # conePos = cone.position
-            # if((mapToUse.car.simulationVariables is not None) if hasattr(mapToUse.car, 'simulationVariables') else False): # should always be true, but just to be sure
+            # if((mapToUse.simVars.car is not None) if (mapToUse.simVars is not None) else False): # should always be true, but just to be sure
             realActualConePos = (cone.position if (cone.slamData is None) else cone.slamData[0][0]) # the simulated lidar must use the 'real' (unmoving) cone position to 'measure' from (but if the cone has no slamData yet, use .position)
             distAngle = GF.distAngleBetwPos(lidarPos, realActualConePos) # get dist and angle between true lidar and true cone positions to get the angle that should be measured
-            distAngle[1] += mapToUse.car.angle - mapToUse.car.simulationVariables.angle # now distAngle holds the 'measured' distance and angle
+            distAngle[1] += mapToUse.car.angle - mapToUse.simVars.car.angle # now distAngle holds the 'measured' distance and angle
             conePos = GF.distAnglePosToPos(distAngle[0], distAngle[1], mapToUse.car.position) # apply true (what the real lidar would measure) dist&angle data to the believed (drifted) car pos&angle.
             
             outerEdgeAngles = [distAngle[1] - np.arctan2(Map.Cone.coneDiam/2, distAngle[0]), distAngle[1] + np.arctan2(Map.Cone.coneDiam/2, distAngle[0])]

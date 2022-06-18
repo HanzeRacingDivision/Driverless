@@ -96,10 +96,12 @@ def blobToConePos(blob): #calculate the position the cone would have over here, 
         #     perpAdd = -perpAdd
         #     print("warning: lidar measurement not simply CW?")
         for i in range(blob['pointCount']-1):
-            superAdjustedConeRadius = np.cos(np.arcsin((blob['lines'][i][0]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
-            perpAngle = blob['lines'][i][1] + perpAdd
-            lineCenter = GF.distAnglePosToPos(blob['lines'][i][0]/2, blob['lines'][i][1], blob['points'][i])
-            conePos = GF.distAnglePosToPos(superAdjustedConeRadius, perpAngle, lineCenter)
+            ## the indirect way:
+            # superAdjustedConeRadius = np.cos(np.arcsin((blob['lines'][i][0]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
+            # lineCenter = GF.distAnglePosToPos(blob['lines'][i][0]/2, blob['lines'][i][1], blob['points'][i])
+            # conePos = GF.distAnglePosToPos(superAdjustedConeRadius, blob['lines'][i][1] + perpAdd, lineCenter)
+            ## the direct way:
+            conePos = GF.distAnglePosToPos((adjustedConeDiam/2), blob['lines'][i][1] + perpAdd - np.arcsin(blob['lines'][i][0] / adjustedConeDiam), blob['points'][i]) # alt version (untested)
             coneCenterPos[0][i] = conePos[0];   coneCenterPos[1][i] = conePos[1]
         conePos = np.array([GF.average(coneCenterPos[0]), GF.average(coneCenterPos[1])], dtype=np.float64)
         return(True, conePos)

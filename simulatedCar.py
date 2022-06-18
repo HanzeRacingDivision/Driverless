@@ -27,7 +27,7 @@ class simCar(Map.Car):
         self.steering_target_margin = np.deg2rad(0.1) # (constant) acceptable margin of error for steering control loop
         self.steerSimSubdt = 0.01 # (constant) delta time of steering sub-simulation loop
         
-        self.simulationVariables = None
+        # self.simTrueCar = None # a (nested) simCar object used for positionalDrift.  MOVED to Map.simVars.car
     
     def update(self, dTime, dDist=None, applyUpdate=True):
             """ update the position of the car, based on velocity, steering and time-passage """

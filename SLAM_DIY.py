@@ -12,6 +12,33 @@ MAX_BLOB_HISTORY = 10
 ##                  - based on time since last SLAM (plus a certain minimum value?)
 ##                  - based on the measured distance (to equalize error, instead of closer cones being more important (pythangorean is not linear))
 
+
+class coneSlamData: #a class to go in Map.Cone.coneConData. This carries some extra data which is only used by the coneConnecter functions
+    """some data to go in .slamData of Map.Cone objects"""
+    def __init__(self, firstPosition, firstTimestamp, firstBLob=None):
+        self.positions = [firstPosition, ] # several (but not all!, see MAX_BLOB_HISTORY) measured positions
+        self.timestamps = [firstTimestamp, ] # timestamps for when this cone was spotted
+        self.blobs = [firstBLob, ]   # lidar blobs
+        self.counter = 1 # spot count
+    def append(self, pos, timestamp, blob=None):
+        self.positions.append(pos)
+        self.timestamps.append(timestamp)
+        self.blobs.append(blob)
+        if(len(self.positions)>MAX_BLOB_HISTORY):
+            self.positions.pop(1);   self.timestamps.pop(1);   self.blobs.pop(1) # delete the second extry (keep the first data point as a sort of anchor)
+        self.counter += 1
+    def getConePos(self, depth=-1): # calculate the cone position based on the positions[] array
+        returnPos = np.zeros(2)
+        depth = (min(depth, len(self.positions)) if (depth>0) else len(self.positions))
+        for i in range(depth):
+            returnPos[0] += self.positions[len(self.positions)-1-i][0] # add to sum
+            returnPos[1] += self.positions[len(self.positions)-1-i][1] # add to sum
+        returnPos[0] /= depth
+        returnPos[1] /= depth
+        # returnPos[0] = GF.average(np.array([self.positions[len(self.positions)-1-i][0] for i in range(depth)]))
+        # returnPos[1] = GF.average(np.array([self.positions[len(self.positions)-1-i][1] for i in range(depth)]))
+        return(returnPos)
+
 def distBetw(posOne: np.ndarray, posTwo: np.ndarray):
     return(GF.distAngleBetwPos(posOne, posTwo)[0])
     #return(math.hypot(*(posTwo-posOne)))
@@ -56,23 +83,15 @@ def calculateOffsets(carPos: np.ndarray, knownCones: np.ndarray, measuredCones: 
     return(calculatedLinearOffset, calculatedRotationalOffset, unshiftedConesOnlyLinear, unshiftedCones)
 
 def updateExistingCone(cone, newPos, timestamp, blob=None):
-    if(type(cone.slamData) is list):
-        if(blob is not None):
-            cone.slamData.append((newPos, timestamp, blob, cone.slamData[-1][-1]+1)) #cone position, timestamp, blob, totalSpotCount
-        else:
-            cone.slamData.append((newPos, cone.slamData[-1][-1]+1)) #cone position, totalSpotCount
-        if(len(cone.slamData)>MAX_BLOB_HISTORY): #limit number of sightings to remember
-            cone.slamData.pop(1) #delete the 2nd oldest data (keep the very first sighting (for simulateLidar, if nothing else))
-        cone.position[0] = GF.average(np.array([item[0][0] for item in cone.slamData]))
-        cone.position[1] = GF.average(np.array([item[0][1] for item in cone.slamData]))
+    if(cone.slamData is not None):
+        cone.slamData.append(newPos, timestamp, blob)
+        newConePos = cone.slamData.getConePos()
+        cone.position[0] = newConePos[0];    cone.position[1] = newConePos[1]
     else:
         print("SLAM_DIY warning: adding 'slamData' to an existing cone")
-        if(blob is not None):
-            cone.slamData = [(newPos, timestamp, blob, 1)] #i'd like to make a 0th entry using the cone's current position, but i dont have a matching blob*
-        else:
-            cone.slamData = [(cone.position.copy(), 0), (newPos, 1)]
+        cone.slamData = coneSlamData(newPos, timestamp, blob)
 
-def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True, storeBlob=False):
+def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True):
     # if(not mapToUse.SLAMPresent):
     #     print("warning, SLAM disabled but used anyway?!")
     rightNow = mapToUse.clock()
@@ -84,7 +103,7 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True,
     ## first, find corrosponding landmarks
     #cones = [] # a list with format [ [existing_cone, [new measurements of that cone]], ...]
     conePointers = [];  knownCones = np.empty((len(lidarLandmarks), 2)); measuredCones = np.empty((len(lidarLandmarks), 2)); magnitudes = np.empty(len(lidarLandmarks))
-    blobList = [] #only used if storeBlob == True
+    blobList = [] # may be filled with only None objects, depending on the contents of the landmarkLists
     newCones = []
     for i in range(len(lidarLandmarks)):
         measurementPos, blob = lidarLandmarks[i]
@@ -106,13 +125,15 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True,
             measuredCones[len(conePointers)-1] = np.array(measurementPos) #np.array() call may be redundant
             magnitudes[len(conePointers)-1] = 1.0
             #magnitudes[coneCounteri] = abs(blob['appendTimestamp'] - lastSLAMtime) / passedTime #the abs() is only if the coneTimestamp is (for some strange reason) older than lastSLAMtime
-            if(storeBlob):
-                blobList.append(blob)
+            blobList.append(blob)
             
             #if(blob['appendTimestamp'] < lastSLAMtime):
             #    print("warning, blob older than lastSLAMtime:", lastSLAMtime - blob['appendTimestamp'])
         else:
-            newCones.append((measurementPos, blob['appendTimestamp'], blob))
+            if(blob is not None):
+                newCones.append((measurementPos, blob['appendTimestamp'], blob))
+            else:
+                newCones.append((measurementPos, mapToUse.clock(), blob))
     
     # ## at this point, we have a list of landmarks and matching measurements
     # print("cones:")
@@ -135,11 +156,8 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True,
         #print("SLAM list sizes:", len(conePointers), len(newCones))
         calculatedLinearOffset, calculatedRotationalOffset, unshiftedConesOnlyLinear, unshiftedCones = calculateOffsets(mapToUse.car.position, knownCones, measuredCones, magnitudes)
         
-        # if(hasattr(mapToUse.car, 'simulationVariables')):
-        #     if(type(mapToUse.car.simulationVariables) is list):
-        #         print("true offsets:", mapToUse.car.position - mapToUse.car.simulationVariables[0], mapToUse.car.angle - mapToUse.car.simulationVariables[1])
-        #     elif(mapToUse.car.simulationVariables is not None): #(type(initMap.car.simulationVariables) is SC.simCar):
-        #         print("true offsets:", mapToUse.car.position - mapToUse.car.simulationVariables.position, mapToUse.car.angle - mapToUse.car.simulationVariables.angle)
+        # if((mapToUse.simVars.car is not None) if (mapToUse.simVars is not None) else False):
+        #     print("true offsets:", mapToUse.car.position - mapToUse.simVars.car.position, mapToUse.car.angle - mapToUse.simVars.car.angle)
         
         if(GF.distAngleBetwPos(np.zeros(2), calculatedLinearOffset)[0] < MAX_SLAM_CORRECTION):
             for i in range(len(conePointers)):
@@ -157,10 +175,7 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True,
                             unshiftedPos = unshiftedPos / overlapCounter #get average position
                             #print("overlap average position:", unshiftedPos)
                             break #break out of (j) loop, becuase otherwise this process might happen multiple times
-                if(storeBlob):
-                    updateExistingCone(conePointers[i], unshiftedPos, rightNow, blobList[i])
-                else:
-                    updateExistingCone(conePointers[i], unshiftedPos, rightNow)
+                updateExistingCone(conePointers[i], unshiftedPos, rightNow, blobList[i])
         else:
             print("SLAM overcorrected?:", calculatedLinearOffset, np.rad2deg(calculatedRotationalOffset))
         
@@ -170,10 +185,7 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True,
     #     print("too few (known) landmarks to do SLAM")
     #     # ## this i'm not sure about, but i guess just take the measured positions at face value and store them for now
     #     # for i in range(len(conePointers)):
-    #     #     if(storeBlob):
-    #     #         updateExistingCone(conePointers[i], measuredCones[i], rightNow, blobList[i])
-    #     #     else:
-    #     #         updateExistingCone(conePointers[i], measuredCones[i], rightNow)
+    #     #     updateExistingCone(conePointers[i], measuredCones[i], rightNow, blobList[i])
     
     
     for measuredCone, coneTimestamp, blob in newCones:
@@ -185,19 +197,13 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True,
             ## if this happens, it means a newCone was spotted multiple times (because it had no overlapping cone in the earlier check).
             ## alternatively, the lidar error was so bad that (due to the unshifting) it now suddenly overlaps a cone when it previously didn't.
             ## in either case, simply update the overlapping cone's position
-            if(storeBlob):
-                updateExistingCone(overlappingCone, unshiftedPos, rightNow, blob)
-            else:
-                updateExistingCone(overlappingCone, unshiftedPos, rightNow)
+            updateExistingCone(overlappingCone, unshiftedPos, rightNow, blob)
         elif(makeNewCones):
             leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, unshiftedPos, mapToUse.car.angle) < 0.0) #if the angle relative to car is negative (CW), it's a right-side cone
             
             conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
             print("SLAM debug: adding new cone based on lidar measurement:", coneInList)
-            if(storeBlob):
-                coneInList.slamData = [(unshiftedPos, rightNow, blob, 1)]
-            else:
-                coneInList.slamData = [(unshiftedPos, 1)] #less data, faster code
+            coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
     
     mapToUse.car.slamData = rightNow
     return()
