@@ -31,12 +31,13 @@ class Map:
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
         ## some static constants:
-        wheelbase = 0.25 #meters
-        chassis_length = 0.37 #meters
-        chassis_width = 0.20 #meters
-        chassis_length_offset = 0.03 #(meters) car center + this = chassis center (mostly used for drawing)
+        wheelbase = 1.0 # (meters) distance between front and rear axle
+        # axleWidth = 1.0 # (meters) distance between the centers of the wheels (a.k.a. 'track')
+        chassis_length = 1.2 # (meters) distance bumper to bumper (for drawing/colision-detection)
+        chassis_width = 1.2 # (meters) car chassis width ('skirt to skirt', one might say). NOT distance between wheel centers
+        chassis_length_offset = (wheelbase/2) + 0.0 # (meters) car pos (rear axle center) + this = chassis center (mostly used for drawing)
         lidarOffsets = (np.array([0.0, 0.0]), ) # the position of the lidar(s), as ((forward offset, perpendicular offset), for all lidars) from the car position (not chassis center)
-        maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept serial commands outside this range)
+        maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept HW commands outside this range)
         
         def __init__(self):
             self.position = np.array([0.0, 0.0], dtype=np.float64)
@@ -70,10 +71,26 @@ class Map:
         #     return(GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position))
         
         def getChassisCenterPos(self):
-            return(GF.distAnglePosToPos(float((self.wheelbase/2) + self.chassis_length_offset), float(self.angle), np.array(self.position)))
+            return(GF.distAnglePosToPos(float(self.chassis_length_offset), float(self.angle), np.array(self.position)))
 
-        # def getLidarPos(self, lidarIndex, interpolation=False): #  ARC_TODO move function from simulateLidar to here?
-        #     return()
+        def calcLidarPos(self, lidarIndex=0, interpolationDt=0.0):
+            carPos = self.position.copy()
+            carAngle = self.angle
+            if(abs(interpolationDt) > 0.001): # a little crude, but a very small interpolation is (usualy) insignificant anyway
+                print("calcLidarPos interpolation is TBD!")
+                # interpolationDiff = self.update(interpolationDt, self.velocity*interpolationDt, False)
+                # #carPos += interpolationDiff[0] # numpy array addition
+                # carPos[0] = carPos[0] + interpolationDiff[0][0];   carPos[1] = carPos[1] + interpolationDiff[0][1]
+                # carAngle = carAngle + interpolationDiff[1]
+                ## alternatively, you could make a dummy Car class object, copy the relevant parameters and run .update() on that, but this seemed cleaner
+            ## the crude way:
+            diagonalDist, angleToLidar = GF.distAngleBetwPos(np.zeros((2)), self.lidarOffsets[lidarIndex]) # (a bit crude) get distance and angle to lidar from car center
+            lidarPos = GF.distAnglePosToPos(diagonalDist, carAngle + angleToLidar, carPos)
+            ## the better way:
+            #lidarPos = np.array([carPos[0] + self.lidarOffsets[lidarIndex][0]*np.cos(carAngle), carPos[1] + self.lidarOffsets[lidarIndex][1]*np.sin(carAngle)])
+            ## debug:
+            #print(self.lidarOffsets[lidarIndex], GF.vectorProjectDist(carPos, lidarPos, carAngle)) # validity check: should print out the same thing twice
+            return(lidarPos)
         
         #def update() was moved to simCar and realCar, because it should be replaced by SLAM (and/or only used as a quick update between (slower) SLAM updates
         
@@ -101,8 +118,8 @@ class Map:
 
     class Cone:
         """ a small class to hold all pertinent information about boundry cones (like position, left-or-right-ness, whether it's part of the finish line, etc) """
-        coneDiam = 0.14 #cone diameter in meters (constant)
-        coneLidarDiam = 0.07 # TODO: make a little formula for this instead (requires knowing the slope)
+        coneDiam = 0.15 #cone diameter in meters (constant)
+        coneLidarDiam = 0.1 # TODO: make a little formula for this instead (requires knowing the slope)
         ## cone connection spacing is set in coneConnecting.py
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING

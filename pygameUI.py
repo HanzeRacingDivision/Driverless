@@ -244,7 +244,14 @@ def handleKeyPress(pygameDrawerInput, keyDown, key, eventToHandle):
             if(pygameDrawerInput.drawConeSlamData > 2): #rollover
                 pygameDrawerInput.drawConeSlamData = 0
         elif(key==pygame.K_h): # h
-            pygameDrawerInput.headlights = not pygameDrawerInput.headlights #only has an effect if car sprite is used (.carPolygonMode)
+            if(pygameDrawerInput.carPolygonMode):
+                pygameDrawerInput.carPolygonMode = False
+            else:
+                if(pygameDrawerInput.headlights):
+                    pygameDrawerInput.carPolygonMode = True
+                    pygameDrawerInput.headlights = False
+                else:
+                    pygameDrawerInput.headlights = True # only has an effect if car sprite is used (.carPolygonMode)
         elif(key==pygame.K_c): # c
             # if(pygame.key.get_pressed()[pygame.K_LCTRL]): #causes too many problems, just restart the program or run pygameDrawerInput.__init__ again
             #     #reset everything
@@ -281,6 +288,8 @@ def handleKeyPress(pygameDrawerInput, keyDown, key, eventToHandle):
         elif(key==pygame.K_m): # m
             if(pygameDrawerInput.mapToDraw.simVars is not None):
                 pygameDrawerInput.mapToDraw.simVars.undiscoveredCones = not pygameDrawerInput.mapToDraw.simVars.undiscoveredCones # toggle
+        elif(key==pygame.K_z): # z
+            pygameDrawerInput.centerZooming = not pygameDrawerInput.centerZooming # toggle
 #        elif(key==pygame.K_d): # d   (for debug)
 #            ## (debug) printing the pickle size of individual components in the map object
 #            import pickle
@@ -391,17 +400,26 @@ def handleWindowEvent(pygameDrawerInput, eventToHandle):
         if(pygame.key.get_pressed()[pygame.K_LCTRL] and simToScale.carCam): #if holding (left) CTRL while in carCam mode, rotate the view
             simToScale.carCamOrient += (eventToHandle.y * np.pi/16)
         else:
-            dif = [simToScale.drawSize[0]/simToScale.sizeScale, simToScale.drawSize[1]/simToScale.sizeScale]
-            #simToScale.sizeScale += eventToHandle.y #zooming (note: can reach 0, at which point the porgram crashes)
+            # save some stuff before the change
+            viewSizeBeforeChange = [simToScale.drawSize[0]/simToScale.sizeScale, simToScale.drawSize[1]/simToScale.sizeScale]
+            mousePosBeforeChange = simToScale.pixelsToRealPos(pygame.mouse.get_pos())
+            # update sizeScale
             simToScale.sizeScale *= 1.0+(eventToHandle.y/10.0) #10.0 is an arbetrary zoomspeed
-            if(simToScale.sizeScale < 1.0):
+            if(simToScale.sizeScale < simToScale.minSizeScale):
                 print("can't zoom out any further")
-                simToScale.sizeScale = 1.0
+                simToScale.sizeScale = simToScale.minSizeScale
+            elif(simToScale.sizeScale > simToScale.maxSizeSale):
+                simToScale.sizeScale = simToScale.maxSizeSale
             #if(not simToScale.carCam): #viewOffset is not used in carCam mode, but it won't hurt to change it anyway
-            dif[0] -= (simToScale.drawSize[0]/simToScale.sizeScale)
-            dif[1] -= (simToScale.drawSize[1]/simToScale.sizeScale)
-            simToScale.viewOffset[0] -= dif[0]/2 #equalizes from the zoom to 'happen' from the middle of the screen
-            simToScale.viewOffset[1] -= dif[1]/2
+            dif = None # init var
+            if(simToScale.centerZooming): ## center zooming:
+                dif = [(viewSizeBeforeChange[0]-(simToScale.drawSize[0]/simToScale.sizeScale))/2, (viewSizeBeforeChange[1]-(simToScale.drawSize[1]/simToScale.sizeScale))/2]
+            else: ## mouse position based zooming:
+                mousePosAfterChange = simToScale.pixelsToRealPos(pygame.mouse.get_pos())
+                dif = [mousePosBeforeChange[0] - mousePosAfterChange[0], mousePosBeforeChange[1] - mousePosAfterChange[1]]
+            simToScale.viewOffset[0] -= dif[0] #equalizes from the zoom to 'happen' from the middle of the screen
+            simToScale.viewOffset[1] -= dif[1]
+
 
 def handleAllWindowEvents(pygameDrawerInput):
     """(UI element) loop through (pygame) window-events and handle all of them"""

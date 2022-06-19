@@ -118,7 +118,7 @@ def connectConeSuperSimple(mapToUse, coneToConnect, applyResult=True, printDebug
             print("input cone already doubly connected?!:", coneToConnect.coneConData)
         return(False, None)
     else:
-        nearbyConeList = mapToUse.distanceToConeSquared(coneToConnect.position, mapToUse.right_cone_list if coneToConnect.LorR else mapToUse.left_cone_list, True, [coneToConnect.ID], coneConnecter.maxConnectionDistSquared, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
+        nearbyConeList = mapToUse.distanceToConeSquared(coneToConnect.position, mapToUse.right_cone_list if coneToConnect.LorR else mapToUse.left_cone_list, True, [coneToConnect.ID], coneConnecter.maxConnectionDist**2, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
         if(len(nearbyConeList) < 1):
             if(printDebug):
                 print("nearbyConeList empty")
@@ -126,7 +126,7 @@ def connectConeSuperSimple(mapToUse, coneToConnect, applyResult=True, printDebug
         bestCandidateIndex = -1;   highestStrength = 0;   candidatesDiscarded = 0
         for i in range(len(nearbyConeList)):
             coneCandidateStrength = 1 #init var
-            coneCandidateStrength *= 1.5-(nearbyConeList[i][1]/coneConnecter.maxConnectionDistSquared)  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
+            coneCandidateStrength *= 1.5-(nearbyConeList[i][1]/(coneConnecter.maxConnectionDist**2))  #high distance, low strength. non-Linear (quadratic?). worst>0.5 best<1.5  (note, no need to limit, because the min score is at the hard threshold)
             coneCandidateStrength *= 0.5+min(mapToUse.getConeChainLen(nearbyConeList[i][0])[0]/coneConnecter.coneConnectionHighChainLen, 1) #long chain, high strength. linear.
             ## no angle math can be done, as Pythagoras's ABC is used, not sohcahtoa :)
             if(coneCandidateStrength > highestStrength):
@@ -156,11 +156,9 @@ def connectConeSuperSimple(mapToUse, coneToConnect, applyResult=True, printDebug
 class coneConnecter():
     """a static class with constants and (pointers to) functions to connect cones (to form a track boundry).
         The variables that this the functions make use of are stored in the Map object in Map.Cone.coneConData"""
-    maxConnectionDist = 1.5  #in meters (or at least not pixels)  note: hard threshold beyond which cones will NOT come into contention for connection
-    maxConnectionDistSquared = maxConnectionDist**2
-    idealConnectionSpacing = 1.0 # space between same-colored connected cones
-    idealBoundarySpacing = 2.0 # space between left and right track boundary (according to the 2020 handbook, minimum 3meter)
-    ## coneConnectionLowChainLen = 3 #if the connection length of coneToConnect is higher than this, devalue the length of the pospect cone's connections #NOT IMPLEMENTED (YET?)
+    maxConnectionDist = 5.0  # (meters) hard threshold beyond which cones will NOT come into contention for (same-colored) connection
+    ## boundary spacing constants are located in pathFinding.py
+    # coneConnectionLowChainLen = 3 #if the connection length of coneToConnect is higher than this, devalue the length of the pospect cone's connections #NOT IMPLEMENTED (YET?)
     coneConnectionHighChainLen = 5 #the longer the sequence, the better, but any longer than this is just as good as this (strength saturation). (not hard threshold)
     coneConnectionHighAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
     coneConnectionMaxAngleDelta = np.deg2rad(120) #if the angle difference is larger than this, it just doesnt make sense to connect them. (this IS a hard threshold)

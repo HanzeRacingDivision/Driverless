@@ -12,6 +12,7 @@ delaySLAMuntillDriving = False
 
 useDrawer = True
 
+from doctest import master
 from Map import Map
 import GF.generalFunctions as GF
 
@@ -98,7 +99,7 @@ if __name__ == "__main__":
         if(bufferLandmarks):
             landmarkBufferLengthThreshold = 5 #if the number of landmarks in the buffer >= this threshold, then process them immediately (dont wait for the timer)
             landmarkBufferTimer = masterMap.clock()
-            landmarkBufferTimeInterval = 0.25
+            landmarkBufferTimeInterval = 0.2
         
         masterMap.car.slamData = masterMap.clock() #store time since last SLAM update in car.slamData
         #SlamUpdateInterval = landmarkBufferTimeInterval
@@ -115,6 +116,7 @@ if __name__ == "__main__":
         timeSinceLastUpdate = masterMap.clock()
         while (DD.windowKeepRunning if useDrawer else True):
             loopStart = masterMap.clock()
+            loopSpeedTimers = [('start', time.time()),]
             
             if(masterMap.car.pathFolData.auto):
                 PP.calcAutoDriving(masterMap)
@@ -123,7 +125,8 @@ if __name__ == "__main__":
                     ## send actuation instructions to carMCU
                     doNothing = 0
                     #connToCar.send((masterMap.car.desired_velocity, masterMap.car.desired_steering))
-            
+                loopSpeedTimers.append(('calcAutoDriving', time.time()))
+
             if(simulation):
                 if(simulatePositionalDrift):
                     # update() the masterMap.simVars.car without error and then add error for the masterMap.car update()
@@ -145,6 +148,7 @@ if __name__ == "__main__":
             else:
                 #get steering & speed data from car and run  masterMap.car.update
                 doNothing = 0
+            loopSpeedTimers.append(('car.update', time.time()))
             
             timeSinceLastUpdate = loopStart #save time (from start of loop) to be used next time
 
@@ -157,6 +161,7 @@ if __name__ == "__main__":
             else:
                 #get data from lidar (microcontroller(s))
                 doNothing = 0
+            loopSpeedTimers.append(('get lidar data', time.time()))
             
             if( (((masterMap.clock() - landmarkBufferTimer) > landmarkBufferTimeInterval) 
                  or (len(lidarConeBuff) > landmarkBufferLengthThreshold))
@@ -175,6 +180,7 @@ if __name__ == "__main__":
                 if(bufferLandmarks):
                     landmarkBufferTimer = masterMap.clock()
                     #landmarkBufferTimer += landmarkBufferTimeInterval # dangerous
+                loopSpeedTimers.append(('SLAM', time.time()))
             
             if(useDrawer):
                 if(drawer.extraViewMode):
@@ -185,7 +191,10 @@ if __name__ == "__main__":
                     drawer.redraw()
                 DD.frameRefresh()
                 UI.handleAllWindowEvents(drawer) #handle all window events like key/mouse presses, quitting and most other things
+                loopSpeedTimers.append(('drawer', time.time()))
             
+            # print("speed times:", [(loopSpeedTimers[i][0], round((loopSpeedTimers[i][1]-loopSpeedTimers[i-1][1])*1000, 1)) for i in range(1,len(loopSpeedTimers))])
+
             loopEnd = masterMap.clock() #this is only for the 'framerate' limiter (time.sleep() doesn't accept negative numbers, this solves that)
             if((loopEnd-loopStart) < 0.015): #60FPS limiter (optional)
                 time.sleep(0.0155-(loopEnd-loopStart))

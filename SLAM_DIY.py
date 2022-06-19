@@ -181,11 +181,13 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
         
         mapToUse.car.position -= (calculatedLinearOffset * trust[0])
         mapToUse.car.angle -= (calculatedRotationalOffset * trust[1])
-    # else:
-    #     print("too few (known) landmarks to do SLAM")
-    #     # ## this i'm not sure about, but i guess just take the measured positions at face value and store them for now
-    #     # for i in range(len(conePointers)):
-    #     #     updateExistingCone(conePointers[i], measuredCones[i], rightNow, blobList[i])
+    else: # if there's NOT enough landmarks to perform SLAM
+        ## this i'm not sure about, but i guess just take the measured positions at face value and store them for now
+        if(abs(mapToUse.car.velocity) < 0.01): # if the car is just standing still (presumably at the start line)
+            for i in range(len(conePointers)):
+                updateExistingCone(conePointers[i], measuredCones[i], rightNow, blobList[i])
+        # else:
+        #     print("too few (known) landmarks to do SLAM")
     
     
     for measuredCone, coneTimestamp, blob in newCones:

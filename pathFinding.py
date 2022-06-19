@@ -233,13 +233,14 @@ def makePath(mapToUse):
 class pathFinder():
     """a static class with constants and (pointers to) functions to find Target points (target_list) using (track boundry) cones.
         The variables that this the functions make use of are stored in the Map object in Map.Target.coneConData"""
-    pathConnectionThreshold = 3 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
+    minBoundarySpacing = 3.0 # space between left and right track boundary (according to the 2020 handbook, minimum 3meter)
+    pathConnectionThreshold = minBoundarySpacing * 1.5 #in meters (or at least not pixels)  IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
     pathConnectionMaxAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
     
-    pathFirstLineCarAngleDeltaMax = np.deg2rad(45) #if the radDiff() between car (.angle) and the first line's connections is bigger than this, switch conneections or stop
+    pathFirstLineCarAngleDeltaMax = np.deg2rad(45) #if the radDiff() between car (.angle) and the first line's connections is bigger than this, switch connections or stop
     pathFirstLineCarSideAngleDelta = np.deg2rad(80) #left cones should be within +- pathFirstLineCarSideAngleDelta radians of the side of the car (asin, car.angle + or - pi/2, depending on left/right side)
-    pathFirstLinePosDist = 2 # simple center to center distance, hard threshold, used to filter out very far cones
-    pathFirstLineCarDist = 1 # real distance, not hard threshold, just distance at which lowest strength-score is given
+    pathFirstLinePosDist = minBoundarySpacing * 0.9 # simple center to center distance, hard threshold, used to filter out very far cones
+    pathFirstLineCarDist = minBoundarySpacing * 0.5 # real distance, not hard threshold, just distance at which lowest strength-score is given
         
     #this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
     @staticmethod

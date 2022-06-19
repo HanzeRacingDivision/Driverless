@@ -84,7 +84,7 @@ def save_map(mapToSave: Map, filename=None, saveSimVarsMap=True):
     map_file.to_excel(filename)
     print("save_map .to_excel time:", round(time.time()-saveStartTime,2))
     # map_file_simVar = None
-    if(saveSimVarsMap and (mapToSave.simVars is not None)):
+    if(saveSimVarsMap and (((len(mapToSave.simVars.left_cone_list)+len(mapToSave.simVars.right_cone_list))>0) if (mapToSave.simVars is not None) else False)):
         simVarMapFilename = "simVar_" + filename # add something to the start (so i dont have to deal with inserting before the file extension)
         #save_map(mapToSave.simVars, simVarMapFilename, False) # recursively
         print("saving simVar map to file:", simVarMapFilename)

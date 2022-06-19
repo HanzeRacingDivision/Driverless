@@ -21,12 +21,16 @@ added a dashed line function to drawDriverless (only in topdown, not 3D, for now
 changed the way mousecones are drawn in drawDriverless (using connectCone() with applyResult=False)
 display loaded mapfile name in the corner of the screen
 cone.slamData now has a struct (see SLAM_DIY.py) instead of being a list
+added some speed timers to drawDriverless and discovered that drawCar runs like shit when sizeScale is very high
+changed the way drawCar() works (again) to be a little more legible (now uses _drawCar() instead of being recursive)
+pressing 'h' now toggles the (useless) headlights AND carPolygonMode, so that's nice
+added mouse-position-based zooming (instead of center-of-screen zooming), to make using a trackpad a little easier (when you can't press on the scrollwheel to drag)
+you can now press 'z' to switch between zooming modes (default is mouse-position-zooming)
 
 next up:
 a (better?) warning when SLAM refuses to work (too much correction)
 make parameters and maps for big car (wheelbase, max lidar range, rules-compliant cone-connection stuff, the whole thing!)
 add/update function comments (""" """) to all changes
-bring (back?) zooming with an offset (based on mouse position) (so i can test with my trackpad)
 make simulatedVision (bad positions, good color data) to help simulatedLidar do its thing
 make use of the (now available) vision data in DIY_SLAM
 update target positions if cone positions change(?)

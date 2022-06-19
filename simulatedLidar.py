@@ -9,18 +9,31 @@ import numpy as np
 from Map import Map
 import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
-SIMULATE_SAMPLING = False # simulate the whole process of sampling points on the surface of the cone (slightly more realistic data)
+SIMULATE_SAMPLING = True # simulate the whole process of sampling points on the surface of the cone (slightly more realistic data)
 
-RANGE_LIMIT = 2.0 # (meters) lidar range limit
+RANGE_LIMIT = 6.0 # (meters) lidar range limit
 
 ## for SIMULATE_SAMPLING == False
 STD_DEV_LIDAR_POS_ERROR = 1.0/1000 # (in meters)
 #STD_DEV_LIDAR_POS_ERROR_PER_METER = 0.01 # (in meters) std dev of positional error (directly added to (x,y)) at 1 meter. More distance means more error
 ## for SIMULATE_SAMPLING == True
 STD_DEV_LIDAR_MEASUREMENT_ERROR = 1.0/1000 # (in meters) std dev of error in individual LiDAR distance measurements (get from datasheet?)
-DATAPOINTS_PER_DISTANCE_NUMERATOR = 3.6 * (Map.Cone.coneLidarDiam / (Map.Cone.coneDiam/2))
+
 if(SIMULATE_SAMPLING):
     import lidarBlobsNoNumba as LB
+    LIDAR_SURFACE_REFLECTION_ARC = np.deg2rad(90) # at some point, the surface is insufficiently perpendicular to correctly reflect the laser
+    ## the quick-n-dirty way:
+    # DATAPOINTS_PER_DISTANCE_NUMERATOR = 3.6 * (Map.Cone.coneLidarDiam / (Map.Cone.coneDiam/2))
+    # LIDAR_SAMPLES_AT_DIST = lambda dist : int(DATAPOINTS_PER_DISTANCE_NUMERATOR / dist) # not very accurate, but gives an approximate curve
+    ## the accurate way: (see 'lidar resolution vs range calculator.xlsx' for explanatory diagram)
+    LIDAR_SAMPLERATE = 7500 # (Hz) lidar samples per second
+    LIDAR_ROTATIONS_PER_SECOND = 5 # (Hz) lidar full rotations per second (5 RPS == 300 RPM)
+    LIDAR_ANGULAR_RESOLUTION = (LIDAR_ROTATIONS_PER_SECOND * 2 * np.pi) / LIDAR_SAMPLERATE # radians between samples
+    LIDAR_REFLECTION_ARC_RATIO = (Map.Cone.coneLidarDiam/2) * np.sin(LIDAR_SURFACE_REFLECTION_ARC/2)
+    LIDAR_SAMPLES_AT_DIST = lambda dist : int((2 * np.arcsin(LIDAR_REFLECTION_ARC_RATIO / dist)) / LIDAR_ANGULAR_RESOLUTION)
+    
+    # RANGE_LIMIT = min(RANGE_LIMIT, LIDAR_REFLECTION_ARC_RATIO / np.sin(LB.MIN_BLOB_CONE_LEN*LIDAR_ANGULAR_RESOLUTION/2)) # recalculate true max range based on the parameters above. NOTE: comment this to overwrite
+    # print("simulatedLidar RANGE_LIMIT:", RANGE_LIMIT)
 
 LIDAR_FULL_ROTATION_FREQ = 5 # 300 RPM == 5 RPS
 ## variables:
@@ -30,24 +43,6 @@ class simulatedLidarVariables: #a class to go in Map.simVars (these are the only
         self.lidarSimulatedAngle = 0.0 # if the simulated lidar is sampled faster than LIDAR_FULL_ROTATION_FREQ, the lidar's current rotation angle determines what it has seens since last time
         self.lidarLastSampleTimestamp = 0.0
 
-
-def calcLidarPos(mapToUse, lidarIndex=0, interpolation=False, carToUse=None): # 'carToUse' is specifically for simulations with positional drift
-    if(carToUse is None):
-        carToUse = mapToUse.car
-    carPos = carToUse.position.copy()
-    carAngle = carToUse.angle
-    if(interpolation):
-        print("calcLidarPos interpolation is TBD!")
-        # dTime = mapToUse.clock() - carToUse.lastFeedbackTimestamp
-        # interpolationDiff = carToUse.update(dTime, carToUse.velocity*dTime, False)
-        # #carPos += interpolationDiff[0] # numpy array addition
-        # carPos[0] = carPos[0] + interpolationDiff[0][0];   carPos[1] = carPos[1] + interpolationDiff[0][1]
-        # carAngle = carAngle + interpolationDiff[1]
-        ## alternatively, you could make a dummy Car class object, copy the relevant parameters and run .update() on that, but this seemed cleaner
-    diagonalDist, angleToLidar = GF.distAngleBetwPos(np.zeros((2)), carToUse.lidarOffsets[lidarIndex]) # (a bit crude) get distance and angle to lidar from car center
-    lidarPos = GF.distAnglePosToPos(diagonalDist, carAngle + angleToLidar, carPos)
-    #print(carToUse.lidarOffsets[lidarIndex], GF.vectorProjectDist(carPos, lidarPos, carAngle)) # validity check: should print out the same thing twice
-    return(lidarPos)
 
 def getCones(mapToUse):
     rightNow = mapToUse.clock()
@@ -60,9 +55,9 @@ def getCones(mapToUse):
         # simVariables.lidarSimulatedAngle += GF.radRoll((2*np.pi*LIDAR_FULL_ROTATION_FREQ)*timeSinceLastSampling) # iterative angle (needless, more floating point error)
         simVariables.lidarLastSampleTimestamp = rightNow
         
-        # lidarPos = calcLidarPos(mapToUse, lidarIndex)
+        # lidarPos = mapToUse.car.calcLidarPos(lidarIndex)
         # if((mapToUse.simVars.car is not None) if (mapToUse.simVars is not None) else False): # should always be true, but just to be sure
-        lidarPos = calcLidarPos(mapToUse, lidarIndex, carToUse=mapToUse.simVars.car)
+        lidarPos = mapToUse.simVars.car.calcLidarPos(lidarIndex)
 
         ## i use distanceToCone() to easily filter the nearby cones, but the distAngle is incorrect (becuase the positions of the cones are incorrect)
         nearbyConeList = None # init var
@@ -81,7 +76,7 @@ def getCones(mapToUse):
             cone, _ = nearbyConeList[i]
             # conePos = cone.position
             # if((mapToUse.simVars.car is not None) if (mapToUse.simVars is not None) else False): # should always be true, but just to be sure
-            realActualConePos = (cone.position if (cone.slamData is None) else cone.slamData[0][0]) # the simulated lidar must use the 'real' (unmoving) cone position to 'measure' from (but if the cone has no slamData yet, use .position)
+            realActualConePos = (cone.position if (cone.slamData is None) else cone.slamData.positions[0]) # an absolutely JANKY hack, which used to make sense, but now barely does. If you loaded in the mapfile WITHOUT undiscoveredCones, this will still work
             distAngle = GF.distAngleBetwPos(lidarPos, realActualConePos) # get dist and angle between true lidar and true cone positions to get the angle that should be measured
             distAngle[1] += mapToUse.car.angle - mapToUse.simVars.car.angle # now distAngle holds the 'measured' distance and angle
             conePos = GF.distAnglePosToPos(distAngle[0], distAngle[1], mapToUse.car.position) # apply true (what the real lidar would measure) dist&angle data to the believed (drifted) car pos&angle.
@@ -105,24 +100,22 @@ def getCones(mapToUse):
                 if(SIMULATE_SAMPLING):
                     # print("simulatedLidar.SIMULATE_SAMPLING is TBD!")
                     adjustedConeDiam = Map.Cone.coneLidarDiam # cone diameter (at the height of the lidar!)
-                    lidarPoints = int(6) #init var
+                    lidarPoints = LB.MIN_BLOB_CONE_LEN #init var
                     if(distAngle[0] > 0.01):#avoid divide by zero, and generally approaching unreasonable numbers
-                        lidarPoints = max(int(DATAPOINTS_PER_DISTANCE_NUMERATOR / distAngle[0]), 2) #the number of datapoints decreases with distance
-                    lidarPointsAngleRange = np.deg2rad(60)
+                        lidarPoints = max(LIDAR_SAMPLES_AT_DIST(distAngle[0]), LB.MIN_BLOB_CONE_LEN) #the number of datapoints decreases with distance
                     invCarToConeAngle = GF.radInv(distAngle[1])
-                    dataPointAngles = [((-lidarPointsAngleRange + ((lidarPointsAngleRange/(lidarPoints-1))*i*2))+invCarToConeAngle) for i in range(lidarPoints)]
+                    dataPointAngles = [((-LIDAR_SURFACE_REFLECTION_ARC + ((LIDAR_SURFACE_REFLECTION_ARC/(lidarPoints-1))*i*2))+invCarToConeAngle) for i in range(lidarPoints)]
                     newBlob = None;  appendSuccess=True; #init var
                     for j in range(len(dataPointAngles)):
-                        if(not appendSuccess):
-                            continue
                         randomMeasurementError = np.random.normal() * STD_DEV_LIDAR_MEASUREMENT_ERROR #add error in a normal distribution (you could scale with dist, but whatever)
                         pointPos = GF.distAnglePosToPos((adjustedConeDiam/2) + randomMeasurementError, dataPointAngles[j], conePos)
                         if(j == 0):
                             newBlob = LB.blobCreate(pointPos, mapToUse.car.position, mapToUse.clock())
                         else:
                             appendSuccess = LB.blobAppend(newBlob, pointPos, mapToUse.car.position, mapToUse.clock())
-                            # if(not appendSuccess):
-                            #     print("(lidarBlobProcSim) bad blob append?")
+                            if(not appendSuccess):
+                                # print("(lidarBlobProcSim) bad blob append?")
+                                break;
                     if(appendSuccess):
                         nearbyConeList[i].append(newBlob)
                 else:
