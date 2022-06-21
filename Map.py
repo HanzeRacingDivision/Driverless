@@ -9,7 +9,7 @@ class Map:
     """ A parent map class that holds all variables that make up a (basic) track """
     def __init__(self):  # variables here that define the scenario/map
         self.clockStart = time.time()
-        self.clock = self.internalClock #default to internalClock
+        self.clock = self.internalClock # defaults to internalClock, but can be anything you want
         
         self.car = self.Car()
         self.left_cone_list = []
@@ -31,11 +31,11 @@ class Map:
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
         ## some static constants:
-        wheelbase = 1.0 # (meters) distance between front and rear axle
-        # axleWidth = 1.0 # (meters) distance between the centers of the wheels (a.k.a. 'track')
-        chassis_length = 1.2 # (meters) distance bumper to bumper (for drawing/colision-detection)
-        chassis_width = 1.2 # (meters) car chassis width ('skirt to skirt', one might say). NOT distance between wheel centers
-        chassis_length_offset = (wheelbase/2) + 0.0 # (meters) car pos (rear axle center) + this = chassis center (mostly used for drawing)
+        wheelbase = 1.03 # (meters) distance between front and rear axle
+        # axleWidth = 0.7 # (meters) distance between the centers of the wheels (a.k.a. 'track')
+        chassis_length = 1.5 # (meters) distance bumper to bumper (for drawing/colision-detection)
+        chassis_width = 1.0 # (meters) car chassis width ('skirt to skirt', one might say). NOT distance between wheel centers
+        chassis_center_offset = (wheelbase/2) + 0.0 # (meters) car pos (rear axle center) + this = chassis center (mostly used for drawing)
         lidarOffsets = (np.array([0.0, 0.0]), ) # the position of the lidar(s), as ((forward offset, perpendicular offset), for all lidars) from the car position (not chassis center)
         maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept HW commands outside this range)
         
@@ -50,6 +50,7 @@ class Map:
             
             self.totalDistTraveled = 0.0
             self.lastFeedbackTimestamp = 0.0
+            self.lastUpdateTimestamp = 0.0
             
             ## moved to pathPlanningTemp (and some renamed), can be found in self.pathFolData
             #self.auto = False #(thijs) could do with a clearer name like 'driving' or 'self_driving_active' or something
@@ -71,9 +72,14 @@ class Map:
         #     return(GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position))
         
         def getChassisCenterPos(self):
-            return(GF.distAnglePosToPos(float(self.chassis_length_offset), float(self.angle), np.array(self.position)))
+            """calculates the position of the center of chassis (instead of the car's position, which is at the center of rotation)
+                used for drawing (and colision detection)
+                please ensure chassis_center_offset is set correctly"""
+            return(GF.distAnglePosToPos(float(self.chassis_center_offset), float(self.angle), np.array(self.position)))
 
         def calcLidarPos(self, lidarIndex=0, interpolationDt=0.0):
+            """calculates the position of (one of) the lidar(s) mounted on the car.
+                (optional) use interpolationDt for a more accurate position (DeltaTime since 'Car.lastUpdateTimestamp')"""
             carPos = self.position.copy()
             carAngle = self.angle
             if(abs(interpolationDt) > 0.001): # a little crude, but a very small interpolation is (usualy) insignificant anyway
@@ -118,7 +124,7 @@ class Map:
 
     class Cone:
         """ a small class to hold all pertinent information about boundry cones (like position, left-or-right-ness, whether it's part of the finish line, etc) """
-        coneDiam = 0.15 #cone diameter in meters (constant)
+        coneDiam = 0.2 #cone diameter in meters (constant)
         coneLidarDiam = 0.1 # TODO: make a little formula for this instead (requires knowing the slope)
         ## cone connection spacing is set in coneConnecting.py
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
@@ -153,12 +159,8 @@ class Map:
             return("Target(pos=["+str(round(self.position[0],2))+','+str(round(self.position[1],2))+"],passed="+str(self.passed)+")")
     
     def internalClock(self): #a function that is passed to Map.clock by default
+        """default clock() function"""
         return(time.time() - self.clockStart)
-    
-    def clockSet(self, clockFunction): #set a different (simulation) function for self.clock, and insert a pointer to the self as a default argument (only used if function HAS an argument, if this is an issue, avoid usage of setClock() and edit self.clock manually)
-        print("WARNING: Map.clockSet() will be removed in future versions, as this method results in the map clock being reset every time a new Map object is created (anywhere)")
-        self.clock = clockFunction
-        self.clock.__defaults__ = (self.clockStart, ) #insert the starting time as the default argument
     
     def getConeChainLen(self, currentCone: Cone, prevCone=None, lengthMem=1): #(itteratively) determine the lenght of a sequence of connected cones (note: uses Cone.ID)
         """ get the length of the 'chain' of cones that the input cone is connected to """
@@ -306,7 +308,9 @@ class Map:
     
     #@property
     def maxConeID(self):
-        return(GF.findMaxAttrIndex((self.right_cone_list + self.left_cone_list), 'ID')[1])
+        """searches both cone_lists to find the largest ID value
+            returns 0 if the list was empty"""
+        return(int(GF.findMaxAttrIndex((self.right_cone_list + self.left_cone_list), 'ID')[1]))
     
     def addCone(self, pos, leftOrRight: bool, isFinish=False):
         """add a new cone to the map"""
@@ -383,7 +387,10 @@ class Map:
         return(self.removeCone(coneObj.ID, coneObj.LorR))
 
 class mapSimVarClass(Map):
-    """(to go in Map.simVars)"""
+    """(to go in Map.simVars) a map object which holds:
+        undiscovered cone lists,
+        the true car position (if simulatePositionalDrift is enabled)
+        and any other simulation-specific variables like 'lidarSimVars'"""
     def __init__(self):
         Map.__init__(self) #init map class
         self.car = None # put a simCar in this Map-like object only if positionalDrift is enabled

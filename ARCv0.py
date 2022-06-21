@@ -46,6 +46,9 @@ if(simulatePositionalDrift and (not simulation)):
     simulatePositionalDrift = False
 
 class masterMapClass(Map):
+    """a wrapper for the Map class which adds/initializes things
+        the Map class is the same for both simulations and IRL runs,
+         this class changes (a little) based on the situation"""
     def __init__(self):
         Map.__init__(self) #init map class
         
@@ -113,7 +116,7 @@ if __name__ == "__main__":
             simDriftVelocityError = 0.1
             simDriftSteeringError = np.deg2rad(5)
         
-        timeSinceLastUpdate = masterMap.clock()
+        ######################################################################################## main loop ###############################################################################
         while (DD.windowKeepRunning if useDrawer else True):
             loopStart = masterMap.clock()
             loopSpeedTimers = [('start', time.time()),]
@@ -131,26 +134,25 @@ if __name__ == "__main__":
                 if(simulatePositionalDrift):
                     # update() the masterMap.simVars.car without error and then add error for the masterMap.car update()
                     masterMap.simVars.car.desired_velocity = masterMap.car.desired_velocity;  masterMap.simVars.car.desired_steering = masterMap.car.desired_steering
-                    masterMap.simVars.car.simulateFeedback(loopStart - timeSinceLastUpdate)
-                    masterMap.simVars.car.update(loopStart - timeSinceLastUpdate) #update (drifted) position/angle
-                    masterMap.simVars.car.lastFeedbackTimestamp = loopStart
+                    masterMap.simVars.car.simulateFeedback(loopStart - masterMap.simVars.car.lastUpdateTimestamp)
+                    masterMap.simVars.car.update(loopStart - masterMap.simVars.car.lastUpdateTimestamp) #update (drifted) position/angle
+                    masterMap.simVars.car.lastUpdateTimestamp = loopStart
                     ## now mess with the velocity/steering a little
                     if(masterMap.simVars.car.velocity > 0.01):
                         masterMap.car.velocity = abs(np.random.normal(masterMap.simVars.car.velocity, simDriftVelocityError)) #abs() is just to make sure it doesnt go negative
                     else:
                         masterMap.car.velocity = 0.0
                     masterMap.car.steering = np.random.normal(masterMap.simVars.car.steering, simDriftSteeringError)
-                    masterMap.car.update(loopStart - timeSinceLastUpdate) #update true (hidden) position
+                    masterMap.car.update(loopStart - masterMap.car.lastUpdateTimestamp) #update true (hidden) position
                 else:
-                    masterMap.car.simulateFeedback(loopStart - timeSinceLastUpdate)
-                    masterMap.car.update(loopStart - timeSinceLastUpdate)
-                masterMap.car.lastFeedbackTimestamp = loopStart
+                    masterMap.car.simulateFeedback(loopStart - masterMap.car.lastUpdateTimestamp)
+                    masterMap.car.update(loopStart - masterMap.car.lastUpdateTimestamp)
+                masterMap.car.lastUpdateTimestamp = loopStart
             else:
                 #get steering & speed data from car and run  masterMap.car.update
-                doNothing = 0
+                masterMap.car.lastFeedbackTimestamp = loopStart # save when the sensors last provided feedback
+                masterMap.car.lastUpdateTimestamp = loopStart # save when the car last updated its position (also done at SLAM)
             loopSpeedTimers.append(('car.update', time.time()))
-            
-            timeSinceLastUpdate = loopStart #save time (from start of loop) to be used next time
 
             ## lidar update:
             if(simulation):
@@ -174,7 +176,7 @@ if __name__ == "__main__":
                     if(makeConesOnlyFirstLap and makeNewCones):
                         makeNewConesTemp = (masterMap.car.pathFolData.laps < 1) #only on the first lap
                     SLAM.updatePosition(masterMap, [lidarConeBuff, []], (1.0, 1.0), makeNewConesTemp)
-                    #doNothing = 0
+                    #masterMap.car.lastUpdateTimestamp = loopStart
                 
                 lidarConeBuff = [] # empty the buffer
                 if(bufferLandmarks):

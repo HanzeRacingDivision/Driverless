@@ -85,11 +85,12 @@ def blobify(point, origin, timestamp, uponExist=None, uponExistArgs=None, uponEx
 
 #@njit
 def blobToConePos(blob): #calculate the position the cone would have over here, to save some processing time on the main thread
+    """estimates the (center) position of a cone based on the LiDAR measurements of its surface"""
     if(blob['pointCount'] < MIN_BLOB_CONE_LEN):
         #print("warning: blob too few points to make into cone")
         return(False, np.zeros(2, dtype=np.float64))
     coneCenterPos = np.empty((2,blob['pointCount']-1), dtype=np.float64) #TBD
-    if(blob['pointCount'] > 1):
+    if(blob['pointCount'] > 1): # should always be true
         perpAdd = np.pi/2 # we can assume (or calculate only once) the direction of the perpendicular angle, by knowing the rotation direction of the lidar
         # baseAngle = GF.get_norm_angle_between(blob['origins'][int(blob['pointCount']/2)], blob['points'][int(blob['pointCount']/2)], 0.0)
         # if(abs(GF.radDiff(blob['lines'][0][1]-perpAdd, baseAngle)) < abs(GF.radDiff(blob['lines'][0][1]+perpAdd, baseAngle))):

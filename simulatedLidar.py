@@ -31,7 +31,7 @@ if(SIMULATE_SAMPLING):
     LIDAR_ANGULAR_RESOLUTION = (LIDAR_ROTATIONS_PER_SECOND * 2 * np.pi) / LIDAR_SAMPLERATE # radians between samples
     LIDAR_REFLECTION_ARC_RATIO = (Map.Cone.coneLidarDiam/2) * np.sin(LIDAR_SURFACE_REFLECTION_ARC/2)
     LIDAR_SAMPLES_AT_DIST = lambda dist : int((2 * np.arcsin(LIDAR_REFLECTION_ARC_RATIO / dist)) / LIDAR_ANGULAR_RESOLUTION)
-    
+
     # RANGE_LIMIT = min(RANGE_LIMIT, LIDAR_REFLECTION_ARC_RATIO / np.sin(LB.MIN_BLOB_CONE_LEN*LIDAR_ANGULAR_RESOLUTION/2)) # recalculate true max range based on the parameters above. NOTE: comment this to overwrite
     # print("simulatedLidar RANGE_LIMIT:", RANGE_LIMIT)
 
@@ -45,6 +45,8 @@ class simulatedLidarVariables: #a class to go in Map.simVars (these are the only
 
 
 def getCones(mapToUse):
+    """simulates LiDAR data and returns a list of cone positions (for all LiDARs)
+        enable SIMULATE_SAMPLING to get blob data (and slightly more realistic error)"""
     rightNow = mapToUse.clock()
     returnList = []
     for lidarIndex in range(len(mapToUse.car.lidarOffsets)):

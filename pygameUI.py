@@ -184,7 +184,8 @@ def handleMousePress(pygameDrawerInput, buttonDown, button, pos, eventToHandle):
             pygameDrawerInput.movingViewOffset = False
 
 def handleKeyPress(pygameDrawerInput, keyDown, key, eventToHandle):
-    """(UI element) handle the key-press-events"""
+    """(UI element) handle the key-press-events
+        see README.MD (github file) for what the keys do (or just scroll down and decypher)"""
     if(key==pygame.K_f): # f
         global flagCursorSet
         if(keyDown):

@@ -40,14 +40,19 @@ class coneSlamData: #a class to go in Map.Cone.coneConData. This carries some ex
         return(returnPos)
 
 def distBetw(posOne: np.ndarray, posTwo: np.ndarray):
+    """just a quick macro to GF.distAngleBetwPos"""
     return(GF.distAngleBetwPos(posOne, posTwo)[0])
     #return(math.hypot(*(posTwo-posOne)))
 
 def rotationShift(centerPos, posToShift, shiftAngle):
+    """rotate a point around another point (not very efficient (yet?))"""
     dist, angle = GF.distAngleBetwPos(np.array(centerPos), np.array(posToShift))
     return(GF.distAnglePosToPos(dist, angle+shiftAngle, np.array(centerPos)))
 
 def averageAngle(angles: np.ndarray):
+    """calculates the average of a list of angles
+        NOTE: this means converting to unit vectors, summing and recalculating an angle
+            you can't just add the angles together if you want an actually good average"""
     # for i in range(len(angles)):
     #     angles[i] = GF.radRoll(angles[i])
     sumVector = np.zeros(2) #the easiest way to calculate a circular mean (mean that considers rollover), is to use the sum of (unit (or any real)) vectors
@@ -58,6 +63,8 @@ def averageAngle(angles: np.ndarray):
     return(GF.distAngleBetwPos(zeroPos, sumVector)[1])
 
 def calculateOffsets(carPos: np.ndarray, knownCones: np.ndarray, measuredCones: np.ndarray, errorMagnitudes: np.ndarray):
+    """calculates the positional error based on a list of known and measured cones
+        uses 'multilateration' (see multilateration.py and google it, it's what GPS uses)"""
     #print("multilat: \n\n")
     calculatedLinearOffset, resultError = multLat.multilaterate(carPos, np.array(measuredCones), np.array([distBetw(carPos, knownCones[i]) for i in range(len(knownCones))]), errorMagnitudes)
     calculatedLinearOffset -= carPos #needed
@@ -83,6 +90,7 @@ def calculateOffsets(carPos: np.ndarray, knownCones: np.ndarray, measuredCones: 
     return(calculatedLinearOffset, calculatedRotationalOffset, unshiftedConesOnlyLinear, unshiftedCones)
 
 def updateExistingCone(cone, newPos, timestamp, blob=None):
+    """updates the .slamData on an existing cone"""
     if(cone.slamData is not None):
         cone.slamData.append(newPos, timestamp, blob)
         newConePos = cone.slamData.getConePos()
@@ -92,6 +100,12 @@ def updateExistingCone(cone, newPos, timestamp, blob=None):
         cone.slamData = coneSlamData(newPos, timestamp, blob)
 
 def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True):
+    """runs the whole DIY_SLAM!
+        you give it measured landmarks (LiDAR & CompVis data) 
+         and it works out which cones those corrospond with.
+        if it encouters a measurement where there is no cone,
+         it will place a cone there (IF makeNewCones==True)
+        updates the car's positions based on the results"""
     # if(not mapToUse.SLAMPresent):
     #     print("warning, SLAM disabled but used anyway?!")
     rightNow = mapToUse.clock()
@@ -181,6 +195,7 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
         
         mapToUse.car.position -= (calculatedLinearOffset * trust[0])
         mapToUse.car.angle -= (calculatedRotationalOffset * trust[1])
+        mapToUse.car.lastUpdateTimestamp = rightNow # save when the car position was last updated
     else: # if there's NOT enough landmarks to perform SLAM
         ## this i'm not sure about, but i guess just take the measured positions at face value and store them for now
         if(abs(mapToUse.car.velocity) < 0.01): # if the car is just standing still (presumably at the start line)
@@ -207,5 +222,5 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
             print("SLAM debug: adding new cone based on lidar measurement:", coneInList)
             coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
     
-    mapToUse.car.slamData = rightNow
-    return()
+    mapToUse.car.slamData = rightNow # save when SLAM was last run
+    return() # i'm not sure what would be useful to return yet

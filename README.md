@@ -45,7 +45,7 @@ keyboard functions:
  - 'Q' toggle cubic spline (currently does nothing, just for visuals)
  - 'T' show relation between cones and target points (path)
  - 'L' switch lidar visual debug mode (spotcount, spotcount+points, coneID)
- - 'H' toggle headlights (does nothing, just for visuals) (also only works if car sprite works)
+ - 'H' toggle headlights (does nothing, just for visuals) and (temporarily) also toggles the car sprite
  - 'D' custom debug stuff, don't worry about that right now
  - 'C' toggle car position history-line (histogram?), note: recudes FPS
  - 'V' switch view mode (global cam with dragging or car-following cam ('CTRL'+scrolling rotates view))
@@ -53,6 +53,7 @@ keyboard functions:
  - 'S' save current map to file
  - '[ and ]' (only for remote interface) increase/decrease packet rate
  - 'M' (only for simulations) toggle undiscoveredCones (whether loaded/placed cones are added to the conelists or yet to be discovered)
+ - 'Z' toggle how zooming (mouse scrolling) works. the defualt mode is nice for trackpads (as you can't drag)
 other:
  - you can drag & drop files onto the pygame window to load mapfiles
  - you can load mapfiles as an argument (in the commandline when starting python)

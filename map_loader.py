@@ -72,7 +72,8 @@ def generateFilename():
 
 def save_map(mapToSave: Map, filename=None, saveSimVarsMap=True):
     """save map to excel file
-        if no filename is provided, one with be automatically generated using generateFilename()"""
+        if no filename is provided, one with be automatically generated using generateFilename()
+        simVars maps are also saved (if saveSimVarsMap==True) to a seperate file"""
     if(filename is None): #automatic file naming
         filename = generateFilename()
     elif(not filename.endswith(mapLoader.fileExt)):
@@ -96,6 +97,9 @@ def save_map(mapToSave: Map, filename=None, saveSimVarsMap=True):
     return(filename, map_file) #, map_file_simVar)   # i think returning the mapFile came from an old version where it was sent to a remote client, i'm just gonna leave it...
 
 def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
+    """loads a map file object (pandas dataframe)
+        (optional) can load data into an existing map
+        returns a new Map object"""
     #print(map_file)
     returnMap = mapFileToObject(map_file)
     if(whereToLoad is not None):
@@ -106,7 +110,6 @@ def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
         whereToLoad.left_cone_list = returnMap.left_cone_list
         whereToLoad.right_cone_list = returnMap.right_cone_list
         whereToLoad.finish_line_cones = returnMap.finish_line_cones
-        #whereToLoad.clockSet(whereToLoad.clock) #a terrible hack that can be removed once the clock system is reworked
         try:
             import pathPlanningTemp as PP
             PP.makeBoundrySplines(whereToLoad)
@@ -139,7 +142,7 @@ def load_map(filename: str, whereToLoad=None):
 
 class mapLoader:
     """a static class for saving/loading/importing pandas excel files
-        (currently!) only saves cone states (positions, connections, etc)"""
+        (currently?) only saves cone states (positions, connections, etc)"""
     fileExt = ".xlsx"
     defaultFilename = "map_"
     

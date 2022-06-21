@@ -17,9 +17,9 @@ class simCar(Map.Car):
     def __init__(self):
         Map.Car.__init__(self) #init Car object
         
-        self.acceleration = 0.7 #m/s^2
-        self.min_velocity = -1
-        self.max_velocity = 3
+        self.acceleration = 0.7 # m/s^2
+        self.min_velocity = -1.0 # m/s
+        self.max_velocity = 5.0 # m/s
 
         self.steering_velocity = 0.0
         self.steering_accel_max = np.deg2rad(1850) # (constant) steering acceleration at full motor power
@@ -30,45 +30,45 @@ class simCar(Map.Car):
         # self.simTrueCar = None # a (nested) simCar object used for positionalDrift.  MOVED to Map.simVars.car
     
     def update(self, dTime, dDist=None, applyUpdate=True):
-            """ update the position of the car, based on velocity, steering and time-passage """
-            if(dDist is None):
-                dDist = self.velocity*dTime
+        """ update the position of the car, based on velocity, steering and time-passage """
+        if(dDist is None):
+            dDist = self.velocity*dTime
+        
+        returnVal = [np.zeros((2)), 0.0]
+        ## turning math
+        if((abs(self.steering) > 0.001) and (abs(self.velocity) > 0.001)): #avoid divide by 0 (and avoid complicated math in a simple situation)
+            turning_radius = self.wheelbase/np.tan(self.steering)
+            angular_velocity = self.velocity/turning_radius
+            arcMov = angular_velocity * dTime
             
-            returnVal = [np.zeros((2)), 0.0]
-            ## turning math
-            if((abs(self.steering) > 0.001) and (abs(self.velocity) > 0.001)): #avoid divide by 0 (and avoid complicated math in a simple situation)
-                turning_radius = self.wheelbase/np.tan(self.steering)
-                angular_velocity = self.velocity/turning_radius
-                arcMov = angular_velocity * dTime
-                
-                #one way to do it
-                # turning_center = GF.distAnglePosToPos(turning_radius, self.angle+(np.pi/2), self.position) #get point around which car turns
-                # newPosition = GF.distAnglePosToPos(turning_radius, self.angle+arcMov-(np.pi/2), turning_center)      #the car has traveled a a certain distancec (velocity*dt) along the circumference of the turning circle, that arc is arcMov radians long
-                
-                #another way of doing it
-                forwardMov = np.sin(arcMov)*turning_radius #sin(arc)*turning radius = movement paralel with (old) carAngle
-                lateralMov = turning_radius - (np.cos(arcMov)*turning_radius) #sin(arc)*turning radius = movement perpendicular to (old) carAngle
-                movAngle = np.arctan2(lateralMov, forwardMov) #
-                diagonalMov = forwardMov/np.cos(movAngle) #the length of a line between the start of the arc and the end of the arc
-                newPosition = GF.distAnglePosToPos(diagonalMov, self.angle+movAngle, self.position)
-                # newPosition[0] = self.position[0] + diagonalMov * np.cos(self.angle+movAngle) #same as using distAnglePosToPos
-                # newPosition[1] = self.position[1] + diagonalMov * np.sin(self.angle+movAngle)
-                
-                returnVal[1] = arcMov
-                #returnVal[0] = newPosition - self.position # numpy array addition
-                returnVal[0] = np.array([newPosition[0]-self.position[0], newPosition[1]-self.position[1]])
-                if(applyUpdate):
-                    ## update position
-                    self.angle += arcMov
-                    self.position[0] = newPosition[0] #keep the numpy array object the same (instead of replacing it with a whole new array every time)
-                    self.position[1] = newPosition[1]
-            else:
-                returnVal[0] = np.array([(dDist * np.cos(self.angle)), (dDist * np.sin(self.angle))])
-                if(applyUpdate):
-                    self.position[0] = self.position[0] + returnVal[0][0] #for some reason += doesnt work at the start
-                    self.position[1] = self.position[1] + returnVal[0][1]
+            #one way to do it
+            # turning_center = GF.distAnglePosToPos(turning_radius, self.angle+(np.pi/2), self.position) #get point around which car turns
+            # newPosition = GF.distAnglePosToPos(turning_radius, self.angle+arcMov-(np.pi/2), turning_center)      #the car has traveled a a certain distancec (velocity*dt) along the circumference of the turning circle, that arc is arcMov radians long
             
-            return(returnVal) # return position and angle
+            #another way of doing it
+            forwardMov = np.sin(arcMov)*turning_radius #sin(arc)*turning radius = movement paralel with (old) carAngle
+            lateralMov = turning_radius - (np.cos(arcMov)*turning_radius) #sin(arc)*turning radius = movement perpendicular to (old) carAngle
+            movAngle = np.arctan2(lateralMov, forwardMov) #
+            diagonalMov = forwardMov/np.cos(movAngle) #the length of a line between the start of the arc and the end of the arc
+            newPosition = GF.distAnglePosToPos(diagonalMov, self.angle+movAngle, self.position)
+            # newPosition[0] = self.position[0] + diagonalMov * np.cos(self.angle+movAngle) #same as using distAnglePosToPos
+            # newPosition[1] = self.position[1] + diagonalMov * np.sin(self.angle+movAngle)
+            
+            returnVal[1] = arcMov
+            #returnVal[0] = newPosition - self.position # numpy array addition
+            returnVal[0] = np.array([newPosition[0]-self.position[0], newPosition[1]-self.position[1]])
+            if(applyUpdate):
+                ## update position
+                self.angle += arcMov
+                self.position[0] = newPosition[0] #keep the numpy array object the same (instead of replacing it with a whole new array every time)
+                self.position[1] = newPosition[1]
+        else:
+            returnVal[0] = np.array([(dDist * np.cos(self.angle)), (dDist * np.sin(self.angle))])
+            if(applyUpdate):
+                self.position[0] = self.position[0] + returnVal[0][0] #for some reason += doesnt work at the start
+                self.position[1] = self.position[1] + returnVal[0][1]
+        
+        return(returnVal) # return position and angle
     
     def simulateFeedback(self, dTime):
         """handle acceleration (both velocity and steering), to simulate getting sensor feedback from car"""

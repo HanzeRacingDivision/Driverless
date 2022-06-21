@@ -16,7 +16,7 @@ class pathPlannerCarData: #a class to go in Map.Car.coneConData or Map.Car.pathF
         
         self.laps = 0
         
-        self.targetVelocity = 1.0
+        self.targetVelocity = 2.0
 
 class pathPlannerMapData: #a class to go in Map.pathFolData (with these variables seperate (instead of inside pathPlanner class), pathPlanner is now fully static)
     """some data to go in .pathFolData of the Map"""

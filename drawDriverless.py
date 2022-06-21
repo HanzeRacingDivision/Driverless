@@ -48,6 +48,7 @@ class pygameDrawerCommon():
         self.statRenderedFonts = []
 
         self.lastMapFilename = "" # the name of the loaded mapfile
+        #self.lastMapFilenameRenderedFont = None # todo: avoid having to render this every loop, maybe?
         
         self.drawTargetConeLines = False #just for UI purposes, to toggle between showing and not showing how the targets are made
         self.drawConeSlamData = 0 #just for UI purposes, to toggle between showing lidar cone spot-count (and the actual datapoints) or not (neither)
@@ -114,6 +115,7 @@ class pygameDrawerCommon():
             self.window.blit(self.statRenderedFonts[i], [self.drawOffset[0]+5,self.drawOffset[1]+5+(i*self.fontSize)])
     
     def drawLoadedFilename(self):
+        """shows the name of the loaded mapfile in the corner of the screen"""
         if(len(self.lastMapFilename) > 0):
             renderedFont = self.pygameFont.render(self.lastMapFilename, False, self.fontColor)
             self.window.blit(renderedFont, [self.drawOffset[0]+self.drawSize[0]-renderedFont.get_width()-5,self.drawOffset[1]+self.drawSize[1]-renderedFont.get_height()-5])
@@ -130,11 +132,11 @@ class pygameDrawer(pygameDrawerCommon):
         self.carCam = startWithCarCam #it's either carCam (car-centered cam, with rotating but no viewOffset), or regular cam (with viewOffset, but no rotating)
         self.invertYaxis = invertYaxis #pygame has pixel(0,0) in the topleft, so this just flips the y-axis when drawing things
         
-        self.minSizeScale = 1.0
-        self.maxSizeSale = 500.0 # zooming in too much makes drawing (the car) really slow
+        self.minSizeScale = 1.0 # note: the unit for sizeScale is pixels per meter, so there's no need to make this too small
+        self.maxSizeSale = 500.0 # zooming in too much makes drawing (the car) really slow (because it has to render the car image at such a high resolution)
         self.centerZooming = False # whether zooming (using the scroll wheel) uses the center of the screen (or the mouse position)
 
-        self.bgColor = [50,50,50] #grey
+        self.bgColor = [50,50,50] #gray
         
         #self.pathCenterPixelDiam = 
         self.pathPointDiam = Map.Cone.coneDiam / 2
@@ -228,7 +230,8 @@ class pygameDrawer(pygameDrawerCommon):
         """draw the background"""
         self.window.fill(self.bgColor, (self.drawOffset[0], self.drawOffset[1], self.drawSize[0], self.drawSize[1])) #dont fill entire screen, just this pygamesim's area (allowing for multiple sims in one window)
     
-    def _dashedLine(self, lineColor, startPixelPos, endPixelPos, lineWidth, dashPixelPeriod=10, dashDutyCycle=0.5):
+    def _dashedLine(self, lineColor, startPixelPos, endPixelPos, lineWidth, dashPixelPeriod=20, dashDutyCycle=0.5):
+        """(sub function) draw a dashed line"""
         pixelDist, angle = GF.distAngleBetwPos(startPixelPos, endPixelPos)
         for i in range(int(pixelDist/dashPixelPeriod)):
             dashStartPos = GF.distAnglePosToPos(i*dashPixelPeriod, angle, startPixelPos)
@@ -236,6 +239,7 @@ class pygameDrawer(pygameDrawerCommon):
             pygame.draw.line(self.window, lineColor, dashStartPos, dashEndPos, int(lineWidth))
 
     def _drawCubicSplinesList(self, splineListToDraw, splineColor, drawDots=True):
+        """(sub function) draw cubic splines"""
         splinePointPixelDiam = self.splinePointDiam * self.sizeScale
         for i in range(len(splineListToDraw[0])):
             splinePointPos = self.realToPixelPos([splineListToDraw[0][i], splineListToDraw[1][i]])
@@ -246,6 +250,7 @@ class pygameDrawer(pygameDrawerCommon):
                 pygame.draw.line(self.window, splineColor, lastSplinePointPos, splinePointPos, self.coneConnectionLineWidth) #line from center pos to center pos
 
     def _drawConeList(self, coneListToDraw, coneColor, drawLines=True, drawSlamData=0):
+        """(sub function) draw a one arbitrary cone list"""
         conePixelDiam = Map.Cone.coneDiam * self.sizeScale
         drawnLineList = [] #[ [ID, ID], ] just a list of drawn lines by ID
         for cone in coneListToDraw:
@@ -311,7 +316,8 @@ class pygameDrawer(pygameDrawerCommon):
             if(self.drawCubicSplines):
                 # TBD: simVars splines?
                 self._drawCubicSplinesList((self.mapToDraw.pathFolData.right_spline if LorR else self.mapToDraw.pathFolData.left_spline), coneColor)
-                
+    
+    # def drawCubicSplinesFunc() # currently included in drawCones(), but could be seperated
     
     def drawPathLines(self, drawPoints=True, drawConeLines=False):
         """draw the path (target_list)
@@ -354,6 +360,7 @@ class pygameDrawer(pygameDrawerCommon):
             pygame.draw.line(self.window, self.finishLineColor, self.realToPixelPos(self.mapToDraw.finish_line_cones[0].position), self.realToPixelPos(self.mapToDraw.finish_line_cones[1].position), self.finishLineWidth)
     
     def _drawCar(self, carToDraw, polygonMode, headlights, isSimVars=False):
+        """(sub function) draws an arbitrary Car object"""
         chassisCenter = carToDraw.getChassisCenterPos()
         if(polygonMode):
             if(self.carPointRadius is None):
@@ -418,8 +425,11 @@ class pygameDrawer(pygameDrawerCommon):
                     pygame.draw.line(self.window, [200, 200, 200], self.realToPixelPos(self.carHistPoints[i-1][j]), self.realToPixelPos(self.carHistPoints[i][j]), 1)
     
     ## UI and debug
-    def _drawMouseCone(self, mapToUse, drawPossibleConnections, drawMaxConnectionDistCircle, isUndiscovered=False):
+    def drawMouseCone(self, drawPossibleConnections=True, drawMaxConnectionDistCircle=True, drawSimvarLines=True):
         """(UI element) show where you're about to place a cone and/or show the avaiable connections to new/hovered-over cone"""
+        mapToUse = self.mapToDraw;   isUndiscovered = False
+        if(drawSimvarLines and (self.mapToDraw.simVars.undiscoveredCones if (self.mapToDraw.simVars is not None) else False)):
+            mapToUse = self.mapToDraw.simVars;   isUndiscovered = True
         if(self.mouseCone is not None): #if there is a floating cone to be drawn
             conePixelDiam = Map.Cone.coneDiam * self.sizeScale
             conePixelPos = pygame.mouse.get_pos() #update position to match mouse position
@@ -452,12 +462,6 @@ class pygameDrawer(pygameDrawerCommon):
                         self._dashedLine(coneColor, conePixelPos, self.realToPixelPos(cone.position), int(self.coneConnectionLineWidth/2), dashedLinePixelPeriod) # draw a dashed line
                     if(bestConnection is not None):
                         pygame.draw.line(self.window, coneColor, conePixelPos, self.realToPixelPos(bestConnection.position), self.coneConnectionLineWidth) # draw a solid line
-
-    def drawMouseCone(self, drawPossibleConnections=True, drawMaxConnectionDistCircle=True, drawSimvarLines=True):
-        if(drawSimvarLines and (self.mapToDraw.simVars.undiscoveredCones if (self.mapToDraw.simVars is not None) else False)):
-            self._drawMouseCone(self.mapToDraw.simVars, drawPossibleConnections, drawMaxConnectionDistCircle, isUndiscovered=True)
-        else:
-            self._drawMouseCone(self.mapToDraw, drawPossibleConnections, drawMaxConnectionDistCircle, isUndiscovered=False)
     
     # def drawDebugLines(self):
     #     """debugging utility, allows certain debugging elements to be visualized (not carCam friendly)"""
@@ -545,7 +549,6 @@ class pygameDrawer3D(pygameDrawerCommon):
         pygameDrawerCommon.__init__(self, mapToDraw, window, drawSize, drawOffset)
         
         self.coneOutlineWidth = 5        #pixels wide
-        
         self.pathCenterPixelDiam = 10    #pixel diameter
         
         self.flagImg = makeFlagImg((self.drawSize[0]/10, self.drawSize[1]/10), (6,4))
@@ -553,8 +556,7 @@ class pygameDrawer3D(pygameDrawerCommon):
         
         # TBD
         self.cameraSurface = pygame.Surface(self.drawSize)
-        # current_dir = os.path.dirname(os.path.abspath(__file__))                 #deleteme
-        # self.cameraSurface = pygame.image.load(os.path.join(current_dir, "coneImg.png")) #deleteme
+        ## figure out how you are gonna stream in the camera frames
         
         # constants, TO BE MOVED TO Map.py (to cone- and car classes respectively)
         self.coneHeight = 0.4
@@ -622,9 +624,11 @@ class pygameDrawer3D(pygameDrawerCommon):
         return(self.perspectiveProjection(self.realToRespectivePos(realPos), z, camHeightIsZeroZ))
     
     def distAngleToPixelPos(self, distAngle, z, camHeightIsZeroZ=False):
+        """just a macro (the solution to long function names)"""
         return(self.perspectiveProjection(GF.distAnglePosToPos(distAngle[0], distAngle[1], np.zeros(2)), z, camHeightIsZeroZ))
     
     def updateCameraFrame(self, buffer, size, encoding):
+        """TBD: figure out how to get frames from our camera / the overal code"""
         self.cameraSurface = pygame.image.frombuffer(buffer, size, encoding) #https://www.pygame.org/docs/ref/image.html#pygame.image.frombuffer
     
     def drawCameraFrame(self):
