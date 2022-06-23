@@ -23,7 +23,7 @@ class PathPlanning:
         self.car = Car(7, 10, noise=1e-3)
         self.cones = Cones()
         self.path = Path()
-        self.clock = Clock()
+        self.clock: Clock = Clock()
 
         self.slam = Slam(self.car, matrix_size=120, noise=1e-3)
         self.slam_active = slam_active
