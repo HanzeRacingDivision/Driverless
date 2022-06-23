@@ -126,7 +126,7 @@ class Car:
                 break
                 # if the steering system has reached its target (and there is no chance of overshoot),
                 # stop iterating (saves a little time)
-        # TODO: simplify formulas for steering motor to approximate it more efficiently...
+        # TODO simplify formulas for steering motor to approximate it more efficiently...
 
         # if self.steering_angle:
         # turning_radius = self.length / sin(radians(self.steering_angle))

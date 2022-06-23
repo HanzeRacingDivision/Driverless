@@ -147,7 +147,7 @@ class PathPlanning:
         self.car.steering_angle = max(-self.car.max_steering, min(self.car.steering_angle, self.car.max_steering))
 
     def implement_main_logic(self):
-        self.car.update(self.clock.get_dt())
+        self.car.update(self.clock.dt)
 
         for target in self.targets.targets:
             target.update(self)
@@ -250,9 +250,9 @@ class PathPlanning:
                 pp_functions.manual_controls.enable_dragging_screen(self, events)
             else:
                 # user inputs
-                pp_functions.manual_controls.user_input(self, events, self.clock.get_dt())
+                pp_functions.manual_controls.user_input(self, events, self.clock.dt)
 
-            self.episode_time_running = self.clock.get_time_running()  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
+            self.episode_time_running = self.clock.time_running  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
             # redefining the car angle so that it is in (-180,180)
             self.car.config_angle()
@@ -266,7 +266,7 @@ class PathPlanning:
             # SLAM
             if self.slam_active:
                 self.slam.update_slam_vars(self.cones.visible[Side.LEFT], self.cones.visible[Side.RIGHT], self.car)
-                self.slam.EKF_predict(self.clock.get_dt())
+                self.slam.EKF_predict(self.clock.dt)
                 if self.num_steps % self.slam.frame_limit == 0 or self.num_steps < 5:
                     self.slam.EKF_update(self.car, self.cones.visible)
 
@@ -292,7 +292,7 @@ class PathPlanning:
             self.car.car_crash_mechanic(self.cones, self.path, self.slam_active)
 
             # checking exit conditions
-            self.set_done(self.clock.get_time_running(), self.episode_num, self.num_steps)
+            self.set_done(self.clock.time_running, self.episode_num, self.num_steps)
 
             # Logic
             self.implement_main_logic()

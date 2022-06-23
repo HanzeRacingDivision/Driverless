@@ -157,7 +157,6 @@ class CarEnv(gym.Env):
         self.episode_num += 1
         self.episode_time_start = self.pp.clock.get_time_running()
 
-
         observation = np.zeros(self.num_obs, dtype=np.float32)
         return observation
 

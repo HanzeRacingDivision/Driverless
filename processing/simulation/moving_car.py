@@ -6,6 +6,10 @@ import time
 import numpy as np
 from PIL import Image, ImageDraw
 
+###############################
+# deprecated file!
+###############################
+
 
 def draw_line_dashed(surface, color, start_pos, end_pos, width=1, dash_length=10, exclude_corners=True):
     """simply a function that draws dashed lines in pygame"""
