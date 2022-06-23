@@ -221,7 +221,8 @@ class PathPlanning:
             observation[13 + 2 * i] = np.interp(cone[1], [-1 * self.car.fov_range, self.car.fov_range], [-1, 1])
 
         # add noise
-        observation *= np.random.normal(1, noise_scale, num_obs)
+        noise = np.float32(np.random.normal(1, noise_scale, size=num_obs))
+        observation = np.multiply(observation, noise)
 
         return observation
 
@@ -310,4 +311,4 @@ if __name__ == '__main__':
     #   1) autonomous: no user inputs, only screen dragging
     #   2) user: old simulation with user inputs
     # SLAM activated True/False
-    sim.run(method="user")
+    sim.run(method="autonomous")
