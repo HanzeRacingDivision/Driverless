@@ -189,10 +189,9 @@ class PathPlanning:
             observation[12 + 2 * i] = np.interp(cone[0], [0, CAR_FIELD_OF_VIEW / PIXELS_PER_UNIT], [-1, 1])
             observation[13 + 2 * i] = np.interp(cone[1], [-1 * CAR_FOV_RANGE, CAR_FOV_RANGE], [-1, 1])
 
-        # add noise
-        noise = np.float32(np.random.normal(1, noise_scale, size=num_obs))
-        observation = np.multiply(observation, noise)
-
+        # add noise -- not working
+        # noise = np.float32(np.random.normal(1, noise_scale, size=num_obs))
+        # observation = np.multiply(observation, noise)
         return observation
 
     def run(self, method):
@@ -232,7 +231,7 @@ class PathPlanning:
             # SLAM
             if self.slam_active:
                 self.slam.update_slam_vars(self.cones.visible[Side.LEFT], self.cones.visible[Side.RIGHT], self.car)
-                self.slam.EKF_predict(self.clock.get_dt())
+                self.slam.EKF_predict(self.clock.dt)
                 if self.num_steps % SLAM_FRAME_LIMIT == 0 or self.num_steps < 5:
                     self.slam.EKF_update(self.car, self.cones.visible)
 

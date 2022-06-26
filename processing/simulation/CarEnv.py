@@ -34,7 +34,7 @@ class CarEnv(gym.Env):
 
         self.num_steps = 0
         
-        self.pp = PathPlanning(False)
+        self.pp = PathPlanning()
 
         self.LEVEL_ID = self.pp.LEVEL_ID
 
@@ -58,7 +58,7 @@ class CarEnv(gym.Env):
 
     def generate_random_action(self):
         car_steering_angle = random.uniform(-self.pp.car.max_steering, self.pp.car.max_steering)
-        car_curr_velocity = CRUISING_SPEED
+        car_curr_velocity = self.pp.cruising_speed
         return [car_steering_angle, car_curr_velocity]
 
     def render(self, mode=None):
@@ -139,7 +139,7 @@ class CarEnv(gym.Env):
         return observation, reward, done, info
 
     def reset(self):
-        self.pp = PathPlanning(False)
+        self.pp = PathPlanning()
 
         self.total_reward = 0
         self.num_steps = 0
@@ -170,6 +170,7 @@ class CarEnv(gym.Env):
 if __name__ == "__main__":
     env = CarEnv()
     obs = env.reset()
+    print(obs.shape, obs.dtype)
     check_env(env)
     d = False
 
