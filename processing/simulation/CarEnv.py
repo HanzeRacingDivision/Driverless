@@ -38,7 +38,7 @@ class CarEnv(gym.Env):
 
         self.LEVEL_ID = self.pp.LEVEL_ID
 
-        self.episode_time_start = self.pp.clock.get_time_running()
+        self.episode_time_start = self.pp.clock.time_running
         self.episode_time_running = 0
         self.total_reward = 0
 
@@ -100,7 +100,7 @@ class CarEnv(gym.Env):
                 self.pp.exit = True
         pp_functions.manual_controls.enable_dragging_screen(self.pp, events)
 
-        self.episode_time_running = self.pp.clock.get_time_running() - self.episode_time_start
+        self.episode_time_running = self.pp.clock.time_running - self.episode_time_start
 
         # update target list
         self.pp.targets.update_target_lists()
@@ -145,7 +145,7 @@ class CarEnv(gym.Env):
         self.num_steps = 0
 
         self.episode_num += 1
-        self.episode_time_start = self.pp.clock.get_time_running()
+        self.episode_time_start = self.pp.clock.time_running
 
         observation = np.zeros(self.num_obs, dtype=np.float32)
         return observation

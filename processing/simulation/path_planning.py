@@ -20,7 +20,7 @@ class PathPlanning:
         self.car = Car()
         self.cones = Cones()
         self.path = Path()
-        self.clock = Clock()
+        self.clock: Clock = Clock()
 
         self.slam = Slam(self.car)
         self.slam_active = SLAM_ACTIVATED
@@ -122,7 +122,7 @@ class PathPlanning:
                 self.track_number_changed = False
 
     def implement_main_logic(self):
-        self.car.update(self.clock.get_dt())
+        self.car.update(self.clock.dt)
 
         for target in self.targets.targets:
             target.update(self)
@@ -189,7 +189,9 @@ class PathPlanning:
             observation[12 + 2 * i] = np.interp(cone[0], [0, CAR_FIELD_OF_VIEW / PIXELS_PER_UNIT], [-1, 1])
             observation[13 + 2 * i] = np.interp(cone[1], [-1 * CAR_FOV_RANGE, CAR_FOV_RANGE], [-1, 1])
 
-        observation *= np.random.normal(1, noise_scale, num_obs)  # add noise
+        # add noise
+        noise = np.float32(np.random.normal(1, noise_scale, size=num_obs))
+        observation = np.multiply(observation, noise)
 
         return observation
 
@@ -217,9 +219,9 @@ class PathPlanning:
                 pp_functions.manual_controls.enable_dragging_screen(self, events)
             else:
                 # user inputs
-                pp_functions.manual_controls.user_input(self, events, self.clock.get_dt())
+                pp_functions.manual_controls.user_input(self, events, self.clock.dt)
 
-            self.episode_time_running = self.clock.get_time_running()  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
+            self.episode_time_running = self.clock.time_running  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
             # update target list
             self.targets.update_target_lists()
@@ -256,7 +258,7 @@ class PathPlanning:
             self.car.car_crash_mechanic(self.cones, self.path, self.slam_active)
 
             # checking exit conditions
-            self.set_done(self.clock.get_time_running(), self.episode_num, self.num_steps)
+            self.set_done(self.clock.time_running, self.episode_num, self.num_steps)
 
             # Logic
             self.implement_main_logic()
