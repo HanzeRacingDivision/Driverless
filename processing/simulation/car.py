@@ -1,38 +1,25 @@
 from math import radians, degrees
 from pygame.math import Vector2
 import numpy as np
-
+from constants import *
 from cone import Side
 from pp_functions.utils import bound_angle_180
 
-NOISE = 1e-10  # noise constant for SLAM variables
-
 
 class Car:
-    def __init__(self, x, y, noise=0, angle=0, length=1.5, max_steering=25, max_acceleration=4.0):
-        self.true_position = Vector2(x, y)  # ground truth
-        self.position = Vector2(x, y)  # perceived position with errors
+    def __init__(self):
+        self.true_position = Vector2(CAR_X_START_POSITION, CAR_Y_START_POSITION)  # ground truth position
+        self.position = Vector2(CAR_X_START_POSITION, CAR_Y_START_POSITION)  # perceived position with errors
         self.velocity = Vector2(0.0, 0.0)
         self.angular_velocity = 0
-        self.true_angle = angle
-        self.angle = angle
-        self.length = length
-        self.max_acceleration = max_acceleration
-        self.max_steering = max_steering
-        self.max_velocity = 1
-        self.brake_deceleration = 4
-        self.free_deceleration = 1
-        self.car_image = None
-        self.crashed = False
-
-        self.noise = noise
-
+        self.true_angle = 0
+        self.angle = 0
         self.acceleration = 0.0
         self.steering_angle = 0.0
-        self.fov = 225  # 150
-        self.turning_sharpness = 1.8
+
+        self.car_image = None
+        self.crashed = False
         self.breaks = True
-        self.fov_range = 60
         self.auto = True
         self.headlights = False
 
@@ -43,23 +30,22 @@ class Car:
         self.steering_target_margin = 0.1  # (constant) acceptable margin of error for steering control loop
         self.steerSimSubdt = 0.01  # (constant) delta time of steering sub-simulation loop
 
-    def config_angle(self):
-        self.true_angle = bound_angle_180(self.true_angle)
+    def steering(self, pp):
+        self.true_angle = bound_angle_180(self.true_angle)  # redefining the car angle so that it is in (-180,180)
 
-    # def steering(self, pp):
-    # if (len(pp.target.visible_targets) > 0
-    # and np.linalg.norm(pp.target.closest_target.position-self.position) < self.fov/pp.ppu
-    # and np.linalg.norm(pp.target.closest_target.position-self.position) > 20/pp.ppu
-    # and self.auto == True
-    # and pp.target.closest_target.passed == False):
+        if (len(pp.targets.visible_targets) > 0
+                and np.linalg.norm(
+                    pp.targets.closest_target.position - self.position) < CAR_FIELD_OF_VIEW / PIXELS_PER_UNIT
+                and np.linalg.norm(pp.targets.closest_target.position - self.position) > 20 / PIXELS_PER_UNIT
+                and self.auto and not pp.targets.closest_target.passed):
+            dist = pp.targets.closest_target.dist_car
+            alpha = pp.targets.closest_target.alpha
+            self.steering_angle = (MAX_STEERING * 2 / np.pi) * np.arctan(
+                alpha / dist ** TURNING_SHARPNESS)
+            self.velocity.x = pp.cruising_speed
 
-    # dist = pp.target.closest_target.dist_car
-    # alpha = pp.target.closest_target.alpha
-    # self.steering_angle = (self.max_steering*2/np.pi)*np.arctan(alpha/dist**self.turning_sharpness)
-    # self.velocity.x = pp.cruising_speed
-
-    # self.acceleration = max(-self.max_acceleration, min(self.acceleration, self.max_acceleration))
-    # self.steering_angle = max(-self.max_steering, min(self.steering_angle, self.max_steering))
+        self.acceleration = max(-MAX_ACCELERATION, min(self.acceleration, MAX_ACCELERATION))
+        self.steering_angle = max(-MAX_STEERING, min(self.steering_angle, MAX_STEERING))
 
     # Car crash mechanic
     def car_crash_mechanic(self, cone_obj, path_obj, slam_active):
@@ -93,7 +79,7 @@ class Car:
         # doesn't seem like the cleanest use of numpy array addition, also: why is this an array addition and not just
         # 'velocity.x += acc*dt' ?
         self.velocity += (self.acceleration * dt, 0)
-        self.velocity.x = max(float(-self.max_velocity), min(self.velocity.x, self.max_velocity))
+        self.velocity.x = max(float(-MAX_VELOCITY), min(self.velocity.x, MAX_VELOCITY))
 
         # simulate steering motor:
         # run a whole-ass sub-simulation just for the steering motor
@@ -133,15 +119,15 @@ class Car:
         if abs(self.steering_simulated) > 0.01:  # fixed bad non-zero check! >:(
             # thijs: i'm pretty sure tan() makes more sense than sin() here, but since the car position is at the center
             # it'll never be perfect
-            turning_radius = self.length / np.tan(radians(self.steering_simulated))
+            turning_radius = CAR_LENGTH / np.tan(radians(self.steering_simulated))
             self.angular_velocity = self.velocity.x / turning_radius
         else:
             self.angular_velocity = 0
         # SLAM variables with added noise
         self.angle += degrees(self.angular_velocity) * dt
         self.position += self.velocity.rotate(-self.angle) * dt
-        self.position += Vector2(np.random.normal(loc=0, scale=self.noise), np.random.normal(loc=0, scale=self.noise))
-        self.angle += np.random.normal(loc=0, scale=self.noise)
+        self.position += Vector2(np.random.normal(loc=0, scale=STEERING_NOISE), np.random.normal(loc=0, scale=STEERING_NOISE))
+        self.angle += np.random.normal(loc=0, scale=STEERING_NOISE)
 
         # ground truth
         self.true_angle += degrees(self.angular_velocity) * dt

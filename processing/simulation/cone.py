@@ -2,7 +2,7 @@ from pygame.math import Vector2
 import numpy as np
 from enum import Enum
 from scipy.interpolate import splprep, splev
-
+from constants import *
 
 class Side(Enum):
     LEFT = 1
@@ -120,7 +120,6 @@ class Cone:
         self.dist_car = 10 ** 10
         self.alpha = 0
         self.id = id_number
-
         self.cov = Vector2(x, y)
 
     def update(self, pp):
@@ -141,7 +140,7 @@ class Cone:
         self.alpha = alpha[0, 0]
 
         # if cone within car fov, set to visible
-        if self.dist_car < pp.car.fov / pp.ppu and np.abs(self.alpha) < pp.car.fov_range:
+        if self.dist_car < CAR_FIELD_OF_VIEW / pp.ppu and np.abs(self.alpha) < CAR_FOV_RANGE:
             self.visible = True
             self.in_fov = True
         else:

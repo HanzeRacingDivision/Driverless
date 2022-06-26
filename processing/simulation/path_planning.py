@@ -1,11 +1,13 @@
 import os
 import pygame
+import random
 
 from car import Car
 from cone import *
 from target import *
 from slam import *
 from clock import *
+from constants import *
 
 import pp_functions
 import pp_functions.manual_controls
@@ -13,40 +15,30 @@ import pp_functions.drawing
 
 
 class PathPlanning:
-    def __init__(self, slam_active, blank_map=False):
-        """
-        @param slam_active: bool; True if SLAM is to be used
-        @param blank_map: bool; True if the map should be a blank sheet, False if a preset map is to be loaded
-        """
-
+    def __init__(self):
         self.targets = Targets()
-        self.car = Car(7, 10, noise=1e-3)
+        self.car = Car()
         self.cones = Cones()
         self.path = Path()
         self.clock = Clock()
 
-        self.slam = Slam(self.car, matrix_size=120, noise=1e-3)
-        self.slam_active = slam_active
+        self.slam = Slam(self.car)
+        self.slam_active = SLAM_ACTIVATED
 
         self.LEVEL_ID = 'None'
         self.initialize_images()
-        if not blank_map:
+        if not BLANK_MAP:
             self.initialize_map()
 
         pygame.init()
         pygame.display.set_caption("Car")
 
-        self.width = 1280
-        self.height = 720
-        self.screen = pygame.display.set_mode((self.width, self.height))
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.fullscreen = False
-        self.ticks = 60
         self.exit = False
         self.mouse_pos_list = []
         self.total_reward = 0
-        self.cruising_speed = 1
-        self.ppu = 32
-
+        self.ppu = PIXELS_PER_UNIT
         self.view_offset = [0, 0]
         self.car_centre = False  # THIS DOESNT WORK YET
         self.prev_view_offset = [0, 0]
@@ -54,18 +46,16 @@ class PathPlanning:
         self.view_offset_mouse_pos_start = [0, 0]
         self.midpoint_created = False
         self.undo_done = False
-
         self.track = True
         self.track_number = 0
         self.track_number_changed = False
         self.time_start_sim = None
-
         self.episode_time_running = 0  # THIS IS A FAKE VARIABLE!!!
         self.reward = 0
         self.done = False
-
         self.episode_num = None
         self.num_steps = 0
+        self.cruising_speed = 1
 
     def initialize_images(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -91,7 +81,7 @@ class PathPlanning:
         self.path.spline_image[Side.RIGHT] = pygame.image.load(image_path6)
 
     def initialize_map(self):
-        random_number = "simple"  # random.randint(1, 7)
+        random_number = random.randint(1, 7)
         self.LEVEL_ID = f"MAP_{random_number}"
 
         left_cones, right_cones = pp_functions.utils.load_existing_map(self.LEVEL_ID)
@@ -131,21 +121,6 @@ class PathPlanning:
                   and self.track):
                 self.track_number_changed = False
 
-    def steering(self):
-        if (len(self.targets.visible_targets) > 0
-                and np.linalg.norm(
-                    self.targets.closest_target.position - self.car.position) < self.car.fov / self.ppu
-                and np.linalg.norm(self.targets.closest_target.position - self.car.position) > 20 / self.ppu
-                and self.car.auto and not self.targets.closest_target.passed):
-            dist = self.targets.closest_target.dist_car
-            alpha = self.targets.closest_target.alpha
-            self.car.steering_angle = (self.car.max_steering * 2 / np.pi) * np.arctan(
-                alpha / dist ** self.car.turning_sharpness)
-            self.car.velocity.x = self.cruising_speed
-
-        self.car.acceleration = max(-self.car.max_acceleration, min(self.car.acceleration, self.car.max_acceleration))
-        self.car.steering_angle = max(-self.car.max_steering, min(self.car.steering_angle, self.car.max_steering))
-
     def implement_main_logic(self):
         self.car.update(self.clock.get_dt())
 
@@ -155,10 +130,6 @@ class PathPlanning:
         for category in Side:
             for cone in self.cones.list[category]:
                 cone.update(self)
-
-        # When using CarEnv, this is unnecessary (and important to keep off), as it is handled by 'done' var
-        # if self.car.crashed:
-        # self.exit = True
 
     def set_done(self, episode_time_running, episode_num, num_steps):
         self.path.compute_boundaries(self)
@@ -171,16 +142,15 @@ class PathPlanning:
             episode_ending = ('crash', self.LEVEL_ID, episode_num, num_steps)
             return True, episode_ending
 
-        elif np.linalg.norm(Vector2(7 * self.ppu, 10 * self.ppu) - self.car.true_position * self.ppu) < 40 and int(
+        elif np.linalg.norm(Vector2(CAR_X_START_POSITION * PIXELS_PER_UNIT, CAR_Y_START_POSITION * PIXELS_PER_UNIT) - self.car.true_position * self.ppu) < 40 and int(
                 episode_time_running) > 4:
             print("track complete! : " + self.LEVEL_ID)
-            # self.done = True
+            self.done = True
             self.track_number += 1
             episode_ending = ('success', self.LEVEL_ID, episode_num, num_steps)
-            # return True, episode_ending
-            return False, episode_ending
+            return True, episode_ending
 
-        elif int(episode_time_running) > 100:
+        elif int(episode_time_running) > EPISODE_TIME_LIMIT:
             print('time limit reached : ' + self.LEVEL_ID)
             self.done = True
             episode_ending = ('time limit', self.LEVEL_ID, episode_num, num_steps)
@@ -192,36 +162,34 @@ class PathPlanning:
 
     def midpoint_steering_angle(self):
         if (len(self.targets.visible_targets) > 0
-                and self.car.fov / self.ppu > np.linalg.norm(
-                    self.targets.closest_target.position - self.car.position) > 20 / self.ppu
+                and CAR_FIELD_OF_VIEW / PIXELS_PER_UNIT > np.linalg.norm(
+                    self.targets.closest_target.position - self.car.position) > 20 / PIXELS_PER_UNIT
                 and self.car.auto and not self.targets.closest_target.passed):
 
             dist = self.targets.closest_target.dist_car
             alpha = self.targets.closest_target.alpha
-            midpoint_steering_angle = (self.car.max_steering * 2 / np.pi) * np.arctan(
-                alpha / dist ** self.car.turning_sharpness)
+            midpoint_steering_angle = (MAX_STEERING * 2 / np.pi) * np.arctan(alpha / dist ** TURNING_SHARPNESS)
         else:
             midpoint_steering_angle = 0
 
-        midpoint_steering_angle = max(-self.car.max_steering, min(midpoint_steering_angle, self.car.max_steering))
+        midpoint_steering_angle = max(-MAX_STEERING, min(midpoint_steering_angle, MAX_STEERING))
 
         return midpoint_steering_angle
 
     def get_observation(self, num_obs: int, noise_scale: float = 0) -> np.ndarray:
         observation = np.zeros(num_obs, dtype=np.float32)
-        observation[0] = np.interp(self.car.velocity.x, [0, self.car.max_velocity], [-1, 1])
+        observation[0] = np.interp(self.car.velocity.x, [0, MAX_VELOCITY], [-1, 1])
         observation[1] = np.interp(self.car.angle, [-180, 180], [-1, 1])
 
         for i, cone in enumerate(self.cones.polar_boundary_sample[Side.LEFT]):
-            observation[2 + 2 * i] = np.interp(cone[0], [0, self.car.fov / self.ppu], [-1, 1])
-            observation[3 + 2 * i] = np.interp(cone[1], [-1 * self.car.fov_range, self.car.fov_range], [-1, 1])
+            observation[2 + 2 * i] = np.interp(cone[0], [0, CAR_FIELD_OF_VIEW / PIXELS_PER_UNIT], [-1, 1])
+            observation[3 + 2 * i] = np.interp(cone[1], [-1 * CAR_FOV_RANGE, CAR_FOV_RANGE], [-1, 1])
 
         for i, cone in enumerate(self.cones.polar_boundary_sample[Side.RIGHT]):
-            observation[12 + 2 * i] = np.interp(cone[0], [0, self.car.fov / self.ppu], [-1, 1])
-            observation[13 + 2 * i] = np.interp(cone[1], [-1 * self.car.fov_range, self.car.fov_range], [-1, 1])
+            observation[12 + 2 * i] = np.interp(cone[0], [0, CAR_FIELD_OF_VIEW / PIXELS_PER_UNIT], [-1, 1])
+            observation[13 + 2 * i] = np.interp(cone[1], [-1 * CAR_FOV_RANGE, CAR_FOV_RANGE], [-1, 1])
 
-        # add noise
-        observation *= np.random.normal(1, noise_scale, num_obs)
+        observation *= np.random.normal(1, noise_scale, num_obs)  # add noise
 
         return observation
 
@@ -237,7 +205,6 @@ class PathPlanning:
         while not self.exit and not self.done:
 
             self.num_steps += 1
-            # Time variables
             self.clock.update()
 
             # Event queue
@@ -254,9 +221,6 @@ class PathPlanning:
 
             self.episode_time_running = self.clock.get_time_running()  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
-            # redefining the car angle so that it is in (-180,180)
-            self.car.config_angle()
-
             # update target list
             self.targets.update_target_lists()
 
@@ -267,23 +231,23 @@ class PathPlanning:
             if self.slam_active:
                 self.slam.update_slam_vars(self.cones.visible[Side.LEFT], self.cones.visible[Side.RIGHT], self.car)
                 self.slam.EKF_predict(self.clock.get_dt())
-                if self.num_steps % self.slam.frame_limit == 0 or self.num_steps < 5:
+                if self.num_steps % SLAM_FRAME_LIMIT == 0 or self.num_steps < 5:
                     self.slam.EKF_update(self.car, self.cones.visible)
 
-                    # calculate closest target
-                    self.targets.update_closest_target()
+            # calculate closest target
+            self.targets.update_closest_target()
 
-                    # computing boundary estimation
-                    self.path.compute_boundaries(self)
+            # computing boundary estimation
+            self.path.compute_boundaries(self)
 
-                    # compute midpoint path
-                    self.path.generate_midpoint_path(self)
+            # compute midpoint path
+            self.path.generate_midpoint_path(self)
 
             # reset targets for new lap
             self.reset_new_lap()
 
             # automatic steering
-            self.steering()
+            self.car.steering(self)
 
             # implement track logic
             self.track_logic()
@@ -304,10 +268,5 @@ class PathPlanning:
 
 
 if __name__ == '__main__':
-    sim = PathPlanning(slam_active=True)
-
-    # 2 steering methods:
-    #   1) autonomous: no user inputs, only screen dragging
-    #   2) user: old simulation with user inputs
-    # SLAM activated True/False
-    sim.run(method="user")
+    sim = PathPlanning()
+    sim.run(method=STEERING_METHOD)

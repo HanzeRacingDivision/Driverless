@@ -3,7 +3,7 @@ from typing import Union, List, Optional
 
 import gym
 import numpy as np
-import time
+from constants import *
 from path_planning import PathPlanning
 import pygame
 import pp_functions
@@ -58,7 +58,7 @@ class CarEnv(gym.Env):
 
     def generate_random_action(self):
         car_steering_angle = random.uniform(-self.pp.car.max_steering, self.pp.car.max_steering)
-        car_curr_velocity = self.pp.cruising_speed
+        car_curr_velocity = CRUISING_SPEED
         return [car_steering_angle, car_curr_velocity]
 
     def render(self, mode=None):
@@ -66,30 +66,22 @@ class CarEnv(gym.Env):
 
     def step(self, action: Union[np.ndarray, int, List[int]]):
 
-        # for key in self.pp.cone.visible_cone_list.keys():
-        #   print(len(self.pp.cone.visible_cone_list[key]))
-
-        # print(self.num_steps)
-
-        # print(self.pp.car.position.x, self.pp.car.position.y)
-        # print(self.episode_time_running)
-
         self.num_steps += 1
 
         if self.mode == "cont":
-            self.pp.car.steering_angle = self.pp.car.max_steering * action[0]
+            self.pp.car.steering_angle = MAX_STEERING * action[0]
 
         elif self.mode == "discrete":
             if action == 0:
-                self.pp.car.steering_angle = 0.5 * self.pp.car.max_steering
+                self.pp.car.steering_angle = 0.5 * MAX_STEERING
             elif action == 1:
-                self.pp.car.steering_angle = 0.5 * -1 * self.pp.car.max_steering
+                self.pp.car.steering_angle = 0.5 * -1 * MAX_STEERING
             elif action == 2:
-                self.pp.car.steering_angle = 1 * self.pp.car.max_steering
+                self.pp.car.steering_angle = 1 * MAX_STEERING
             elif action == 3:
-                self.pp.car.steering_angle = 1 * -1 * self.pp.car.max_steering
+                self.pp.car.steering_angle = 1 * -1 * MAX_STEERING
             elif action == 4:
-                self.pp.car.steering_angle = 0 * self.pp.car.max_steering
+                self.pp.car.steering_angle = 0 * MAX_STEERING
 
         self.pp.num_steps += 1
         self.pp.clock.update()
@@ -109,8 +101,6 @@ class CarEnv(gym.Env):
         pp_functions.manual_controls.enable_dragging_screen(self.pp, events)
 
         self.episode_time_running = self.pp.clock.get_time_running() - self.episode_time_start
-
-        self.pp.car.config_angle()
 
         # update target list
         self.pp.targets.update_target_lists()
@@ -156,7 +146,6 @@ class CarEnv(gym.Env):
 
         self.episode_num += 1
         self.episode_time_start = self.pp.clock.get_time_running()
-
 
         observation = np.zeros(self.num_obs, dtype=np.float32)
         return observation

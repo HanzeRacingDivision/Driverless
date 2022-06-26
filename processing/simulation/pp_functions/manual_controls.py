@@ -2,6 +2,7 @@ import pygame
 from math import copysign
 
 from cone import *
+from constants import *
 import pp_functions.utils
 
 import os
@@ -185,22 +186,22 @@ def user_input(pp, events, dt):
     # manual acceleration
     if pressed[pygame.K_UP]:
         if pp.car.velocity.x < 0:
-            pp.car.acceleration = pp.car.brake_deceleration
+            pp.car.acceleration = BRAKE_DECELERATION
         else:
             pp.car.acceleration += 1 * dt
     elif pressed[pygame.K_DOWN] and pp.car.breaks == True:
         if pp.car.velocity.x > 0:
-            pp.car.acceleration = -pp.car.brake_deceleration
+            pp.car.acceleration = -BRAKE_DECELERATION
         else:
             pp.car.acceleration -= 1 * dt
     elif pressed[pygame.K_SPACE]:
-        if abs(pp.car.velocity.x) > dt * pp.car.brake_deceleration:
-            pp.car.acceleration = -copysign(pp.car.brake_deceleration, pp.car.velocity.x)
+        if abs(pp.car.velocity.x) > dt * BRAKE_DECELERATION:
+            pp.car.acceleration = -copysign(BRAKE_DECELERATION, pp.car.velocity.x)
         else:
             pp.car.acceleration = -pp.car.velocity.x / dt
     else:
-        if abs(pp.car.velocity.x) > dt * pp.car.free_deceleration:
-            pp.car.acceleration = -copysign(pp.car.free_deceleration, pp.car.velocity.x)
+        if abs(pp.car.velocity.x) > dt * FREE_DECELERATION:
+            pp.car.acceleration = -copysign(FREE_DECELERATION, pp.car.velocity.x)
         else:
             if dt != 0:
                 pp.car.acceleration = -pp.car.velocity.x / dt

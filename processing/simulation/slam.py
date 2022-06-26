@@ -1,18 +1,19 @@
 from path import *
 from math import radians, degrees
+from constants import *
 
 
 class Slam:
-    def __init__(self, car, matrix_size=250, noise=0):
+    def __init__(self, car):
         # state vector we are predicting, denoted by Greek letter [mu]
         # first 2 elements are car positions, others are landmark locations (x, y)
-        self.mu = np.zeros(matrix_size)
+        self.mu = np.zeros(MATRIX_SIZE)
         self.mu[0] = car.position.x
         self.mu[1] = car.position.y
 
         # covariance matrix for respective uncertainty of pairs of landmarks and car variables
-        self.cov = np.zeros((matrix_size, matrix_size))
-        for i in range(3, matrix_size):
+        self.cov = np.zeros((MATRIX_SIZE, MATRIX_SIZE))
+        for i in range(3, MATRIX_SIZE):
             self.cov[i, i] = 10 ** 10  # covariance for each landmark with itself is high
 
         self.u = np.zeros(3)
@@ -20,10 +21,6 @@ class Slam:
         self.obs = []
         self.c_prob = []
         self.Qt = np.zeros((2, 2))
-
-        self.frame_limit = 1  # "run SLAM every frame_limit frames"
-
-        self.noise = noise  # size of the self-created error for testing
 
     def update_slam_vars(self, visible_left_cones, visible_right_cones, car):
         """
@@ -39,16 +36,16 @@ class Slam:
         self.obs = []
         self.c_prob = np.ones(len(self.mu))
         for i in range(len(visible_left_cones)):
-            observed_car_dist = visible_left_cones[i].true_dist_car*np.random.normal(loc=1, scale=self.noise)
-            observed_alpha = visible_left_cones[i].alpha*np.random.normal(loc=1, scale=self.noise)
+            observed_car_dist = visible_left_cones[i].true_dist_car*np.random.normal(loc=1, scale=SLAM_NOISE)
+            observed_alpha = visible_left_cones[i].alpha*np.random.normal(loc=1, scale=SLAM_NOISE)
 
             self.obs.append([observed_car_dist, observed_alpha, visible_left_cones[i].id])
             cone_dists.append(observed_car_dist)
             cone_angles.append(observed_alpha)
 
         for i in range(len(visible_right_cones)):
-            observed_car_dist = visible_right_cones[i].true_dist_car*np.random.normal(loc=1, scale=self.noise)
-            observed_alpha = visible_right_cones[i].alpha*np.random.normal(loc=1, scale=self.noise)
+            observed_car_dist = visible_right_cones[i].true_dist_car*np.random.normal(loc=1, scale=SLAM_NOISE)
+            observed_alpha = visible_right_cones[i].alpha*np.random.normal(loc=1, scale=SLAM_NOISE)
 
             self.obs.append([observed_car_dist, observed_alpha, visible_right_cones[i].id])
             cone_dists.append(observed_car_dist)
