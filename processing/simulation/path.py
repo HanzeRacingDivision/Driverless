@@ -9,10 +9,8 @@ from target import Target
 class Path:
     def __init__(self):
         self.spline_image = {Side.LEFT: None, Side.RIGHT: None}
-
         self.splines = {Side.LEFT: 0, Side.RIGHT: 0}
         self.spline_linked = {Side.LEFT: False, Side.RIGHT: False}
-
         self.start_midpoint_x = 0
         self.start_midpoint_y = 0
 
@@ -51,7 +49,6 @@ class Path:
                 self.splines[category] = splev(unew, tck)
 
     def generate_midpoint_path(self, pp):
-
         # auto generate path based on splines/cones
         if (len(pp.cones.in_fov[Side.LEFT]) > 1
                 and len(pp.cones.in_fov[Side.RIGHT]) > 1):
