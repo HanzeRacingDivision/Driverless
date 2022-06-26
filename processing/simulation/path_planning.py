@@ -191,8 +191,7 @@ class PathPlanning:
 
         # add noise
         noise = np.float32(np.random.normal(1, noise_scale, size=num_obs))
-        observation = np.multiply(observation, noise)
-
+        observation = np.clip(np.multiply(observation, noise), -1, 1)
         return observation
 
     def run(self, method):
@@ -232,7 +231,7 @@ class PathPlanning:
             # SLAM
             if self.slam_active:
                 self.slam.update_slam_vars(self.cones.visible[Side.LEFT], self.cones.visible[Side.RIGHT], self.car)
-                self.slam.EKF_predict(self.clock.get_dt())
+                self.slam.EKF_predict(self.clock.dt)
                 if self.num_steps % SLAM_FRAME_LIMIT == 0 or self.num_steps < 5:
                     self.slam.EKF_update(self.car, self.cones.visible)
 
