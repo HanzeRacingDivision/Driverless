@@ -56,6 +56,7 @@ class PathPlanning:
         self.episode_num = None
         self.num_steps = 0
         self.cruising_speed = 1
+        self.last_time_lap_changed = self.clock.time_running
 
     def initialize_images(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -81,7 +82,8 @@ class PathPlanning:
         self.path.spline_image[Side.RIGHT] = pygame.image.load(image_path6)
 
     def initialize_map(self):
-        random_number = random.randint(1, 7)
+        #random_number = random.randint(1, 7)
+        random_number = "simple"
         self.LEVEL_ID = f"MAP_{random_number}"
 
         left_cones, right_cones = pp_functions.utils.load_existing_map(self.LEVEL_ID)
@@ -97,8 +99,8 @@ class PathPlanning:
             self.targets.reset_targets()
 
     def track_logic(self):
+        self.path.compute_boundaries(self)
         if self.cones.first_visible_cone[Side.LEFT] != 0 and self.cones.first_visible_cone[Side.RIGHT] != 0:
-
             # Setting the finishing line/point
             if not self.midpoint_created and self.track:
                 self.path.start_midpoint_x = np.mean([self.cones.first_visible_cone[Side.LEFT].true_position.x,
@@ -111,9 +113,12 @@ class PathPlanning:
             elif (np.linalg.norm(
                     Vector2(self.path.start_midpoint_x,
                             self.path.start_midpoint_y) - self.car.true_position) < 20 / self.ppu
-                  and not self.track_number_changed and self.track):
+                  and not self.track_number_changed and self.track and (self.clock.time_running - self.last_time_lap_changed > 10)):
                 self.track_number += 1
                 self.track_number_changed = True
+                #self.targets.reset_targets()
+                if self.slam_active and MODE == "race":
+                    self.slam_active = False
 
             # Setting track_number_changed to false when not on finishing line
             elif (np.linalg.norm((self.path.start_midpoint_x - self.car.true_position[0],
@@ -207,6 +212,7 @@ class PathPlanning:
 
             self.num_steps += 1
             self.clock.update()
+            self.episode_time_running = self.clock.time_running  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
             # Event queue
             events = pygame.event.get()
@@ -216,11 +222,8 @@ class PathPlanning:
 
             if method == "autonomous":
                 pp_functions.manual_controls.enable_dragging_screen(self, events)
-            else:
-                # user inputs
+            else:  # user inputs
                 pp_functions.manual_controls.user_input(self, events, self.clock.dt)
-
-            self.episode_time_running = self.clock.time_running  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
             # update target list
             self.targets.update_target_lists()

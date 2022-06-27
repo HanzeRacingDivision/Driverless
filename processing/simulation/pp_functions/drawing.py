@@ -172,9 +172,9 @@ def render(pp):
         # text_pos = [10, 15]
         # pp.screen.blit(text_surf, text_pos)
 
-        text_surf = text_font.render(f'Steering : {round(pp.car.steering_angle, 1)}', True, (255, 255, 255))
-        text_pos = [10, 2 * line_offset]
-        pp.screen.blit(text_surf, text_pos)
+        # text_surf = text_font.render(f'Steering : {round(pp.car.steering_angle[0], 1)}', True, (255, 255, 255))
+        # text_pos = [10, 2 * line_offset]
+        # pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Speed : {round(pp.car.velocity.x, 1)}', True, (255, 255, 255))
         text_pos = [10, 3 * line_offset]

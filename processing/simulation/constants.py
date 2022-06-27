@@ -1,4 +1,13 @@
+# Race
+MODEL_NAME = "PPO"
+MODEL_NUMBER = "1651669206"  # disc: 1649940839/ cont: 1651669206
+TIME_STEPS = 580000   # disc: 500000, cont: 580000
+CONVERSION = "none"  # disc_to_cont
+
 # Path Planning
+MODE = "race"  #
+# "race": one lap slam and midpoint method, then agent without SLAM
+# "testing": everything else :)
 STEERING_METHOD = "autonomous"  # "user"/"autonomous"
 BLANK_MAP = False  # use blank map at the start
 EPISODE_TIME_LIMIT = 100
@@ -6,11 +15,14 @@ SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 PIXELS_PER_UNIT = 32
 
+# Clock
+CLOCK_SPEED = 1
+
 # SLAM
 SLAM_ACTIVATED = True
 SLAM_NOISE = 1e-3
 SLAM_FRAME_LIMIT = 1  # "run slam every x seconds"
-MATRIX_SIZE = 300
+MATRIX_SIZE = 200
 
 # Car
 STEERING_NOISE = 1e-3

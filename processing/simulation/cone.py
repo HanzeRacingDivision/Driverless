@@ -20,31 +20,48 @@ class Cones:
         self.new_visible_cone_flag = {Side.LEFT: False, Side.RIGHT: False}
         self.first_cone_found = {Side.LEFT: False, Side.RIGHT: False}
         self.first_visible_cone = {Side.LEFT: 0, Side.RIGHT: 0}
+        self.new_in_fov_cone_flag = {Side.LEFT: False, Side.RIGHT: False}
+        self.id_list = {Side.LEFT:[], Side.RIGHT: []}
 
         self.boundary_sample = {Side.LEFT: [[-100 for _ in range(5)], [-100 for _ in range(5)]],
                                 Side.RIGHT: [[-100 for _ in range(5)],
                                              [-100 for _ in range(5)]]}  # [[x_pos_list], [y_pos_list]]
         self.polar_boundary_sample = {Side.LEFT: [], Side.RIGHT: []}  # [[r1, theta1], [r2, theta2], ...]
 
+        self.in_fov_id_list = {Side.LEFT: [], Side.RIGHT: []}
+
     def update_cone_list(self, pp):
         self.polar = []
         for category in Side:
             initial_length = len(self.visible[category])
+            initial_in_fov_id_list = self.in_fov_id_list[category]
+
             self.visible[category] = []
             self.in_fov[category] = []
+            self.in_fov_id_list[category] = []
 
             for cone in self.list[category]:
+                self.id_list[category].append(cone.id)
                 self.polar.append([cone.alpha, cone.dist_car, cone.category])
                 if cone.visible:
                     self.visible[category].append(cone)
 
                 if cone.in_fov:
                     self.in_fov[category].append(cone)
+                    self.in_fov_id_list[category].append(cone.id)
 
             if initial_length != len(self.visible[category]):
                 self.new_visible_cone_flag[category] = True
             else:
                 self.new_visible_cone_flag[category] = False
+
+            # if new cone is added in the field of view we have to recompute the boundaries to get the new observation
+            for id in self.in_fov_id_list[category]:
+                if id not in initial_in_fov_id_list:
+                    self.new_in_fov_cone_flag[category] = True
+                    break
+                else:
+                    self.new_in_fov_cone_flag[category] = False
 
         # update boundary sample and polar boundary sample
         if pp.car.auto:
@@ -52,7 +69,7 @@ class Cones:
             for category in Side:
                 cone_list_x_pos = []
                 cone_list_y_pos = []
-                if self.new_visible_cone_flag[Side.LEFT] or self.new_visible_cone_flag[Side.RIGHT]:
+                if self.new_in_fov_cone_flag[Side.LEFT] or self.new_in_fov_cone_flag[Side.RIGHT]:
                     for cone in self.in_fov[category]:
                         cone_list_x_pos.append(cone.position.x)
                         cone_list_y_pos.append(cone.position.y)

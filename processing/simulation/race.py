@@ -2,6 +2,7 @@ import numpy as np
 import pygame
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3 import PPO, A2C, DQN
+from constants import *
 
 from CarEnv import CarEnv
 
@@ -20,23 +21,18 @@ def disc_to_cont(action):
 
 
 if __name__ == "__main__":
-
-    model_name = "PPO"
-    time_steps = 500000
-
-    models_dir = f'models/{model_name}-1649940839'
-
+    models_dir = f'models/{MODEL_NAME}-{MODEL_NUMBER}'
     env = CarEnv(mode="cont")
     check_env(env)
 
-    if model_name == 'PPO' or model_name == 'PPO-cont':
-        model = PPO.load(f"{models_dir}/car_model_{time_steps}")
-    elif model_name == 'A2C' or model_name == 'A2C-cont':
-        model = A2C.load(f"{models_dir}/car_model_{time_steps}")
-    elif model_name == 'DQN' or model_name == 'DQN-cont':
-        model = DQN.load(f"{models_dir}/car_model_{time_steps}")
+    if MODEL_NAME == 'PPO' or MODEL_NAME == 'PPO-cont':
+        model = PPO.load(f"{models_dir}/car_model_{TIME_STEPS}")
+    elif MODEL_NAME == 'A2C' or MODEL_NAME == 'A2C-cont':
+        model = A2C.load(f"{models_dir}/car_model_{TIME_STEPS}")
+    elif MODEL_NAME == 'DQN' or MODEL_NAME == 'DQN-cont':
+        model = DQN.load(f"{models_dir}/car_model_{TIME_STEPS}")
     else:
-        raise ValueError(f"{model_name} not recognized as valid model name")
+        raise ValueError(f"{MODEL_NAME} not recognized as valid model name")
 
     episodes = 1
 
@@ -46,16 +42,16 @@ if __name__ == "__main__":
         while not done:
 
             if env.pp.track_number > 0:
-                print(env.pp.cones.visible)
                 action, _states = model.predict(observation)
-                action = disc_to_cont(action)
-                # action = np.interp(env.pp.midpoint_steering_angle(), [-120, 120], [-1, 1])
+                if CONVERSION == "disc_to_cont":
+                    action = disc_to_cont(action)
                 action = [action]
+                print("agent:", action)
             else:
-                action = np.interp(env.pp.midpoint_steering_angle(), [-120, 120], [-1, 1])
+                angle = env.pp.midpoint_steering_angle()
+                action = np.interp(angle, [-120, 120], [-5, 5])
                 action = [action]
-
-            print(action)
+                print("midpoint:", action)
 
             observation, reward, done, info = env.step(action)
             env.render()
