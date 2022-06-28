@@ -110,5 +110,5 @@ class ConeDetection:
 
 
 # Create a new object and execute.
-detector = ConeDetection(capture_index=0, model_name='best.pt')
+detector = ConeDetection(capture_index=1, model_name='best.pt')
 detector()
