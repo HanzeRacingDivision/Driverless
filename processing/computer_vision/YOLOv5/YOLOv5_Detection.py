@@ -87,7 +87,7 @@ class ConeDetection:
           ret, frame = cap.read()
           assert ret
 
-          frame = cv2.resize(cap, (416, 416))
+          frame = cv2.resize(cap, (640, 640))
 
           cv2.normalize(frame, frame, 0, 255, cv2.NORM_MINMAX)
 
@@ -103,12 +103,12 @@ class ConeDetection:
 
           cv2.imshow('YOLOv5 Detection', frame)
 
-          if cv2.waitKey(1) & 0xFF == ord('w'):
+          if cv2.waitKey(1) & 0xFF == ord('q'):
                break
 
         cap.release()
 
 
 # Create a new object and execute.
-detector = ConeDetection(capture_index=1, model_name='best.pt')
+detector = ConeDetection(capture_index=0, model_name='best.pt')
 detector()
