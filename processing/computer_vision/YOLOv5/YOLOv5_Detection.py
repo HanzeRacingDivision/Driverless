@@ -103,7 +103,7 @@ class ConeDetection:
 
           cv2.imshow('YOLOv5 Detection', frame)
 
-          if cv2.waitKey(1) & 0xFF == ord('z'):
+          if cv2.waitKey(1) & 0xFF == ord('q'):
                break
 
         cap.release()
