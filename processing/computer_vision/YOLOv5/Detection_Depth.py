@@ -5,40 +5,37 @@ import depthai as dai
 import numpy as np
 import time
 
+resolution_x = 1280
+resolution_y = 1280
+
+origin_x = resolution_x / 2
+origin_y = resolution_y / 2
+
 '''
 Spatial Tiny-yolo example
   Performs inference on RGB camera and retrieves spatial location coordinates: x,y,z relative to the center of depth map.
   Can be used for tiny-yolo-v3 or tiny-yolo-v4 networks
 '''
 
-#Get argument first
-nnBlobPath = str((Path(__file__).parent / Path('../models/yolo-v4-tiny-tf_openvino_2021.4_6shave.blob')).resolve().absolute())
-if 1 < len(sys.argv):
-    arg = sys.argv[1]
-    if arg == "yolo3":
-        nnBlobPath = str((Path(__file__).parent / Path('../models/yolo-v3-tiny-tf_openvino_2021.4_6shave.blob')).resolve().absolute())
-    elif arg == "yolo4":
-        nnBlobPath = str((Path(__file__).parent / Path('../models/yolo-v4-tiny-tf_openvino_2021.4_6shave.blob')).resolve().absolute())
-    elif arg == "5":
-        nnBlobPath = "D:\Development\HARD\Car_Simulation\Object_Detection_Module\YOLOv5\custom_model.blob"
-else:
-    print("Using Tiny YoloV4 model. If you wish to use Tiny YOLOv3, call 'tiny_yolo.py yolo3'")
+# Get argument first
+nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/custom_model.blob"
 
 if not Path(nnBlobPath).exists():
     import sys
-    raise FileNotFoundError(f'Required file/s not found, please run "{sys.executable} install_requirements.py"')
+    raise FileNotFoundError(
+        f'Required file/s not found, please run "{sys.executable} install_requirements.py"')
 
-#Tiny yolo v3 / 4 label texts
+# Tiny yolo v3 / 4 label texts
 labelMap = [
     "Blue", "Yellow"
 ]
 
 syncNN = True
 
-#Create pipeline
+# Create pipeline
 pipeline = dai.Pipeline()
 
-#Define sources and outputs
+# Define sources and outputs
 camRgb = pipeline.create(dai.node.ColorCamera)
 spatialDetectionNetwork = pipeline.create(dai.node.YoloSpatialDetectionNetwork)
 monoLeft = pipeline.create(dai.node.MonoCamera)
@@ -57,9 +54,9 @@ xoutBoundingBoxDepthMapping.setStreamName("boundingBoxDepthMapping")
 xoutDepth.setStreamName("depth")
 nnNetworkOut.setStreamName("nnNetwork")
 
-#Properties
-camRgb.setPreviewSize(416, 416)
-camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+# Properties
+camRgb.setPreviewSize(resolution_x, resolution_y)
+camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
 camRgb.setInterleaved(False)
 camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
 
@@ -68,11 +65,12 @@ monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
 monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
-#setting node configs
+# setting node configs
 stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-#Align depth map to the perspective of RGB camera, on which inference is done
+# Align depth map to the perspective of RGB camera, on which inference is done
 stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
-stereo.setOutputSize(monoLeft.getResolutionWidth(), monoLeft.getResolutionHeight())
+stereo.setOutputSize(monoLeft.getResolutionWidth(),
+                     monoLeft.getResolutionHeight())
 
 spatialDetectionNetwork.setBlobPath(nnBlobPath)
 spatialDetectionNetwork.setConfidenceThreshold(0.5)
@@ -81,8 +79,8 @@ spatialDetectionNetwork.setBoundingBoxScaleFactor(0.5)
 spatialDetectionNetwork.setDepthLowerThreshold(100)
 spatialDetectionNetwork.setDepthUpperThreshold(5000)
 
-#Yolo specific parameters
-spatialDetectionNetwork.setNumClasses(80)
+# Yolo specific parameters
+spatialDetectionNetwork.setNumClasses(2)
 spatialDetectionNetwork.setCoordinateSize(4)
 spatialDetectionNetwork.setAnchors([10.0,
                                     13.0,
@@ -102,10 +100,11 @@ spatialDetectionNetwork.setAnchors([10.0,
                                     198.0,
                                     373.0,
                                     326.0])
-spatialDetectionNetwork.setAnchorMasks({ "side160": [0,1,2], "side80": [3,4,5] , "side40":[6, 7, 8]})
+spatialDetectionNetwork.setAnchorMasks(
+    {"side160": [0, 1, 2], "side80": [3, 4, 5], "side40": [6, 7, 8]})
 spatialDetectionNetwork.setIouThreshold(0.5)
 
-#Linking
+# Linking
 monoLeft.out.link(stereo.left)
 monoRight.out.link(stereo.right)
 
@@ -116,21 +115,25 @@ else:
     camRgb.preview.link(xoutRgb.input)
 
 spatialDetectionNetwork.out.link(xoutNN.input)
-spatialDetectionNetwork.boundingBoxMapping.link(xoutBoundingBoxDepthMapping.input)
+spatialDetectionNetwork.boundingBoxMapping.link(
+    xoutBoundingBoxDepthMapping.input)
 
 stereo.depth.link(spatialDetectionNetwork.inputDepth)
 spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
-spatialDetectionNetwork.outNetwork.link(nnNetworkOut.input);
+spatialDetectionNetwork.outNetwork.link(nnNetworkOut.input)
 
-#Connect to device and start pipeline
-with dai.Device(pipeline) as device :
+# Connect to device and start pipeline
+with dai.Device(pipeline) as device:
 
-#Output queues will be used to get the rgb frames and nn data from the outputs defined above
-    previewQueue = device.getOutputQueue(name = "rgb", maxSize = 4, blocking = False)
-    detectionNNQueue = device.getOutputQueue(name = "detections", maxSize = 4, blocking = False)
-    xoutBoundingBoxDepthMappingQueue = device.getOutputQueue(name = "boundingBoxDepthMapping", maxSize = 4, blocking = False)
-    depthQueue = device.getOutputQueue(name = "depth", maxSize = 4, blocking = False)
-    networkQueue = device.getOutputQueue(name = "nnNetwork", maxSize = 4, blocking = False);
+    # Output queues will be used to get the rgb frames and nn data from the outputs defined above
+    previewQueue = device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
+    detectionNNQueue = device.getOutputQueue(
+        name="detections", maxSize=4, blocking=False)
+    xoutBoundingBoxDepthMappingQueue = device.getOutputQueue(
+        name="boundingBoxDepthMapping", maxSize=4, blocking=False)
+    depthQueue = device.getOutputQueue(name="depth", maxSize=4, blocking=False)
+    networkQueue = device.getOutputQueue(
+        name="nnNetwork", maxSize=4, blocking=False)
 
     startTime = time.monotonic()
     counter = 0
@@ -149,18 +152,19 @@ with dai.Device(pipeline) as device :
             for ten in inNN.getAllLayerNames():
                 toPrint = f'{toPrint} {ten},'
             print(toPrint)
-            printOutputLayersOnce = False;
+            printOutputLayersOnce = False
 
         frame = inPreview.getCvFrame()
-        depthFrame = depth.getFrame() # depthFrame values are in millimeters
+        depthFrame = depth.getFrame()  # depthFrame values are in millimeters
 
-        depthFrameColor = cv2.normalize(depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
+        depthFrameColor = cv2.normalize(
+            depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
         depthFrameColor = cv2.equalizeHist(depthFrameColor)
         depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
 
-        counter+=1
+        counter += 1
         current_time = time.monotonic()
-        if (current_time - startTime) > 1 :
+        if (current_time - startTime) > 1:
             fps = counter / (current_time - startTime)
             counter = 0
             startTime = current_time
@@ -172,7 +176,8 @@ with dai.Device(pipeline) as device :
 
             for roiData in roiDatas:
                 roi = roiData.roi
-                roi = roi.denormalize(depthFrameColor.shape[1], depthFrameColor.shape[0])
+                roi = roi.denormalize(
+                    depthFrameColor.shape[1], depthFrameColor.shape[0])
                 topLeft = roi.topLeft()
                 bottomRight = roi.bottomRight()
                 xmin = int(topLeft.x)
@@ -180,29 +185,39 @@ with dai.Device(pipeline) as device :
                 xmax = int(bottomRight.x)
                 ymax = int(bottomRight.y)
 
-                cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
+                cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax,
+                              ymax), color, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
 
-#If the frame is available, draw bounding boxes on it and show the frame
+# If the frame is available, draw bounding boxes on it and show the frame
         height = frame.shape[0]
-        width  = frame.shape[1]
+        width = frame.shape[1]
         for detection in detections:
-#Denormalize bounding box
             x1 = int(detection.xmin * width)
             x2 = int(detection.xmax * width)
             y1 = int(detection.ymin * height)
             y2 = int(detection.ymax * height)
-        try : label = labelMap[detection.label] 
-        except : label = detection.label
-        cv2.putText(frame, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-        cv2.putText(frame, "{:.2f}".format(detection.confidence * 100), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-        cv2.putText(frame, f"X: {int(detection.spatialCoordinates.x)} mm", (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-        cv2.putText(frame, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-        cv2.putText(frame, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            try:
+                label = labelMap[detection.label]
+            except:
+                label = detection.label
+            cv2.putText(frame, str(label), (x1 + 10, y1 + 20),
+                        cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.putText(frame, "{:.2f}".format(detection.confidence * 100),
+                        (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.putText(frame, f"X: {int(detection.spatialCoordinates.x)} mm",
+                        (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.putText(frame, f"Y: {int(detection.spatialCoordinates.y)} mm",
+                        (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.putText(frame, f"Z: {int(detection.spatialCoordinates.z)} mm",
+                        (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
 
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, cv2.FONT_HERSHEY_SIMPLEX)
+            cv2.rectangle(frame, (x1, y1), (x2, y2),
+                          color, cv2.FONT_HERSHEY_SIMPLEX)
 
-        cv2.putText(frame, "NN fps: {:.2f}".format(fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
+        cv2.putText(frame, "NN fps: {:.2f}".format(
+            fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
         cv2.imshow("depth", depthFrameColor)
         cv2.imshow("rgb", frame)
 
-        if cv2.waitKey(1) == ord('q') : break
+        if cv2.waitKey(1) == ord('q'):
+            break
