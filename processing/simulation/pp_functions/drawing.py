@@ -1,19 +1,12 @@
 import pygame
-from math import sin, radians, degrees, copysign
+from math import radians
 from pygame.math import Vector2
-import time
 import numpy as np
-from PIL import Image, ImageDraw
-from scipy.interpolate import splprep, splev
-import pandas as pd
 
 import os
 import sys
-
-sys.path.append(os.path.abspath(os.path.join('..', '')))
 from cone import Side
-from pp_functions.utils import bound_angle_180
-
+sys.path.append(os.path.abspath(os.path.join('..', '')))
 
 def draw_line_dashed(surface, color, start_pos, end_pos, offset, width=1, dash_length=10, exclude_corners=True):
     """simply a function that draws dashed lines in pygame"""
@@ -41,7 +34,6 @@ def render(pp):
     pp.screen.fill((0, 0, 0))
     rotated = pygame.transform.rotate(pp.car.car_image, pp.car.true_angle)
     rect = rotated.get_rect()
-
     pos_temp = pp.car.true_position * pp.ppu
     pos_1 = int(pos_temp.x)
     pos_2 = int(pos_temp.y)

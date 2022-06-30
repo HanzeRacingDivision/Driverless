@@ -33,14 +33,14 @@ class PathPlanning:
         self.slam_active = SLAM_ACTIVATED
 
         self.LEVEL_ID = 'None'
-        self.initialize_images()
+
         if not BLANK_MAP:
             self.initialize_map()
 
         pygame.init()
         pygame.display.set_caption("Car")
-
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.initialize_images()
         self.fullscreen = False
         self.exit = False
         self.mouse_pos_list = []
@@ -68,7 +68,10 @@ class PathPlanning:
     def initialize_images(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         image_path = os.path.join(current_dir, "images/car_r_30.png")
-        self.car.car_image = pygame.image.load(image_path)
+
+        car_image = pygame.image.load(image_path)
+        self.car.car_image = pygame.transform.smoothscale(car_image.convert_alpha(), (CAR_LENGTH*PIXELS_PER_UNIT, CAR_WIDTH*PIXELS_PER_UNIT))
+
 
         # image_path7 = os.path.join(current_dir, "explosion_image.png")
         # explosion_image = pygame.image.load(image_path7)
@@ -90,7 +93,7 @@ class PathPlanning:
 
     def initialize_map(self):
         # random_number = random.randint(1, 7)
-        random_number = 1
+        random_number = "simple"
         self.LEVEL_ID = f"MAP_{random_number}"
 
         left_cones, right_cones = pp_functions.utils.load_existing_map(self.LEVEL_ID)
@@ -205,36 +208,80 @@ class PathPlanning:
         observation = np.clip(np.multiply(observation, noise), -1, 1)
         return observation
 
+    def get_fake_steering_info(self):
+        angle = self.car.steering_angle
+        velocity = self.car.velocity[0]
+
+        self.car.steering_angle = angle
+        self.car.velocity[0] = velocity
+
+    # def get_fake_observation(self):
+    #     ANGLE_OFFSET = 0  # in radians
+    #     observation = {Side.LEFT: [], Side.RIGHT: []}
+    #     for category in Side:
+    #         for cone in self.cones.in_fov[category]:
+    #             r = cone.true_dist_car + np.random.normal(0, SLAM_NOISE)
+    #             theta = cone.alpha/180*math.pi + np.random.normal(0, SLAM_NOISE)
+    #             observation[category].append([r, theta, cone.position])
+    #
+    #     return observation
+    #
+    # def match_observation_to_get_ids(self, observation):
+    #     observation_with_ids = {Side.LEFT: [], Side.RIGHT: []}
+    #     for category in Side:
+    #         for cone in self.cones.perceived[category]:
+    #             for [r, theta, position] in (observation[category]):
+    #                 distance_sqr = cone.dist_car**2 + r**2 - 2*r*cone.dist_car*math.cos(cone.alpha*math.pi/180 - theta)
+    #                 if distance_sqr < DISTANCE_TO_MATCH:
+    #                     # TODO: Use new information, not only match!
+    #                     observation_with_ids[category].append(cone)
+    #                     observation[category].remove([r, theta, position])
+    #
+    #     return observation_with_ids, observation
+    #
+    # def make_new_cones(self, observation):
+    #     current_highest_id = len(self.cones.perceived[Side.RIGHT]) + len(self.cones.perceived[Side.LEFT])
+    #     observation_with_ids = {Side.LEFT: [], Side.RIGHT: []}
+    #     for category in Side:
+    #         for [r, theta, position] in observation[category]:
+    #             current_highest_id += 1
+    #             x_y_in_dir_of_car = pol2cart(r, theta)
+    #             rotate = np.matrix(
+    #                 [[np.cos(-self.car.angle * np.pi / 180), -1 * np.sin(-self.car.angle * np.pi / 180)],
+    #                  [np.sin(-self.car.angle * np.pi / 180), np.cos(-self.car.angle * np.pi / 180)]])
+    #
+    #             a_b = np.transpose(np.matrix([x_y_in_dir_of_car.x, -1 * x_y_in_dir_of_car.y]))
+    #             x, y = rotate * a_b
+    #             car_x, car_y = self.car.position
+    #             x += car_x
+    #             y += car_y
+    #             new_cone = Cone(x, y, category, current_highest_id)
+    #             new_cone.alpha = theta/math.pi*180
+    #             new_cone.dist_car = r
+    #             observation_with_ids[category].append(new_cone)
+
+    #    return observation_with_ids
+
     def get_fake_observation(self):
         observation = {Side.LEFT: [], Side.RIGHT: []}
         for category in Side:
             for cone in self.cones.in_fov[category]:
-                r = cone.true_dist_car + np.random.normal(0, SLAM_NOISE)
-                theta = cone.alpha/180*math.pi + np.random.normal(0, SLAM_NOISE)
-                observation[category].append([r, theta, cone.position])
+                x = cone.position.x + np.random.normal(0, SLAM_NOISE)
+                y = cone.position.y + np.random.normal(0, SLAM_NOISE)
+                observation[category].append([x, y])
 
         return observation
 
     def match_observation_to_get_ids(self, observation):
         observation_with_ids = {Side.LEFT: [], Side.RIGHT: []}
-        # print(len(observation[Side.LEFT])+len(observation[Side.RIGHT]))
-        # counter = 0
-        i = 0
         for category in Side:
             for cone in self.cones.perceived[category]:
-                for [r, theta, position] in (observation[category]):
-                    distance_sqr = cone.true_dist_car**2 + r**2 - 2*r*cone.true_dist_car*math.cos(cone.alpha*math.pi/180-theta)
+                for [x, y] in (observation[category]):
+                    distance_sqr = (cone.position.x - x)**2 + (cone.position.y - y)**2
                     if distance_sqr < DISTANCE_TO_MATCH:
-
-                        i += 1
-                        # counter += 1
-                        # print("NEW:", x, y, "OLD:", cone.position.x, cone.position.y)
                         # TODO: Use new information, not only match!
-                        print("Observation:", i, "matched to cone", cone.id)
                         observation_with_ids[category].append(cone)
-                        observation[category].remove([r, theta, position])
-
-        # print(counter)
+                        observation[category].remove([x, y])
 
         return observation_with_ids, observation
 
@@ -242,23 +289,9 @@ class PathPlanning:
         current_highest_id = len(self.cones.perceived[Side.RIGHT]) + len(self.cones.perceived[Side.LEFT])
         observation_with_ids = {Side.LEFT: [], Side.RIGHT: []}
         for category in Side:
-            for [r, theta, position] in observation[category]:
+            for [x, y] in observation[category]:
                 current_highest_id += 1
-                x_y_in_dir_of_car = pol2cart(r, theta)
-                rotate = np.matrix(
-                    [[np.cos(-self.car.angle * np.pi / 180), -1 * np.sin(-self.car.angle * np.pi / 180)],
-                     [np.sin(-self.car.angle * np.pi / 180), np.cos(-self.car.angle * np.pi / 180)]])
-
-                a_b = np.transpose(np.matrix([x_y_in_dir_of_car.x, -1 * x_y_in_dir_of_car.y]))
-                x, y = rotate * a_b
-                car_x, car_y = self.car.position
-                x += car_x
-                y += car_y
-                # print(r, theta)
-                # print("NEW:", x, y, "PROPER:", position.x, position.y)
                 new_cone = Cone(x, y, category, current_highest_id)
-                new_cone.alpha = theta/math.pi*180
-                new_cone.true_dist_car = r
                 observation_with_ids[category].append(new_cone)
 
         return observation_with_ids
@@ -344,6 +377,7 @@ class PathPlanning:
                 self.cones.perceived[category] += new[category]
             print("perceived:", self.cones.perceived)
 
+            #self.get_fake_steering_info()
 
         pygame.quit()
 

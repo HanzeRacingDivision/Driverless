@@ -57,7 +57,7 @@ class Car:
                     if np.linalg.norm(tuple(x - y for x, y in zip([self.true_position.x, self.true_position.y],
                                                                   [cone_obj.list[category][i].true_position.x,
                                                                    cone_obj.list[category][
-                                                                       i].true_position.y]))) < 0.4:
+                                                                       i].true_position.y]))) < CRITICAL_DISTANCE:
                         self.crashed = True
                         break
 
@@ -71,7 +71,7 @@ class Car:
                     for i in range(len(path_obj.splines[category][0])):
                         if np.linalg.norm(tuple(x - y for x, y in zip([self.true_position.x, self.true_position.y],
                                                                       [path_obj.splines[category][0][i],
-                                                                       path_obj.splines[category][1][i]]))) < 0.25:
+                                                                       path_obj.splines[category][1][i]]))) < CRITICAL_DISTANCE:
                             self.crashed = True
                             break
 
