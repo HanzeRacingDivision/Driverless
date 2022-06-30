@@ -5,6 +5,7 @@ TIME_STEPS = 580000   # disc: 500000, cont: 580000
 CONVERSION = "none"  # disc_to_cont
 
 # Path Planning
+DISTANCE_TO_MATCH = 0.15
 MODE = "race"  #
 # "race": one lap slam and midpoint method, then agent without SLAM
 # "testing": everything else :)

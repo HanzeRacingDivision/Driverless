@@ -35,6 +35,7 @@ class Slam:
         cone_angles = []
         self.obs = []
         self.c_prob = np.ones(len(self.mu))
+
         for i in range(len(visible_left_cones)):
             observed_car_dist = visible_left_cones[i].true_dist_car*np.random.normal(loc=1, scale=SLAM_NOISE)
             observed_alpha = visible_left_cones[i].alpha*np.random.normal(loc=1, scale=SLAM_NOISE)

@@ -84,6 +84,9 @@ def render(pp):
             # x, y = apply_view_offset(cone.position * pp.ppu - (3, 3)) - Vector2(cone.cov.x / 2, cone.cov.y / 2)
             # pygame.draw.rect(pp.screen, (200, 200, 0), pygame.Rect(x, y, cone.cov.x, cone.cov.y), 1)
         # lines to cones which are in field-of-view
+        for cone in pp.cones.perceived[category]:
+            # picture of a cone
+            pp.screen.blit(pp.targets.image, apply_view_offset(cone.position * pp.ppu - (3, 3)))
         for cone in pp.cones.in_fov[category]:
             if cone.in_fov:
                 draw_line_dashed(pp.screen, (150, 150, 150), (pos_1, pos_2), cone.true_position * pp.ppu, offset,

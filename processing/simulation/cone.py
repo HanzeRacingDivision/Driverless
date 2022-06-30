@@ -21,7 +21,8 @@ class Cones:
         self.first_cone_found = {Side.LEFT: False, Side.RIGHT: False}
         self.first_visible_cone = {Side.LEFT: 0, Side.RIGHT: 0}
         self.new_in_fov_cone_flag = {Side.LEFT: False, Side.RIGHT: False}
-        self.id_list = {Side.LEFT:[], Side.RIGHT: []}
+        self.id_list = {Side.LEFT: [], Side.RIGHT: []}
+        self.perceived = {Side.LEFT: [], Side.RIGHT: []}
 
         self.boundary_sample = {Side.LEFT: [[-100 for _ in range(5)], [-100 for _ in range(5)]],
                                 Side.RIGHT: [[-100 for _ in range(5)],
@@ -160,5 +161,5 @@ class Cone:
         if self.dist_car < CAR_FIELD_OF_VIEW / pp.ppu and np.abs(self.alpha) < CAR_FOV_RANGE:
             self.visible = True
             self.in_fov = True
-        else:
+        else:  # if not within range anymore than remove it from field of view and leave it in visible
             self.in_fov = False
