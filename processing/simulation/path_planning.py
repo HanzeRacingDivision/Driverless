@@ -1,6 +1,6 @@
 import os
 import pygame
-import math
+import csv
 
 from car import Car
 from cone import *
@@ -8,6 +8,7 @@ from target import *
 from slam import *
 from clock import *
 from constants import *
+from datetime import datetime
 
 import pp_functions
 import pp_functions.manual_controls
@@ -18,7 +19,6 @@ def pol2cart(rho, phi):
     x = rho * np.cos(phi)
     y = rho * np.sin(phi)
     return Vector2(x, y)
-
 
 
 class PathPlanning:
@@ -64,6 +64,13 @@ class PathPlanning:
         self.num_steps = 0
         self.cruising_speed = 1
         self.last_time_lap_changed = self.clock.time_running
+
+        if LOGGING:
+            now = datetime.now()
+            self.f = open(str(now.strftime("%H_%M_%S"))+".csv", 'w')
+            self.writer = csv.writer(self.f)
+            text = ("Timestamp", "FPS", "Car(x, y)", "Car speed", "Car angle", "Cones detected", 1)
+            self.writer.writerow(text)
 
     def initialize_images(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -191,6 +198,20 @@ class PathPlanning:
 
         return midpoint_steering_angle
 
+    def logging(self):
+        """ Creates a log of simulation data at each step in the simulation and saves it to a .csv file."""
+        precision = 2
+        time_stamp = round(self.clock.time_running, precision)
+        x = round(self.car.position.x, precision)
+        y = round(self.car.position.y, precision)
+        num_cones = len(self.cones.visible[Side.LEFT]) + len(self.cones.visible[Side.RIGHT])
+        fps = round(1/(self.clock.dt + 10**-1000), precision)
+        speed = round(self.car.velocity[0], precision)
+        angle = round(self.car.steering_angle, precision)
+        row = time_stamp, fps, (x, y), speed, angle, num_cones, 1
+        self.writer.writerow(row)
+        print(row)
+
     def get_observation(self, num_obs: int, noise_scale: float = 0) -> np.ndarray:
         observation = np.zeros(num_obs, dtype=np.float32)
         observation[0] = np.interp(self.car.velocity.x, [0, MAX_VELOCITY], [-1, 1])
@@ -208,20 +229,20 @@ class PathPlanning:
         observation = np.clip(np.multiply(observation, noise), -1, 1)
         return observation
 
-    def get_fake_steering_info(self):
-        angle = self.car.steering_angle
-        velocity = self.car.velocity[0]
-
-        self.car.steering_angle = angle
-        self.car.velocity[0] = velocity
-
+    # def get_fake_steering_info(self):
+    #     angle = self.car.steering_angle
+    #     velocity = self.car.velocity[0]
+    #
+    #     self.car.steering_angle = angle
+    #     self.car.velocity[0] = velocity
+    #
     # def get_fake_observation(self):
     #     ANGLE_OFFSET = 0  # in radians
     #     observation = {Side.LEFT: [], Side.RIGHT: []}
     #     for category in Side:
     #         for cone in self.cones.in_fov[category]:
     #             r = cone.true_dist_car + np.random.normal(0, SLAM_NOISE)
-    #             theta = cone.alpha/180*math.pi + np.random.normal(0, SLAM_NOISE)
+    #             theta = cone.alpha/180*np.pi + np.random.normal(0, SLAM_NOISE)
     #             observation[category].append([r, theta, cone.position])
     #
     #     return observation
@@ -231,7 +252,7 @@ class PathPlanning:
     #     for category in Side:
     #         for cone in self.cones.perceived[category]:
     #             for [r, theta, position] in (observation[category]):
-    #                 distance_sqr = cone.dist_car**2 + r**2 - 2*r*cone.dist_car*math.cos(cone.alpha*math.pi/180 - theta)
+    #                 distance_sqr = cone.dist_car**2 + r**2 - 2*r*cone.dist_car*np.cos(cone.alpha*np.pi/180 - theta)
     #                 if distance_sqr < DISTANCE_TO_MATCH:
     #                     # TODO: Use new information, not only match!
     #                     observation_with_ids[category].append(cone)
@@ -256,11 +277,11 @@ class PathPlanning:
     #             x += car_x
     #             y += car_y
     #             new_cone = Cone(x, y, category, current_highest_id)
-    #             new_cone.alpha = theta/math.pi*180
+    #             new_cone.alpha = theta/np.pi*180
     #             new_cone.dist_car = r
     #             observation_with_ids[category].append(new_cone)
-
-    #    return observation_with_ids
+    #
+    #     return observation_with_ids
 
     def get_fake_observation(self):
         observation = {Side.LEFT: [], Side.RIGHT: []}
@@ -365,21 +386,26 @@ class PathPlanning:
             # Drawing
             pp_functions.drawing.render(self)
 
-            observation = self.get_fake_observation()
-            obs_with_ids, remainder = self.match_observation_to_get_ids(observation)
-            new = self.make_new_cones(remainder)
-            print("NEW LINE:")
-            print("obs:", observation)
-            print("matched:", obs_with_ids)
-            if len(new[Side.LEFT])+len(new[Side.RIGHT]) != 0:
-                print("found:", new)
-            for category in Side:
-                self.cones.perceived[category] += new[category]
-            print("perceived:", self.cones.perceived)
+            if LOGGING:
+                self.logging()
+
+            # observation = self.get_fake_observation()
+            # obs_with_ids, remainder = self.match_observation_to_get_ids(observation)
+            # new = self.make_new_cones(remainder)
+            # print("NEW LINE:")
+            # print("obs:", observation)
+            # print("matched:", obs_with_ids)
+            # if len(new[Side.LEFT])+len(new[Side.RIGHT]) != 0:
+            #     print("found:", new)
+            # for category in Side:
+            #     self.cones.perceived[category] += new[category]
+            # print("perceived:", self.cones.perceived)
 
             #self.get_fake_steering_info()
 
         pygame.quit()
+        if LOGGING:
+            self.f.close()
 
 
 if __name__ == '__main__':
