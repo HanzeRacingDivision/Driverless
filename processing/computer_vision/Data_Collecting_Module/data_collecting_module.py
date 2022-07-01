@@ -3,20 +3,20 @@ import cv2
 import time 
 
 path = 'data/images'
-cameraNumber = 0 # 1 For external camera, 0 for internal
+cameraNumber = 1 # 1 For external camera, 0 for internal
 cameraBrightness = 150
 moduleValue = 10
-minBlur = 150
+minBlur = 100
 grayImage = False
 saveData = True
 showImage = True
-imgWidth = 640
-imgHeight = 480
+imgWidth = 1920
+imgHeight = 1080
 
 global countFolder
 capture = cv2.VideoCapture(cameraNumber)
-capture.set(3, 640)
-capture.set(4, 480)
+capture.set(3, 1920)
+capture.set(4, 1080)
 capture.set(10, cameraBrightness)
 
 count = 0
