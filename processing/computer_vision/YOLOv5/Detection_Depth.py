@@ -18,7 +18,8 @@ Spatial Tiny-yolo example
 '''
 
 # Get argument first
-nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/custom_model.blob"
+#nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/custom_model.blob"
+nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/yolo-v4-tiny-tf_openvino_2021.4_6shave.blob"
 
 if not Path(nnBlobPath).exists():
     import sys
