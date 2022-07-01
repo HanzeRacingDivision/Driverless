@@ -168,3 +168,7 @@ cython_debug/
 #.idea/
 
 **/processing/computer_vision/YOLOv5/Images
+**/processing/computer_vision/YOLOv5/yolo-v4-tiny-tf_openvino_2021.4_6shave.blob
+**/processing/computer_vision/YOLOv5/test.py
+**/processing/computer_vision/YOLOv5/Detection_Depth.py
+**/processing/computer_vision/YOLOv5/Data_Cones.mp4

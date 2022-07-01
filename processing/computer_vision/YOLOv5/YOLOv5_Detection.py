@@ -87,7 +87,7 @@ class ConeDetection:
           ret, frame = cap.read()
           assert ret
 
-          frame = cv2.resize(cap, (640, 640))
+          frame = cv2.resize(cap, (1280, 1280))
 
           cv2.normalize(frame, frame, 0, 255, cv2.NORM_MINMAX)
 
