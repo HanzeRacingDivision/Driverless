@@ -208,8 +208,8 @@ def makeBoundrySpline(mapToUse, inputConeList):
 
 def makeBoundrySplines(mapToUse):
     """make and store qubic splines for both left_ and right_cone_list"""
-    mapToUse.pathFolData.left_spline = makeBoundrySpline(mapToUse, mapToUse.left_cone_list)
-    mapToUse.pathFolData.right_spline = makeBoundrySpline(mapToUse, mapToUse.right_cone_list)
+    mapToUse.pathFolData.left_spline = makeBoundrySpline(mapToUse, mapToUse.cone_lists[False])
+    mapToUse.pathFolData.right_spline = makeBoundrySpline(mapToUse, mapToUse.cone_lists[True])
 
 def makePathSpline(mapToUse):
     """calculate and return a qubic spline for the target_list"""

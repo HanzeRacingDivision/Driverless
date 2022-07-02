@@ -13,7 +13,7 @@ import time #for debugging
 
 def mapObjectToFile(mapToSave):
     """convert Map object to pandas dataframe"""
-    combinedConeList = mapToSave.left_cone_list + mapToSave.right_cone_list
+    combinedConeList = mapToSave.cone_lists[False] + mapToSave.cone_lists[True]
     map_file = pd.DataFrame({'ConeID' : [cone.ID for cone in combinedConeList],
                              'Cone_Type' : [('RIGHT' if cone.LorR else 'LEFT') for cone in combinedConeList],
                              'Cone_X' : [cone.position[0] for cone in combinedConeList],
@@ -37,7 +37,7 @@ def mapFileToObject(map_file):
                 print("maploader failed to add a cone:", coneToCovert['ConeID'], coneInList)
         ## now that all the cones are imported, their connections can be established
         for i in range(len(connectionList)): # for every cone that has been loaded in
-            LorRconeList = (mapObj.right_cone_list if connectionList[i][0].LorR else mapObj.left_cone_list) # alternatively, you could use a combinedConeList
+            LorRconeList = mapObj.cone_lists[connectionList[i][0].LorR] # alternatively, you could use a combinedConeList
             for connectedConeID in connectionList[i][1::]:
                 if(not np.isnan(connectedConeID)):
                     connectionList[i][0].connections.append(LorRconeList[GF.findIndexByClassAttr(LorRconeList, 'ID', int(connectedConeID))])
@@ -47,7 +47,7 @@ def mapFileToObject(map_file):
             coneToCovert = map_file.iloc[row] #load the row (the cone)
             mapObj.addConeObj(Map.Cone(row, [coneToCovert['Cone_X'], coneToCovert['Cone_Y']], (coneToCovert['Cone_Type'] == 'RIGHT'), coneToCovert['Finish'])) #manually add cone object to make sure that the ID matched the row index
         ## now that all the cones are imported, their connections can be established
-        combinedConeList = mapObj.left_cone_list + mapObj.right_cone_list #this list is (or at least really really should) be the mapObj equivalent of the map_file, with the same order of items.
+        combinedConeList = mapObj.cone_lists[False] + mapObj.cone_lists[True] #this list is (or at least really really should) be the mapObj equivalent of the map_file, with the same order of items.
         for row in range(len(map_file)):  ## this works because: (combinedConeList[row].ID == row) is true
             connections = [map_file.iloc[row]['Conn_A'], map_file.iloc[row]['Conn_B']]
             for coneIndex in connections:
@@ -56,7 +56,7 @@ def mapFileToObject(map_file):
     
     try:
         import coneConnecting as CC
-        combinedConeList = mapObj.left_cone_list + mapObj.right_cone_list
+        combinedConeList = mapObj.cone_lists[False] + mapObj.cone_lists[True]
         for cone in combinedConeList:
             for connectedCone in cone.connections:
                 dist, angle = GF.distAngleBetwPos(cone.position, connectedCone.position)
@@ -85,7 +85,7 @@ def save_map(mapToSave: Map, filename=None, saveSimVarsMap=True):
     map_file.to_excel(filename)
     print("save_map .to_excel time:", round(time.time()-saveStartTime,2))
     # map_file_simVar = None
-    if(saveSimVarsMap and (((len(mapToSave.simVars.left_cone_list)+len(mapToSave.simVars.right_cone_list))>0) if (mapToSave.simVars is not None) else False)):
+    if(saveSimVarsMap and (((len(mapToSave.simVars.cone_lists[False])+len(mapToSave.simVars.cone_lists[True]))>0) if (mapToSave.simVars is not None) else False)):
         simVarMapFilename = "simVar_" + filename # add something to the start (so i dont have to deal with inserting before the file extension)
         #save_map(mapToSave.simVars, simVarMapFilename, False) # recursively
         print("saving simVar map to file:", simVarMapFilename)
@@ -107,8 +107,7 @@ def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
         #     print("loading mapfile into .simVars")
         #     whereToLoad = whereToLoad.simVars
         #copyImportMap(whereToLoad, returnMap) #has problems with car objects and clocks and all that nastyness
-        whereToLoad.left_cone_list = returnMap.left_cone_list
-        whereToLoad.right_cone_list = returnMap.right_cone_list
+        whereToLoad.cone_lists = returnMap.cone_lists
         whereToLoad.finish_line_cones = returnMap.finish_line_cones
         try:
             import pathPlanningTemp as PP

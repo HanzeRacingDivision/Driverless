@@ -242,7 +242,7 @@ def handleKeyPress(pygameDrawerInput, keyDown, key, eventToHandle):
             pygameDrawerInput.drawTargetConeLines = not pygameDrawerInput.drawTargetConeLines #only has an effect if pyagmesimInput.mapToDraw.pathFinderPresent == True
         elif(key==pygame.K_l): # l
             pygameDrawerInput.drawConeSlamData += 1 #only has an effect if there is a lidar present
-            if(pygameDrawerInput.drawConeSlamData > 2): #rollover
+            if(pygameDrawerInput.drawConeSlamData > 3): #rollover
                 pygameDrawerInput.drawConeSlamData = 0
         elif(key==pygame.K_h): # h
             if(pygameDrawerInput.carPolygonMode):

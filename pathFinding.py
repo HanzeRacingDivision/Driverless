@@ -28,7 +28,7 @@ def makePath(mapToUse):
         print("not gonna make path, already full circle")
         return(False)
     if(len(mapToUse.target_list) == 0): #if there is no existing path to go on
-        if((len(mapToUse.right_cone_list) < 2) or (len(mapToUse.left_cone_list) < 2)): #first pathLine can only be made between 2 connected cones
+        if((len(mapToUse.cone_lists[True]) < 2) or (len(mapToUse.cone_lists[False]) < 2)): #first pathLine can only be made between 2 connected cones
             print("not enough cones in one or more coneLists, cant place first pathLine")
             return(False)
         
@@ -50,7 +50,7 @@ def makePath(mapToUse):
             if(firstCones[LorR] is None):
                 bestCandidateIndex = -1;   highestStrength = 0;   candidatesDiscarded = 0
                 sideAngleRange = [mapToUse.car.angle +((-np.pi/2) if LorR else (np.pi/2)) -pathFinder.pathFirstLineCarSideAngleDelta, mapToUse.car.angle +((-np.pi/2) if LorR else (np.pi/2)) +pathFinder.pathFirstLineCarSideAngleDelta] #left side is car.angle +pi/2, right side is car.angle -pi/2
-                firstConeCandidates = mapToUse.distanceToCone(mapToUse.car.position, mapToUse.right_cone_list if LorR else mapToUse.left_cone_list, 'SORTBY_DIST', [], pathFinder.pathFirstLinePosDist, 'EXCL_UNCONN', [], mapToUse.car.angle, sideAngleRange) #sorting is unnecessarry
+                firstConeCandidates = mapToUse.distanceToCone(mapToUse.car.position, mapToUse.cone_lists[LorR], 'SORTBY_DIST', [], pathFinder.pathFirstLinePosDist, 'EXCL_UNCONN', [], mapToUse.car.angle, sideAngleRange) #sorting is unnecessarry
                 for i in range(len(firstConeCandidates)):
                     cone = firstConeCandidates[i][0]
                     connectionCount = len(cone.connections) #due to the EXCL_UNCONN filtering, this value should never be 0

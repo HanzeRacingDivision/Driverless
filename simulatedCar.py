@@ -34,7 +34,7 @@ class simCar(Map.Car):
         if(dDist is None):
             dDist = self.velocity*dTime
         
-        returnVal = [np.zeros((2)), 0.0]
+        returnVal = [np.zeros((2)), 0.0] # init var
         ## turning math
         if((abs(self.steering) > 0.001) and (abs(self.velocity) > 0.001)): #avoid divide by 0 (and avoid complicated math in a simple situation)
             turning_radius = self.wheelbase/np.tan(self.steering)

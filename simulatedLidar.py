@@ -56,40 +56,40 @@ def getCones(mapToUse):
         simVariables.lidarSimulatedAngle = GF.radRoll((2*np.pi*LIDAR_FULL_ROTATION_FREQ)*rightNow) # absolute sinusoidal angle
         # simVariables.lidarSimulatedAngle += GF.radRoll((2*np.pi*LIDAR_FULL_ROTATION_FREQ)*timeSinceLastSampling) # iterative angle (needless, more floating point error)
         simVariables.lidarLastSampleTimestamp = rightNow
-        
-        # lidarPos = mapToUse.car.calcLidarPos(lidarIndex)
-        # if((mapToUse.simVars.car is not None) if (mapToUse.simVars is not None) else False): # should always be true, but just to be sure
-        lidarPos = mapToUse.simVars.car.calcLidarPos(lidarIndex)
 
         ## i use distanceToCone() to easily filter the nearby cones, but the distAngle is incorrect (becuase the positions of the cones are incorrect)
-        nearbyConeList = None # init var
-        coneLists = mapToUse.left_cone_list + mapToUse.right_cone_list
-        if(mapToUse.simVars is not None): # should always be true
-            if(mapToUse.simVars.undiscoveredCones or ((len(mapToUse.simVars.left_cone_list) + len(mapToUse.simVars.right_cone_list)) > 0)): # undiscoveredCones is also used by UI stuff, so may not be entirely helpful
-                coneLists = mapToUse.simVars.left_cone_list + mapToUse.simVars.right_cone_list
+        nearbyConeList = None;    simVarsLidarPos = None # init vars
+        regularLidarPos = mapToUse.car.calcLidarPos(lidarIndex) # fallback value, in case simVars.car is None (and an initialzation of the variable)
+        coneLists = mapToUse.cone_lists[False] + mapToUse.cone_lists[True] # fallback value, in case simVars is None (and an initialzation of the variable)
+        if(mapToUse.simVars.undiscoveredCones or ((len(mapToUse.simVars.cone_lists[False]) + len(mapToUse.simVars.cone_lists[True])) > 0)): # undiscoveredCones is also used by UI stuff, so may not be entirely helpful
+            coneLists = mapToUse.simVars.cone_lists[False] + mapToUse.simVars.cone_lists[True]
+        if(mapToUse.simVars.car is not None): # should be true if simulatePositionalDrift is enabled (which is most of the time)
+            simVarsLidarPos = mapToUse.simVars.car.calcLidarPos(lidarIndex) 
         if(timeSinceLastSampling < (1/LIDAR_FULL_ROTATION_FREQ)):
-            nearbyConeList = mapToUse.distanceToCone(lidarPos, coneLists, sortBySomething='SORTBY_ANGL', simpleThreshold=RANGE_LIMIT, angleThreshRange=[prevLidarAngle, simVariables.lidarSimulatedAngle])
+            nearbyConeList = mapToUse.distanceToCone((simVarsLidarPos if (mapToUse.simVars.car is not None) else regularLidarPos), coneLists, sortBySomething='SORTBY_ANGL', simpleThreshold=RANGE_LIMIT, angleThreshRange=[prevLidarAngle, simVariables.lidarSimulatedAngle])
         else:
-            nearbyConeList = mapToUse.distanceToCone(lidarPos, coneLists, sortBySomething='SORTBY_ANGL', simpleThreshold=RANGE_LIMIT)
+            nearbyConeList = mapToUse.distanceToCone((simVarsLidarPos if (mapToUse.simVars.car is not None) else regularLidarPos), coneLists, sortBySomething='SORTBY_ANGL', simpleThreshold=RANGE_LIMIT)
             #nearbyConeList = mapToUse.distanceToConeSquared(lidarPos, None, sortByDistance=False, simpleSquaredThreshold=(RANGE_LIMIT**2)) # faster, but you cant sort by angle, which breaks the obscurity check later
         
-        returnList.append([])
-        for i in range(len(nearbyConeList)): # a forloop to check for obscu
-            cone, _ = nearbyConeList[i]
-            # conePos = cone.position
-            # if((mapToUse.simVars.car is not None) if (mapToUse.simVars is not None) else False): # should always be true, but just to be sure
+        returnList.append([]) # initialize an empy array (for each lidar)
+        for i in range(len(nearbyConeList)):
+            cone, _ = nearbyConeList[i] # just makes things more legible
+
+            conePos = cone.position # fallback value (simulatePositionalDrift must be False or something)
             realActualConePos = (cone.position if (cone.slamData is None) else cone.slamData.positions[0]) # an absolutely JANKY hack, which used to make sense, but now barely does. If you loaded in the mapfile WITHOUT undiscoveredCones, this will still work
-            distAngle = GF.distAngleBetwPos(lidarPos, realActualConePos) # get dist and angle between true lidar and true cone positions to get the angle that should be measured
-            distAngle[1] += mapToUse.car.angle - mapToUse.simVars.car.angle # now distAngle holds the 'measured' distance and angle
-            conePos = GF.distAnglePosToPos(distAngle[0], distAngle[1], mapToUse.car.position) # apply true (what the real lidar would measure) dist&angle data to the believed (drifted) car pos&angle.
+            distAngle = GF.distAngleBetwPos((simVarsLidarPos if (mapToUse.simVars.car is not None) else regularLidarPos), realActualConePos) # get dist and angle between true lidar and true cone positions to get the angle that should be measured
+            if(mapToUse.simVars.car is not None): # should always be true, but just to be sure
+                distAngle[1] += mapToUse.car.angle - mapToUse.simVars.car.angle # now distAngle holds the 'measured' distance and angle
+                conePos = GF.distAnglePosToPos(distAngle[0], distAngle[1], regularLidarPos) # apply true (what the real lidar would measure) dist&angle data to the believed (drifted) car pos&angle.
             
-            outerEdgeAngles = [distAngle[1] - np.arctan2(Map.Cone.coneDiam/2, distAngle[0]), distAngle[1] + np.arctan2(Map.Cone.coneDiam/2, distAngle[0])]
+            outerEdgeAngleOffset = np.arctan2(Map.Cone.coneLidarDiam/2, distAngle[0]) # (draw it out, it's not complicated.) the angle between the center and outer edge of the cone at this distance
+            outerEdgeAngles = [distAngle[1] - outerEdgeAngleOffset, distAngle[1] + outerEdgeAngleOffset]
             nearbyConeList[i].append(outerEdgeAngles)
             obscured = False
             for j in range(i):
                 #radRangeOne only works with GF_noNumba, but it could be slightly faster maybe
                 if(GF.radRange(outerEdgeAngles[0], nearbyConeList[j][2][0], nearbyConeList[j][2][1]) or 
-                    GF.radRange(outerEdgeAngles[1], nearbyConeList[j][2][0], nearbyConeList[j][2][1])):
+                    GF.radRange(outerEdgeAngles[1], nearbyConeList[j][2][0], nearbyConeList[j][2][1])): # check if the current outerEdgeAngles overlap with existing (closer) outerEdgeAngles
                     if(distAngle[0] < nearbyConeList[j][1][0]): #if that cone is further away (and therefore obstructed by the current cone)
                         if(len(nearbyConeList[j]) > 3):# if a blob was made for that cone,
                             #print("(lidarBlobProcSim) popping blob:", nearbyConeList[j][3])

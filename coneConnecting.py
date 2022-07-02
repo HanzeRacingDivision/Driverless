@@ -40,7 +40,7 @@ def connectCone(mapToUse, coneToConnect, applyResult=True, printDebug=True): #at
         if((currentConnectionCount>0) and (len(coneToConnect.coneConData)>0)): #only 1 of the 2 checks should be needed, but just to be safe
             currentExistingAngle = GF.radRoll(GF.radInv(coneToConnect.coneConData[0].angle))
         
-        nearbyConeList = mapToUse.distanceToCone(coneToConnect.position, mapToUse.right_cone_list if coneToConnect.LorR else mapToUse.left_cone_list, 'SORTBY_DIST', [coneToConnect.ID], coneConnecter.maxConnectionDist, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by distance, but that's not really needed given the (CURRENT) math
+        nearbyConeList = mapToUse.distanceToCone(coneToConnect.position, mapToUse.cone_lists[coneToConnect.LorR], 'SORTBY_DIST', [coneToConnect.ID], coneConnecter.maxConnectionDist, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by distance, but that's not really needed given the (CURRENT) math
         # nearbyConeList structure: [[cone, [dist, angle]], ]
         if(len(nearbyConeList) < 1):
             if(printDebug):
@@ -118,7 +118,7 @@ def connectConeSuperSimple(mapToUse, coneToConnect, applyResult=True, printDebug
             print("input cone already doubly connected?!:", coneToConnect.coneConData)
         return(False, None)
     else:
-        nearbyConeList = mapToUse.distanceToConeSquared(coneToConnect.position, mapToUse.right_cone_list if coneToConnect.LorR else mapToUse.left_cone_list, True, [coneToConnect.ID], coneConnecter.maxConnectionDist**2, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
+        nearbyConeList = mapToUse.distanceToConeSquared(coneToConnect.position, mapToUse.cone_lists[coneToConnect.LorR], True, [coneToConnect.ID], coneConnecter.maxConnectionDist**2, 'EXCL_DUBL_CONN', [coneToConnect.ID])  #note: list is sorted by (squared) distance, but that's not really needed given the (CURRENT) math
         if(len(nearbyConeList) < 1):
             if(printDebug):
                 print("nearbyConeList empty")

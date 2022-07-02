@@ -12,8 +12,7 @@ class Map:
         self.clock = self.internalClock # defaults to internalClock, but can be anything you want
         
         self.car = self.Car()
-        self.left_cone_list = []
-        self.right_cone_list = []
+        self.cone_lists = {False: [], True: []}
         self.finish_line_cones = [] #holds 2 Cone objects, 1 left and 1 right (redundant, becuase Cone.isFinish attribute, but this will save a lot of list-searching time)
         
         self.target_list = [] #list of Target objects, the order of the list is the order in which they need to be driven
@@ -26,17 +25,17 @@ class Map:
         self.simVars = None # holds simulatedLidar variables (and/or other: ...)
     
     def __repr__(self): #print map objects in a legible fashion
-        return("Map(typ="+(self.__class__.__name__)+",LEFT:"+str(len(self.left_cone_list))+",RIGHT:"+str(len(self.right_cone_list))+",FINISH:"+str(len(self.finish_line_cones))+",TARGETS:"+str(len(self.target_list))+(",TARG_FULL_CIRC,"if self.targets_full_circle else ",")+str(self.car)+")")
+        return("Map(typ="+(self.__class__.__name__)+",LEFT:"+str(len(self.cone_lists[False]))+",RIGHT:"+str(len(self.cone_lists[True]))+",FINISH:"+str(len(self.finish_line_cones))+",TARGETS:"+str(len(self.target_list))+(",TARG_FULL_CIRC,"if self.targets_full_circle else ",")+str(self.car)+")")
     
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
         ## some static constants:
         wheelbase = 1.03 # (meters) distance between front and rear axle
-        # axleWidth = 0.7 # (meters) distance between the centers of the wheels (a.k.a. 'track')
-        chassis_length = 1.5 # (meters) distance bumper to bumper (for drawing/colision-detection)
-        chassis_width = 1.0 # (meters) car chassis width ('skirt to skirt', one might say). NOT distance between wheel centers
+        # axleWidth = 0.71 # (meters) distance between the centers of the wheels (a.k.a. 'track')
+        chassis_length = 1.56 # (meters) distance bumper to bumper (for drawing/colision-detection)
+        chassis_width = 1.06 # (meters) car chassis width ('skirt to skirt', one might say). NOT distance between wheel centers
         chassis_center_offset = (wheelbase/2) + 0.0 # (meters) car pos (rear axle center) + this = chassis center (mostly used for drawing)
-        lidarOffsets = (np.array([0.0, 0.0]), ) # the position of the lidar(s), as ((forward offset, perpendicular offset), for all lidars) from the car position (not chassis center)
+        lidarOffsets = (np.array([1.2, 0.0]), ) # the position of the lidar(s), as ((forward offset, perpendicular offset), for all lidars) from the car position (not chassis center)
         maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept HW commands outside this range)
         
         def __init__(self):
@@ -180,7 +179,7 @@ class Map:
                     print("serious error in getConeChainLen(). bad data in Cone.connections?:", currentCone, prevCone) #currentCone.connections, prevCone.connections)
                     return(-1, currentCone)
         else: #technically, this does allow more that 2 connections per cone, but what maniac would do that
-            if(lengthMem >= len((self.right_cone_list if currentCone.LorR else self.left_cone_list))): #a crude way of checking if the chain loops
+            if(lengthMem >= len(self.cone_lists[currentCone.LorR])): #a crude way of checking if the chain loops
                 #print(("right" if currentCone.LorR else "left"), "cone chain is full circle")
                 ## alternatively, you could just set a (Map class) boolean to indicate that a full cone circle chain has been reached (and skip all this itteration)
                 ## or, you could store (pass on as argument) the start of the chain, and just check if currentCone==startingCone
@@ -195,7 +194,7 @@ class Map:
             allows (optional) filtering based on cone.ID, max-distance, cone-connected-ness 
             and (optional) sorting by distance """   
         if(conelist is None): #if no conelist was entered (probably should do this)
-            conelist = self.left_cone_list + self.right_cone_list #then search both lists
+            conelist = self.cone_lists[False] + self.cone_lists[True] #then search both lists
         returnList = []  #[[conePointer, squaredDist], ]
         for cone in conelist:
             #cone stucture:  [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data (certainty, time spotted, etc)]
@@ -234,7 +233,7 @@ class Map:
             allows (optional) filtering based on cone.ID, max-distance, cone-connected-ness and angle thresholds
             and (optional) sorting by distance, angle or angle-delta """
         if(conelist is None): #if no conelist was entered (probably should do this)
-            conelist = self.left_cone_list + self.right_cone_list #then search both lists
+            conelist = self.cone_lists[False] + self.cone_lists[True] #then search both lists
         returnList = []  #[[conePointer, [dist, angle]], ]
         hasAngleThreshRange = (len(angleThreshRange) == 2) #init var
         for cone in conelist:
@@ -296,7 +295,7 @@ class Map:
         """ return whether or not a given position overlaps an existing cone and the cone which it overlaps (if any) """
         boolAnswer = False;   coneListPointer=None #boolAnswer MUST default to False, the other variables dont matter as much
         coneDistToler = self.Cone.coneDiam * 0.75  #overlap tolerance  NOTE: area is square, not round
-        combinedConeList = (self.right_cone_list + self.left_cone_list)
+        combinedConeList = self.cone_lists[True] + self.cone_lists[False]
         for cone in combinedConeList:
             if((posToCheck[0] > (cone.position[0]-coneDistToler)) and (posToCheck[0] < (cone.position[0]+coneDistToler)) and (posToCheck[1] > (cone.position[1]-coneDistToler)) and (posToCheck[1] < (cone.position[1]+coneDistToler))):
                 # if(boolAnswer): #if an overlapping cone was already found
@@ -310,7 +309,7 @@ class Map:
     def maxConeID(self):
         """searches both cone_lists to find the largest ID value
             returns 0 if the list was empty"""
-        return(int(GF.findMaxAttrIndex((self.right_cone_list + self.left_cone_list), 'ID')[1]))
+        return(int(GF.findMaxAttrIndex((self.cone_lists[True] + self.cone_lists[False]), 'ID')[1]))
     
     def addCone(self, pos, leftOrRight: bool, isFinish=False):
         """add a new cone to the map"""
@@ -322,7 +321,7 @@ class Map:
             print("addCone warning: there's already 2 finish cones. adding as non-finish cone...")
             isFinish = False
         aNewCone = self.Cone(self.maxConeID()+1, pos, leftOrRight, bool(isFinish)) #bool is just to make sure it's not a 0/1 int
-        (self.right_cone_list if leftOrRight else self.left_cone_list).append(aNewCone)
+        self.cone_lists[leftOrRight].append(aNewCone)
         if(isFinish):
             self.finish_line_cones.append(aNewCone)
         return(True, aNewCone)
@@ -335,13 +334,13 @@ class Map:
             return(False, overlappingCone)
         if(checkMaxConeID):
             maxConeID = self.maxConeID()
-            if((coneObj.ID <= maxConeID) and ((len(self.left_cone_list)+len(self.right_cone_list))>0)):
+            if((coneObj.ID <= maxConeID) and ((len(self.cone_lists[False])+len(self.cone_lists[True]))>0)):
                 print("addConeObj warning, ID (", coneObj.ID ,") too low! changing it to:", maxConeID+1)
                 coneObj.ID = maxConeID+1
         if(coneObj.isFinish and ((len(self.finish_line_cones)>=2) or ((self.finish_line_cones[0].LorR == coneObj.LorR) if (len(self.finish_line_cones)==1) else False))):
             print("addConeObj warning: there's already 2 finish cones. adding as non-finish cone...")
             coneObj.isFinish = False
-        (self.right_cone_list if coneObj.LorR else self.left_cone_list).append(coneObj)
+        self.cone_lists[coneObj.LorR].append(coneObj)
         if(coneObj.isFinish):
             self.finish_line_cones.append(coneObj)
         return(True, coneObj)
@@ -350,20 +349,20 @@ class Map:
         """remove a cone, given the cone's ID"""
         listToSearch = []; coneIndexInList=-1 #init vars (not needed, but it's clean)
         if((LorRhint is not None) and (type(LorRhint) is bool)):
-            listToSearch = (self.right_cone_list if LorRhint else self.left_cone_list)
+            listToSearch = self.cone_lists[LorRhint]
         else:
-            listToSearch = (self.left_cone_list + self.right_cone_list)
+            listToSearch = (self.cone_lists[False] + self.cone_lists[True])
         coneIndexInList = GF.findIndexByClassAttr(listToSearch,'ID', ID)
         if(coneIndexInList < 0):
-            print("removeCone failed, couldn't find ID in list (", (("right_cone_list" if LorRhint else "left_cone_list") if ((LorRhint is not None) and (type(LorRhint) is bool)) else "both"),")")
+            print("removeCone failed, couldn't find ID in list (", (("right cone list" if LorRhint else "left cone list") if ((LorRhint is not None) and (type(LorRhint) is bool)) else "both"),")")
             return(False)
         coneToDelete = listToSearch[coneIndexInList]
-        if((LorRhint != coneToDelete.LorR) if ((LorRhint is not None) and (type(LorRhint) is bool)) else ((coneIndexInList >= len(self.left_cone_list)) != coneToDelete.LorR)): #if the cone.LorR value doesnt match the list in which it was found, something went very wrong earlier!
+        if((LorRhint != coneToDelete.LorR) if ((LorRhint is not None) and (type(LorRhint) is bool)) else ((coneIndexInList >= len(self.cone_lists[False])) != coneToDelete.LorR)): #if the cone.LorR value doesnt match the list in which it was found, something went very wrong earlier!
             print("removeCone WARNING: LorR list mismatch:", coneToDelete.LorR)
         
         if(not ((LorRhint is not None) and (type(LorRhint) is bool))): #if both lists were searched, select the list (to delete from)
-            listToSearch = (self.right_cone_list if (coneIndexInList >= len(self.left_cone_list)) else self.left_cone_list)
-            coneIndexInList = ((coneIndexInList-len(self.left_cone_list)) if (coneIndexInList >= len(self.left_cone_list)) else coneIndexInList)
+            listToSearch = (self.cone_lists[True] if (coneIndexInList >= len(self.cone_lists[False])) else self.cone_lists[False])
+            coneIndexInList = ((coneIndexInList-len(self.cone_lists[False])) if (coneIndexInList >= len(self.cone_lists[False])) else coneIndexInList)
         ##first, cleanly sever all ties to other things in the system
         if(coneToDelete.isFinish):
             finishConeIndex = GF.findIndexByClassAttr(self.finish_line_cones,'ID', ID) #(safely) try to find the cone in the finish_line_cones

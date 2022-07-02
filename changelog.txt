@@ -30,14 +30,18 @@ moved 'timeSinceLastUpdate' into the Map.Car class, under the name: 'Car.lastUpd
 removed 'clockSet()' from Map class (it was not used anywhere (and it's a funky hack anyway))
 add/update function comments (""" """) to all changes
 changed the way drawMouseCone() works again (i realized you don't need a sub-function if you're usually passing the same thing)
+BIG CHANGE: the cone lists are now in a dict called cone_lists, mapped to False and True for left and right respectively. (no more left_cone_list and right_cone_list)
+fixed bug in simulatedLidar (and changed some stuff around), so lidarOffsets now work, AND you can turn off positionalDrift if you want.
+added yet another drawConeSlamData mode, which just doesn't display how often the cone is seen (so you can actually see how well the lidar center pos is calculated)
+BIG ADDITION: HWserialConn, HWserialLogging, realCar and realLidar all added (see also: plethora of arduino code that makes it work)
 
 next up:
-measure chassis size and make a fun new carSprite
 extra support for bigger (finish?) and orange cones ? (at least drawing, i dont know about other stuff...)
 delaunay triangulation testing (make a basic implementation and draw it, then we'll figure out what to do with it later)
 make simulatedVision (bad positions, good color data) to help simulatedLidar do its thing
 make use of the (now available) vision data in DIY_SLAM
 update target positions if cone positions change
+make a fun new carSprite
 basic DSP (filtering) on the steering?? idk man, it seems like there is a lot of predictable oscillation, maybe DSP will help (or not, if freq is too low)
 button for toggling spline dots
 3d render engine undiscovered cones and splines and all that (just more stuff in general?)

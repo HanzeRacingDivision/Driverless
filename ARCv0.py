@@ -10,7 +10,8 @@ makeConesAfterMapload = False #whether to completely rely on the loaded map, or 
 makeConesOnlyFirstLap = True
 delaySLAMuntillDriving = False
 
-useDrawer = True
+useDrawer = True # whether to draw stuff on the screen (pretty useful for debugging and user-interfacing, but it does consume a bunch of processing power)
+printConnectionDebug = True # whether to explicitely print out the details of the kartMCU and LiDAR connections (serial port stuff)
 
 from doctest import master
 from Map import Map
@@ -24,13 +25,13 @@ import pathPlanningTemp as PP    #autodriving and splines
 import SLAM_DIY as SLAM  # TODO: replace/improve SLAM_DIY
 
 if(simulation):
+    from Map import mapSimVarClass
     import simulatedCar   as SC
     import simulatedLidar as SL
     #import simulatedVision as SV  # simulated computerVision (at least useful to determine the color of detected cones)
-    from Map import mapSimVarClass
 else:
-    import carMainConn    as RC
-    import lidarConn      as RL
+    import realCar        as RC
+    import realLidars     as RL
     #import visionTBD      as RV   # real computerVision is TBD
 
 if(useDrawer):
@@ -56,7 +57,7 @@ class masterMapClass(Map):
             self.car = SC.simCar() #simCar has Map.Car as a parent class, so all regular Car stuff will still work
             self.simVars = mapSimVarClass()
         else:
-            self.car = RC.realCar()
+            self.car = RC.realCar(self.clock)
         
         self.car.pathFolData = PP.pathPlannerCarData()
         self.pathFolData = PP.pathPlannerMapData()
@@ -92,9 +93,28 @@ if __name__ == "__main__":
         if(simulation):
             masterMap.simVars.lidarSimVars = [SL.simulatedLidarVariables() for _ in masterMap.car.lidarOffsets]
         else:
-            doNothing = 0
-            #start car communication here
-            #start lidar communication(s) here
+            #### connect the kartMCU and lidar(s):
+            ## first the kartMCU:
+            while(not masterMap.car.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=[], printDebug=printConnectionDebug)):
+                time.sleep(0.5) # a nice long delay, to avoid spamming the terminal output
+            masterMap.car.doHandshakeIndef(resetESP=True, printDebug=True)
+            if(not masterMap.car.is_ready):
+                print("realCar handshake failed or something, i don't feel like dealing with this")
+                raise(Exception("nah, bro"))
+            # ## initialize the lidar(s)
+            # lidars = [RL.lidarClass(masterMap.clock, lidarIndex) for lidarIndex in range(   1   )]
+            # for lidar in lidars:
+            #     while(not lidar.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=[lidar.comPort for lidar in lidars], printDebug=printConnectionDebug)):
+            #         time.sleep(0.5) # wait a little bit, to avoid spamming the terminal
+            #     lidar.doHandshakeIndef(resetESP=True, printDebug=True)
+            # ## now make sure the serial ports are actually connected to the correct objects:
+            # HWserialConn.shuffleSerials([masterMap.realCar,] + lidars)
+            
+            ## now that all the connections are established, let's start initializing some stuff:
+            masterMap.car.setSteeringEnable(False) # enable/disable the steering motor (so a human can drive the kart)
+            masterMap.car.setPedalPassthroughEnable(True) # enable/disable the steering motor (so a human can drive the kart)
+            # for lidar in lidars:
+            #     lidar.requestSetMaxRange(masterMap.car, 10000) # set the max lidar range (in millimeters)
         
         lidarConeBuff = [] #init var
         cameraConeBuff = [] 
@@ -123,11 +143,6 @@ if __name__ == "__main__":
             
             if(masterMap.car.pathFolData.auto):
                 PP.calcAutoDriving(masterMap)
-                #masterMap.car.sendSpeedAngle(masterMap.car.desired_velocity, masterMap.car.desired_steering) #(spam) send instruction (or simulate doing so)
-                if(not simulation):
-                    ## send actuation instructions to carMCU
-                    doNothing = 0
-                    #connToCar.send((masterMap.car.desired_velocity, masterMap.car.desired_steering))
                 loopSpeedTimers.append(('calcAutoDriving', time.time()))
 
             if(simulation):
@@ -148,10 +163,10 @@ if __name__ == "__main__":
                     masterMap.car.simulateFeedback(loopStart - masterMap.car.lastUpdateTimestamp)
                     masterMap.car.update(loopStart - masterMap.car.lastUpdateTimestamp)
                 masterMap.car.lastUpdateTimestamp = loopStart
-            else:
-                #get steering & speed data from car and run  masterMap.car.update
-                masterMap.car.lastFeedbackTimestamp = loopStart # save when the sensors last provided feedback
-                masterMap.car.lastUpdateTimestamp = loopStart # save when the car last updated its position (also done at SLAM)
+            else: # with real car:
+                masterMap.car.update() # retrieve data from the kartMCU and transmit the desired speed/steering
+                # masterMap.car.lastFeedbackTimestamp = loopStart # save when the sensors last provided feedback                    # moved to car.update function!
+                # masterMap.car.lastUpdateTimestamp = loopStart # save when the car last updated its position (also done at SLAM)   # moved to car.update function!
             loopSpeedTimers.append(('car.update', time.time()))
 
             ## lidar update:
@@ -161,6 +176,8 @@ if __name__ == "__main__":
                 for dataPerLidar in lidarCones:
                     lidarConeBuff += dataPerLidar # for each lidar, add the spotted cones (and the measurement points) to the overall buffer
             else:
+                for lidar in lidars:
+                    lidarConeBuff += lidar.getCones()
                 #get data from lidar (microcontroller(s))
                 doNothing = 0
             loopSpeedTimers.append(('get lidar data', time.time()))
