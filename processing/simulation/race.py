@@ -1,9 +1,7 @@
-import numpy as np
 import pygame
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3 import PPO, A2C, DQN
 from constants import *
-
 from CarEnv import CarEnv
 
 
@@ -52,7 +50,6 @@ if __name__ == "__main__":
                 action = np.interp(angle, [-120, 120], [-5, 5])
                 action = [action]
                 print("midpoint:", action)
-
             observation, reward, done, info = env.step(action)
             env.render()
 

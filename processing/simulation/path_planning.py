@@ -300,7 +300,8 @@ class PathPlanning:
                 for [x, y] in (observation[category]):
                     distance_sqr = (cone.position.x - x)**2 + (cone.position.y - y)**2
                     if distance_sqr < DISTANCE_TO_MATCH:
-                        # TODO: Use new information, not only match!
+                        cone.position.x = x
+                        cone.position.y = y
                         observation_with_ids[category].append(cone)
                         observation[category].remove([x, y])
 

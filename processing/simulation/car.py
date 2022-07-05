@@ -16,7 +16,6 @@ class Car:
         self.angle = 0
         self.acceleration = 0.0
         self.steering_angle = 0.0
-
         self.car_image = None
         self.crashed = False
         self.breaks = True

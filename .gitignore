@@ -167,3 +167,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 /processing/simulation/0.csv
+*.csv
+processing/simulation/logs/PPO-cont-1656753785/monitor.csv
+processing/simulation/logs/PPO-cont-1656753785/PPO-cont_0/events.out.tfevents.1656753785.DEEPTHOUGHT.12156.0

@@ -1,6 +1,4 @@
 from pygame.math import Vector2
-import numpy as np
-
 from constants import *
 
 
