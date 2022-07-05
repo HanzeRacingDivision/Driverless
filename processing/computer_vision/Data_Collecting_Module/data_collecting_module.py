@@ -3,7 +3,7 @@ import cv2
 import time 
 
 path = 'data/images'
-cameraNumber = 1 # 1 For external camera, 0 for internal
+cameraNumber = 0 # 1 For external camera, 0 for internal
 cameraBrightness = 150
 moduleValue = 10
 minBlur = 100
