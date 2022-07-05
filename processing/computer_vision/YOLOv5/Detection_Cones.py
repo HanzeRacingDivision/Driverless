@@ -6,6 +6,8 @@ import depthai as dai
 import numpy as np
 import time
 import os
+import json
+
 
 Type = {
     'avi': cv2.VideoWriter_fourcc(*'XVID'),
@@ -237,6 +239,20 @@ class DetectionMoule:
                 Top_Right_Point = x2, y1
                 Bottom_Left_Point = x1, y2
                 Bottom_Right_Point = x2, y2
+                
+                dict = {
+                    "Label" : label,
+                    "Top_Left_Point" : Top_Left_Point,
+                    "Top_Right_Point" : Top_Right_Point,
+                    "Bottom_Left_Point": Bottom_Left_Point,
+                    "Bottom_Right_Point": Bottom_Right_Point,
+                    "Time": time.time()
+                }
+
+                json_object = json.dump(dict, indent = 4)
+
+                with open("detection.json", "w") as outfile:
+                    outfile.write(json_object)
 
                 print(Top_Left_Point)
                 print(Top_Right_Point)
