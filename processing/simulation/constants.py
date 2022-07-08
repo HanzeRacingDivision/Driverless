@@ -1,5 +1,5 @@
 # Path Planning
-STEERING_METHOD = "autonomous"  # "user"/"autonomous"
+STEERING_METHOD = "user"  # "user"/"autonomous"
 BLANK_MAP = False  # use blank map at the start
 EPISODE_TIME_LIMIT = 100
 SCREEN_WIDTH = 1280

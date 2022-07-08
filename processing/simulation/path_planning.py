@@ -8,6 +8,7 @@ from target import *
 from slam import *
 from clock import *
 from constants import *
+from HWserialConn import *
 
 import pp_functions
 import pp_functions.manual_controls
@@ -27,7 +28,7 @@ class PathPlanning:
 
         self.LEVEL_ID = 'None'
         self.initialize_images()
-        if not BLANK_MAP:
+        if False: #not BLANK_MAP:
             self.initialize_map()
 
         pygame.init()
@@ -131,6 +132,25 @@ class PathPlanning:
             for cone in self.cones.list[category]:
                 cone.update(self)
 
+
+    def collect_cones_from_LIDAR(self):
+
+
+        #0) 
+
+        #1) receive data using HWserialConn.py and process it
+        data = np.zeros(0)
+
+        #2) Assign each cone left/right label - can do randomly for now but we will need a way of assigning color based on which cone we are seeing
+
+
+        #3) process data into format that SLAM accepts
+
+
+        #4) feed detected cones into slam
+
+
+
     def set_done(self, episode_time_running, episode_num, num_steps):
         self.path.compute_boundaries(self)
         self.car.car_crash_mechanic(self.cones, self.path, self.slam_active)
@@ -227,6 +247,9 @@ class PathPlanning:
 
             # update cone list
             self.cones.update_cone_list(self)
+
+            # update cone list from LIDAR
+            self.collect_cones_from_LIDAR()
 
             # SLAM
             if self.slam_active:
