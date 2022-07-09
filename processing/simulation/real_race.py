@@ -1,3 +1,4 @@
+import time
 import pygame
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3 import PPO, A2C, DQN
@@ -32,7 +33,7 @@ class FakeCar():
         self.lastUpdateTimestamp = env.pp.clock.time_running
 
 
-class realCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
+class RealCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
     """a class that simulates the car
         (replace Map.Car object with this)"""
 
@@ -41,8 +42,11 @@ class realCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
         kartMCUserialClass.__init__(self, clockFunc)  # init Car object
         kartMCUserialLogger.__init__(self, logfilename)  # init logger
 
+        self.connect(comPort=None, autoFind=True, tryAny=False, printDebug=True)
+        self.doHandshakeIndef(resetESP=True, printDebug=True)
+
         # self.desired_steering_raw = np.int32(0) # see the @property for this value
-        self.lastEncoderVals = None
+        self.lastEncoderVals = [0, 0, 0, 0]
 
     def __del__(
             self):  # the automatically generated __del__ function only calls 1 (custom?) __del__ function, the first parent class's one. This solves that
@@ -61,10 +65,10 @@ class realCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
 
     @property
     def desired_steering_raw(self):
-        return (np.int32(self.desired_steering / STEERING_RAW_TO_RADIANS))
+        return np.int32(self.desired_steering / STEERING_RAW_TO_RADIANS)
 
     def _rawSteeringToReal(self, rawSteerVal: np.int32):
-        return (rawSteerVal * STEERING_RAW_TO_RADIANS)
+        return rawSteerVal * STEERING_RAW_TO_RADIANS
 
     def _rawEncodersToMeters(self, rawEncoderValues: np.array):
         return (np.array([rawEncoderValues * ENCO_COUNT_TO_METERS[i] for i in range(4)], dtype=np.float32))
@@ -126,7 +130,7 @@ class realCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
         return (returnVal)  # return position and angle
 
     def update(self):
-        dTime = self.clockFunc.time_running - self.lastUpdateTimestamp
+        dTime = self.clockFunc() - self.lastUpdateTimestamp
         if not self.is_ready:
             print("can't run realCar.update(), the connection is not ready:", self.is_ready)
             return False
@@ -147,7 +151,7 @@ class realCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
             self.velocity = self._encodersToForwardSpeed(newData['encoders'], dTime)
             dDist = self._encodersToForwardMovement(newData['encoders'])
         self._update_pos(dTime, dDist, True)
-        self.lastUpdateTimestamp = self.clockFunc.time_running  # save when the car last updated its position (also done at SLAM)
+        self.lastUpdateTimestamp = self.clockFunc()  # save when the car last updated its position (also done at SLAM)
         self.lastEncoderVals = newData['encoders']  # save (the distance-travelled of each wheel) for next time
 
 
@@ -167,7 +171,8 @@ if __name__ == "__main__":
 
     episodes = 1
 
-    car = realCar(env.pp.clock)
+    car = RealCar(time.time)
+    last_angle = 0
 
     for i in range(episodes):
         done = False
@@ -180,33 +185,37 @@ if __name__ == "__main__":
                 if CONVERSION == "disc_to_cont":
                     action = disc_to_cont(action)
                 action = [action]
-                print("agent:", action)
+                #print("agent:", action)
             else:
                 angle = env.pp.midpoint_steering_angle()
                 action = np.interp(angle, [-120, 120], [-5, 5])
                 action = [action]
-                print("midpoint:", action)
+                #print("midpoint:", action)
 
             # send these values to the car object
             car.desired_velocity = 1
-            car.desired_steering = action
+            car.desired_steering = action[0]
             # update the Thijs' car object
             # it will
                 # send the desired steering data
                 # read the encoders
                 # update its position using those encoders
             car.update()
-
+            print(car.angle, car.velocity)
             # retrieve the position from Thijs' car
-            real_angle = [car.angle]
+            # real_angle = [car.angle - last_angle]
 
             # update the environment
-            observation, reward, done, info = env.step(real_angle)
+            # observation, reward, done, info = env.step(real_angle)
+            # last_angle = car.angle
             # update the position of the car using the Thijs' car
+
             env.pp.car.position.x = car.position[0]
             env.pp.car.position.y = car.position[1]
             env.pp.car.true_position.x = car.position[0]
             env.pp.car.true_position.y = car.position[1]
+            env.pp.car.true_angle = -np.rad2deg(car.angle)
+            env.pp.car.angle = -np.rad2deg(car.angle)
 
             env.render()
 
