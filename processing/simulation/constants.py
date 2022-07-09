@@ -17,7 +17,9 @@ EPISODE_TIME_LIMIT = 100
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 PIXELS_PER_UNIT = 32
-LOGGING = True  # True/False
+LOGGING = False  # True/False switch for logging information from the simulation
+COLLECT_STEERING_DATA = False  # True/False switch to get data from the encoders
+COLLECT_LIDAR_DATA = True  # True/False for trying to get data from the LiDAR
 
 # Clock
 CLOCK_SPEED = 1

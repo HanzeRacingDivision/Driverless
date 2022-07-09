@@ -229,13 +229,6 @@ class PathPlanning:
         observation = np.clip(np.multiply(observation, noise), -1, 1)
         return observation
 
-    # def get_fake_steering_info(self):
-    #     angle = self.car.steering_angle
-    #     velocity = self.car.velocity[0]
-    #
-    #     self.car.steering_angle = angle
-    #     self.car.velocity[0] = velocity
-    #
     # def get_fake_observation(self):
     #     ANGLE_OFFSET = 0  # in radians
     #     observation = {Side.LEFT: [], Side.RIGHT: []}
@@ -401,8 +394,6 @@ class PathPlanning:
             # for category in Side:
             #     self.cones.perceived[category] += new[category]
             # print("perceived:", self.cones.perceived)
-
-            #self.get_fake_steering_info()
 
         pygame.quit()
         if LOGGING:

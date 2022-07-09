@@ -299,9 +299,9 @@ class handshakeESPserial:
         return (True)
 
     def _resetESP(self):
-        self._serial.setRTS(1);
-        time.sleep(ESP_RESET_TIME);
-        self._serial.setRTS(0);
+        self._serial.setRTS(1)
+        time.sleep(ESP_RESET_TIME)
+        self._serial.setRTS(0)
         time.sleep(ESP_POST_RESET_TIME)
 
     def DEBUG_checkIgnoredSerialData(self):  # TODO: fancier print
@@ -427,9 +427,9 @@ class handshakeESPserial:
         self._serial, self.handshakeLocalTimestamp, self.handshakeReceivedTimestamp, self.handshakeReceivedIdentifier,
         self.handshake_done)
         # overwrite own values:
-        self._serial = otherObj._serial;
+        self._serial = otherObj._serial
         self.handshakeLocalTimestamp = otherObj.handshakeLocalTimestamp
-        self.handshakeReceivedTimestamp = otherObj.handshakeReceivedTimestamp;
+        self.handshakeReceivedTimestamp = otherObj.handshakeReceivedTimestamp
         self.handshakeReceivedIdentifier = otherObj.handshakeReceivedIdentifier
         self.handshake_done = otherObj.handshake_done
         # overwrite otherObj values:
@@ -713,67 +713,53 @@ def shuffleSerials(serialHandlers):
     ## TODO!
 
 
+def processConeData(lidarData, handshakeESPserial):
+    '''
+    Converts the Lidar data into a np array for the simulation
+    '''
+    ConeData = np.zeros((len(lidarData), 4))
+    for i in range(len(lidarData)):
+        ConeData[i, 0] = lidarData['pos'][i][0]  # absolute x_pos
+        ConeData[i, 1] = lidarData['pos'][i][1]  # absolute y_pos
+        ConeData[i, 2] = handshakeESPserial.convertTimestamp(lidarData['timestamp'][i])  # timestamp
+        ConeData[i, 3] = lidarData['inaccuracy'][i]  # inaccuracy
+    return ConeData
+
+
 if __name__ == '__main__':
 
     startTime = time.time()
     clockFunc = lambda: (time.time() - startTime)
     printConnectionDebug = True  # so you dont have to change it for all the functions below
 
-    # ## lidar only test (with logging):
-    # try:
-    #     test = lidarESPserialClass(clockFunc=clockFunc, identifierIndex=0)
-    #     test.connect(comPort=None, autoFind=True, tryAny=False, printDebug=printConnectionDebug)
-    #     test.doHandshakeIndef(resetESP=True, printDebug=True)
-    #     if(test.is_ready):
-    #         class tempCarClass:
-    #             position = np.array([0.0, 0.0])
-    #             angle = 0.0
-    #         tempCar = tempCarClass()
-    #         print("conn test success:", test.requestSetMaxRange(tempCar, 1000))
-    #         if(test.is_ready):
-    #             from log.HWserialConnLogging import LIDARserialLogger
-    #             lidarLogger = LIDARserialLogger()
-    #             while(True):
-    #                 test.DEBUG_checkIgnoredSerialData()
-    #                 lidarData = test.requestLidarData(tempCar)
-    #                 print("test requestLidarData:", lidarData)
-    #                 for conePos in lidarData: # lidarData is always an array, but sometimes empty (if requestLidarData failed)
-    #                     lidarLogger.logConePos(conePos)
-    #                 time.sleep(0.02) # 20ms == 50Hz == probably enough to keep up
-    #         test.DEBUG_checkIgnoredSerialData()
-    # finally:
-    #     print("newSerialComTest ending")
-    #     try:
-    #         test.disconnect()
-    #         print("serial close success:", not test.is_open)
-    #     except Exception as excep:
-    #         print("couldn't disconnect serial:", excep)
-
-    ## kartMCU only test (with logging):
+    ## lidar only test (with logging):
     try:
-        test = kartMCUserialClass(clockFunc=clockFunc)
+        test = lidarESPserialClass(clockFunc=clockFunc, identifierIndex=0)
         test.connect(comPort=None, autoFind=True, tryAny=False, printDebug=printConnectionDebug)
         test.doHandshakeIndef(resetESP=True, printDebug=True)
-        if (test.is_ready):
+        if test.is_ready:
             class tempCarClass:
-                desired_steering = 0.0
-                desired_steering_raw = 0
-                desired_velocity = 0.0
+                position = np.array([0.0, 0.0])
+                angle = 0.0
+                velocity = 0.0
+
             tempCar = tempCarClass()
-            test.requestSetSteeringEnable(tempCar, False)
-            test.requestSetPedalPassthroughEnable(tempCar, True)
+            print("conn test success:", test.requestSetMaxRange(tempCar, 1000))
             if test.is_ready:
-                from log.HWserialConnLogging import kartMCUserialLogger
-                kartMCULogger = kartMCUserialLogger()
+                from log.HWserialConnLogging import LIDARserialLogger
+
+                lidarLogger = LIDARserialLogger()
                 while True:
                     test.DEBUG_checkIgnoredSerialData()
-                    # regularPacket = test.requestKartData(tempCar)
-                    rawPacket = test.requestKartData(tempCar, True)
-                    # print("test requestKartData:", regularPacket)
-                    print("test requestKartData raw:", rawPacket)
-                    if rawPacket is not None:
-                        kartMCULogger.logPacket(rawPacket, clockFunc())
-                    time.sleep(0.01)  # 10ms == 100Hz == plenty
+                    #Car = test.requestCar()
+                    #lidarData = test.requestLidarData(Car)
+                    lidarData = test.requestLidarData(tempCar)
+                    ConeData = processConeData(lidarData, test)
+                    print("test requestLidarData:", lidarData)
+                    for conePos in lidarData:  # lidarData is always an array, but sometimes empty (if requestLidarData failed)
+                        lidarLogger.logConePos(conePos)
+
+                    time.sleep(0.02)  # 20ms == 50Hz == probably enough to keep up
             test.DEBUG_checkIgnoredSerialData()
     finally:
         print("newSerialComTest ending")
@@ -782,10 +768,44 @@ if __name__ == '__main__':
             print("serial close success:", not test.is_open)
         except Exception as excep:
             print("couldn't disconnect serial:", excep)
-        try:
-            kartMCULogger.close()
-        except Exception as excep:
-            print("couldn't close kartMCULogger:", excep)
+
+    # ## kartMCU only test (with logging):
+    # try:
+    #     test = kartMCUserialClass(clockFunc=clockFunc)
+    #     test.connect(comPort=None, autoFind=True, tryAny=False, printDebug=printConnectionDebug)
+    #     test.doHandshakeIndef(resetESP=True, printDebug=True)
+    #     if(test.is_ready):
+    #         class tempCarClass:
+    #             desired_steering = 0.0
+    #             desired_steering_raw = 0
+    #             desired_velocity = 0.0
+    #         tempCar = tempCarClass()
+    #         test.requestSetSteeringEnable(tempCar, False)
+    #         test.requestSetPedalPassthroughEnable(tempCar, True)
+    #         if(test.is_ready):
+    #             from log.HWserialConnLogging import kartMCUserialLogger
+    #             kartMCULogger = kartMCUserialLogger()
+    #             while(True):
+    #                 test.DEBUG_checkIgnoredSerialData()
+    #                 # regularPacket = test.requestKartData(tempCar)
+    #                 rawPacket = test.requestKartData(tempCar, True)
+    #                 # print("test requestKartData:", regularPacket)
+    #                 print("test requestKartData raw:", rawPacket)
+    #                 if(rawPacket is not None):
+    #                     kartMCULogger.logPacket(rawPacket, clockFunc())
+    #                 time.sleep(0.01) # 10ms == 100Hz == plenty
+    #         test.DEBUG_checkIgnoredSerialData()
+    # finally:
+    #     print("newSerialComTest ending")
+    #     try:
+    #         test.disconnect()
+    #         print("serial close success:", not test.is_open)
+    #     except Exception as excep:
+    #         print("couldn't disconnect serial:", excep)
+    #     try:
+    #         kartMCULogger.close()
+    #     except Exception as excep:
+    #         print("couldn't close kartMCULogger:", excep)
 
     # ## lidar and kartMCU test:
     # try:
