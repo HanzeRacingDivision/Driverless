@@ -10,8 +10,9 @@ import os
 Type = {
     'avi': cv2.VideoWriter_fourcc(*'XVID'),
     'mp4v': cv2.VideoWriter_fourcc(*'H264'),
-    #'mp4v': cv2.VideoWriter_fourcc(*'XVID'),
+    # 'mp4v': cv2.VideoWriter_fourcc(*'XVID'),
 }
+
 
 class DetectionMoule:
 
@@ -29,7 +30,7 @@ class DetectionMoule:
 
     # Get argument first
     #nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/custom_model.blob"
-    nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/yolo-v4-tiny-tf_openvino_2021.4_6shave.blob"
+    nnBlobPath = "640_half_shave.blob"
 
     if not Path(nnBlobPath).exists():
         import sys
@@ -38,18 +39,7 @@ class DetectionMoule:
 
     # Tiny yolo v3 / 4 label texts
     labelMap = [
-        "person",         "bicycle",    "car",           "motorbike",     "aeroplane",   "bus",           "train",
-        "truck",          "boat",       "traffic light", "fire hydrant",  "stop sign",   "parking meter", "bench",
-        "bird",           "cat",        "dog",           "horse",         "sheep",       "cow",           "elephant",
-        "bear",           "zebra",      "giraffe",       "backpack",      "umbrella",    "handbag",       "tie",
-        "suitcase",       "frisbee",    "skis",          "snowboard",     "sports ball", "kite",          "baseball bat",
-        "baseball glove", "skateboard", "surfboard",     "tennis racket", "bottle",      "wine glass",    "cup",
-        "fork",           "knife",      "spoon",         "bowl",          "banana",      "apple",         "sandwich",
-        "orange",         "broccoli",   "carrot",        "hot dog",       "pizza",       "donut",         "cake",
-        "chair",          "sofa",       "pottedplant",   "bed",           "diningtable", "toilet",        "tvmonitor",
-        "laptop",         "mouse",      "remote",        "keyboard",      "cell phone",  "microwave",     "oven",
-        "toaster",        "sink",       "refrigerator",  "book",          "clock",       "vase",          "scissors",
-        "teddy bear",     "hair drier", "toothbrush"
+        "Blue", "Yellow"
     ]
 
     filename = "Data_Cones.mp4"
@@ -62,7 +52,8 @@ class DetectionMoule:
 
     # Define sources and outputs
     camRgb = pipeline.create(dai.node.ColorCamera)
-    spatialDetectionNetwork = pipeline.create(dai.node.YoloSpatialDetectionNetwork)
+    spatialDetectionNetwork = pipeline.create(
+        dai.node.YoloSpatialDetectionNetwork)
     monoLeft = pipeline.create(dai.node.MonoCamera)
     monoRight = pipeline.create(dai.node.MonoCamera)
     stereo = pipeline.create(dai.node.StereoDepth)
@@ -80,38 +71,73 @@ class DetectionMoule:
     nnNetworkOut.setStreamName("nnNetwork")
 
     # Properties
-    camRgb.setPreviewSize(416, 416)
+    camRgb.setPreviewSize(640, 640)
     camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
     camRgb.setInterleaved(False)
     camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
 
     monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
     monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
-    monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+    monoRight.setResolution(
+        dai.MonoCameraProperties.SensorResolution.THE_400_P)
     monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
     # setting node configs
-    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+    stereo.setDefaultProfilePreset(
+        dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
     # Align depth map to the perspective of RGB camera, on which inference is done
     stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
     stereo.setOutputSize(monoLeft.getResolutionWidth(),
-                        monoLeft.getResolutionHeight())
+                         monoLeft.getResolutionHeight())
 
     spatialDetectionNetwork.setBlobPath(nnBlobPath)
-    spatialDetectionNetwork.setConfidenceThreshold(0.99)
+    spatialDetectionNetwork.setConfidenceThreshold(0.5)
     spatialDetectionNetwork.input.setBlocking(False)
     spatialDetectionNetwork.setBoundingBoxScaleFactor(0.5)
     spatialDetectionNetwork.setDepthLowerThreshold(100)
     spatialDetectionNetwork.setDepthUpperThreshold(5000)
 
     # Yolo specific parameters
-    spatialDetectionNetwork.setNumClasses(80)
+    spatialDetectionNetwork.setNumClasses(2)
     spatialDetectionNetwork.setCoordinateSize(4)
     spatialDetectionNetwork.setAnchors(
-        [10, 14, 23, 27, 37, 58, 81, 82, 135, 169, 344, 319])
+        [
+            10.0,
+            13.0,
+            16.0,
+            30.0,
+            33.0,
+            23.0,
+            30.0,
+            61.0,
+            62.0,
+            45.0,
+            59.0,
+            119.0,
+            116.0,
+            90.0,
+            156.0,
+            198.0,
+            373.0,
+            326.0
+        ])
     spatialDetectionNetwork.setAnchorMasks(
-        {"side26": [1, 2, 3], "side13": [3, 4, 5]})
-    spatialDetectionNetwork.setIouThreshold(0.9)
+        {"side80": [
+            0,
+            1,
+            2
+        ],
+            "side40": [
+            3,
+            4,
+            5
+        ],
+            "side20": [
+            6,
+            7,
+            8
+        ]})
+    spatialDetectionNetwork.setIouThreshold(0.5)
 
     # Linking
     monoLeft.out.link(stereo.left)
@@ -141,12 +167,14 @@ class DetectionMoule:
     with dai.Device(pipeline) as device:
 
         # Output queues will be used to get the rgb frames and nn data from the outputs defined above
-        previewQueue = device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
+        previewQueue = device.getOutputQueue(
+            name="rgb", maxSize=4, blocking=False)
         detectionNNQueue = device.getOutputQueue(
             name="detections", maxSize=4, blocking=False)
         xoutBoundingBoxDepthMappingQueue = device.getOutputQueue(
             name="boundingBoxDepthMapping", maxSize=4, blocking=False)
-        depthQueue = device.getOutputQueue(name="depth", maxSize=4, blocking=False)
+        depthQueue = device.getOutputQueue(
+            name="depth", maxSize=4, blocking=False)
         networkQueue = device.getOutputQueue(
             name="nnNetwork", maxSize=4, blocking=False)
 
@@ -158,7 +186,7 @@ class DetectionMoule:
 
         out = cv2.VideoWriter(
             filename, cv2.VideoWriter_fourcc(*'mp4v'), 25, (416, 416))
-        
+
         while True:
             inPreview = previewQueue.get()
             inDet = detectionNNQueue.get()
@@ -175,11 +203,11 @@ class DetectionMoule:
             frame = inPreview.getCvFrame()
             depthFrame = depth.getFrame()  # depthFrame values are in millimeters
 
-
             depthFrameColor = cv2.normalize(
                 depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
             depthFrameColor = cv2.equalizeHist(depthFrameColor)
-            depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
+            depthFrameColor = cv2.applyColorMap(
+                depthFrameColor, cv2.COLORMAP_HOT)
 
             counter += 1
             current_time = time.monotonic()
@@ -205,7 +233,7 @@ class DetectionMoule:
                     ymax = int(bottomRight.y)
 
                     cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax,
-                                ymax), color, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
+                                                                  ymax), color, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
 
             # If the frame is available, draw bounding boxes on it and show the frame
             height = frame.shape[0]
@@ -221,17 +249,17 @@ class DetectionMoule:
                 except:
                     label = detection.label
                 frame_aug = cv2.putText(frame, str(label), (x1 + 10, y1 + 20),
-                            cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                                        cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
                 frame_aug = cv2.putText(frame, "{:.2f}".format(
                     detection.confidence), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
                 print("Label = ", end="")
                 print(str(label))
                 frame_aug = cv2.putText(frame, f"X: {int(detection.spatialCoordinates.x)} mm",
-                            (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                                        (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
                 frame_aug = cv2.putText(frame, f"Y: {int(detection.spatialCoordinates.y)} mm",
-                            (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                                        (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
                 frame_aug = cv2.putText(frame, f"Z: {int(detection.spatialCoordinates.z)} mm",
-                            (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                                        (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
 
                 Top_Left_Point = x1, y1
                 Top_Right_Point = x2, y1
@@ -249,7 +277,7 @@ class DetectionMoule:
                 print()
 
                 cv2.rectangle(frame, (x1, y1), (x2, y2),
-                            color, cv2.FONT_HERSHEY_SIMPLEX)
+                              color, cv2.FONT_HERSHEY_SIMPLEX)
 
             frame_aug = cv2.putText(frame, "NN fps: {:.2f}".format(
                 fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
