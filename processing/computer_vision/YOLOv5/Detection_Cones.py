@@ -18,6 +18,8 @@ Type = {
 
 class DetectionMoule:
 
+    file = "detection.json"
+
     resolution_x = 416
     resolution_y = 416
 
@@ -270,6 +272,7 @@ class DetectionMoule:
                 
                 dict = {
                     "Label" : label,
+                    "Distance": int(detection.spatialCoordinates.z),
                     "Top_Left_Point" : Top_Left_Point,
                     "Top_Right_Point" : Top_Right_Point,
                     "Bottom_Left_Point": Bottom_Left_Point,
@@ -277,10 +280,11 @@ class DetectionMoule:
                     "Time": time.time()
                 }
 
-                json_object = json.dump(dict, indent = 4)
-
-                with open("detection.json", "w") as outfile:
-                    outfile.write(json_object)
+                with open("detection.json", "r+") as file:
+                    data = json.load(file)
+                    data.append(dict)
+                    file.seek(0)
+                    json.dump(data, file)
 
                 print(Top_Left_Point)
                 print(Top_Right_Point)
