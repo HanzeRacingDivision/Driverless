@@ -169,7 +169,7 @@ def collect_cones_from_lidar(lidar, real_car):
     # 3) Make cone objects for the simulation
     perceived_cones = []
     for cone_info in cone_data:
-        cone = Cone(cone_info[0]+CAR_X_START_POSITION, cone_info[1]+CAR_Y_START_POSITION, Side.LEFT, None)
+        cone = Cone(cone_info[0], cone_info[1], Side.LEFT, None)
         perceived_cones.append(cone)
     return perceived_cones
 
