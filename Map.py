@@ -30,13 +30,15 @@ class Map:
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
         ## some static constants:
+        maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept HW commands outside this range)
         wheelbase = 1.03 # (meters) distance between front and rear axle
         # axleWidth = 0.71 # (meters) distance between the centers of the wheels (a.k.a. 'track')
         chassis_length = 1.56 # (meters) distance bumper to bumper (for drawing/colision-detection)
         chassis_width = 1.06 # (meters) car chassis width ('skirt to skirt', one might say). NOT distance between wheel centers
         chassis_center_offset = (wheelbase/2) + 0.0 # (meters) car pos (rear axle center) + this = chassis center (mostly used for drawing)
-        lidarOffsets = (np.array([1.2, 0.0]), ) # the position of the lidar(s), as ((forward offset, perpendicular offset), for all lidars) from the car position (not chassis center)
-        maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept HW commands outside this range)
+        lidarOffsets = (np.array([1.2, 0.0, 0.1]), ) # the positions of the lidars, as ((forward offset, perpendicular offset, height), for all lidars) from the car position (not chassis center)
+        cameraOffset = {"pos" : np.array([0.0, 0.0, 1.0]), "tilt" : 0.0} # the position of the camera where pos=(forward offset, perpendicular offset, height), positive tilt means looking upwards
+        cameraFOV = np.deg2rad(np.array([75, 55])) # camera Field-Of-View as (horizontal, vertical) in radians
         
         def __init__(self):
             self.position = np.array([0.0, 0.0], dtype=np.float64)
@@ -67,16 +69,7 @@ class Map:
         def __repr__(self): #print car objects in a legible fashion
             return("Car(typ="+(self.__class__.__name__)+",pos=["+str(round(self.position[0],2))+','+str(round(self.position[1],2))+"],angle="+str(round(np.rad2deg(self.angle),1))+")")
         
-        # def getRearAxlePos(self): #i changed the car's main position to be at the rear-axle, so this function is obsolete. Use getChassisCenterPos() if you still want the chassis center (old way)
-        #     return(GF.distAnglePosToPos(self.wheelbase/2, GF.radInv(self.angle), self.position))
-        
-        def getChassisCenterPos(self):
-            """calculates the position of the center of chassis (instead of the car's position, which is at the center of rotation)
-                used for drawing (and colision detection)
-                please ensure chassis_center_offset is set correctly"""
-            return(GF.distAnglePosToPos(float(self.chassis_center_offset), float(self.angle), np.array(self.position)))
-
-        def calcLidarPos(self, lidarIndex=0, interpolationDt=0.0):
+        def _calcOffsetPos(self, offset: np.ndarray, interpolationDt=0.0):
             """calculates the position of (one of) the lidar(s) mounted on the car.
                 (optional) use interpolationDt for a more accurate position (DeltaTime since 'Car.lastUpdateTimestamp')"""
             carPos = self.position.copy()
@@ -88,14 +81,32 @@ class Map:
                 # carPos[0] = carPos[0] + interpolationDiff[0][0];   carPos[1] = carPos[1] + interpolationDiff[0][1]
                 # carAngle = carAngle + interpolationDiff[1]
                 ## alternatively, you could make a dummy Car class object, copy the relevant parameters and run .update() on that, but this seemed cleaner
-            ## the crude way:
-            diagonalDist, angleToLidar = GF.distAngleBetwPos(np.zeros((2)), self.lidarOffsets[lidarIndex]) # (a bit crude) get distance and angle to lidar from car center
-            lidarPos = GF.distAnglePosToPos(diagonalDist, carAngle + angleToLidar, carPos)
-            ## the better way:
-            #lidarPos = np.array([carPos[0] + self.lidarOffsets[lidarIndex][0]*np.cos(carAngle), carPos[1] + self.lidarOffsets[lidarIndex][1]*np.sin(carAngle)])
+            ## a somewhat crude way:
+            diagonalDist, angleToOffsetPos = GF.distAngleBetwPos(np.zeros((2)), offset[0:2]) # (a bit crude) get distance and angle to lidar from car center
+            offsetPos = GF.distAnglePosToPos(diagonalDist, carAngle + angleToOffsetPos, carPos)
+            ## the better way: TBD(?)
             ## debug:
-            #print(self.lidarOffsets[lidarIndex], GF.vectorProjectDist(carPos, lidarPos, carAngle)) # validity check: should print out the same thing twice
-            return(lidarPos)
+            # print(np.round(offset[0:2], 2), np.round(GF.vectorProjectDist(carPos, offsetPos, carAngle), 2)) # validity check: should print out the same thing twice
+            return(offsetPos)
+        
+        def getChassisCenterPos(self):
+            """calculates the position of the center of chassis (instead of the car's position, which is at the center of rotation)
+                used for drawing (and colision detection)
+                please ensure chassis_center_offset is set correctly"""
+            #return(self._calcOffsetPos(np.array([self.chassis_center_offset, 0.0])))
+            return(GF.distAnglePosToPos(float(self.chassis_center_offset), float(self.angle), np.array(self.position))) # a little faster / more direct
+
+        def calcLidarPos(self, lidarIndex=0, interpolationDt=0.0):
+            """calculates the position of (one of) the lidar(s) mounted on the car.
+                (optional) use interpolationDt for a more accurate position (DeltaTime since 'Car.lastUpdateTimestamp')
+                note: this is a macro for _calcOffsetPos()"""
+            return(self._calcOffsetPos(self.lidarOffsets[lidarIndex], interpolationDt))
+            
+        def calcCameraPos(self, interpolationDt=0.0):
+            """calculates the position of (one of) the lidar(s) mounted on the car.
+                (optional) use interpolationDt for a more accurate position (DeltaTime since 'Car.lastUpdateTimestamp')
+                note: this is a macro for _calcOffsetPos()"""
+            return(self._calcOffsetPos(self.cameraOffset['pos'], interpolationDt))
         
         #def update() was moved to simCar and realCar, because it should be replaced by SLAM (and/or only used as a quick update between (slower) SLAM updates
         
@@ -125,6 +136,7 @@ class Map:
         """ a small class to hold all pertinent information about boundry cones (like position, left-or-right-ness, whether it's part of the finish line, etc) """
         coneDiam = 0.2 #cone diameter in meters (constant)
         coneLidarDiam = 0.1 # TODO: make a little formula for this instead (requires knowing the slope)
+        conePeakHeight = 0.4 # NOTE: not the height of the cone, but rather the height the cone WOULD HAVE reached, were it's peak actually sharp
         ## cone connection spacing is set in coneConnecting.py
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
@@ -291,13 +303,18 @@ class Map:
                         returnList.append([cone, [distance, angle]])
         return(returnList)
     
+    def _overlapConeCheck(self, posToCheck, conePosToUse, coneDistToler=None):
+        """ return whether or not posToCheck overlaps a cone at conePosToUse"""
+        if(coneDistToler is None):
+            coneDistToler = self.Cone.coneDiam * 0.75  #overlap tolerance  NOTE: area is square, not round
+        return((posToCheck[0] > (conePosToUse[0]-coneDistToler)) and (posToCheck[0] < (conePosToUse[0]+coneDistToler)) and (posToCheck[1] > (conePosToUse[1]-coneDistToler)) and (posToCheck[1] < (conePosToUse[1]+coneDistToler)))
+
     def overlapConeCheck(self, posToCheck):
         """ return whether or not a given position overlaps an existing cone and the cone which it overlaps (if any) """
         boolAnswer = False;   coneListPointer=None #boolAnswer MUST default to False, the other variables dont matter as much
-        coneDistToler = self.Cone.coneDiam * 0.75  #overlap tolerance  NOTE: area is square, not round
         combinedConeList = self.cone_lists[True] + self.cone_lists[False]
         for cone in combinedConeList:
-            if((posToCheck[0] > (cone.position[0]-coneDistToler)) and (posToCheck[0] < (cone.position[0]+coneDistToler)) and (posToCheck[1] > (cone.position[1]-coneDistToler)) and (posToCheck[1] < (cone.position[1]+coneDistToler))):
+            if(self._overlapConeCheck(posToCheck, cone.position)):
                 # if(boolAnswer): #if an overlapping cone was already found
                 #     print("multiple cones overlap!?") #OR two cones are very close (but not overlapping), and the posToCheck overlaps with both
                 # else:

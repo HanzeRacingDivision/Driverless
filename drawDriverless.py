@@ -133,7 +133,8 @@ class pygameDrawer(pygameDrawerCommon):
         self.invertYaxis = invertYaxis #pygame has pixel(0,0) in the topleft, so this just flips the y-axis when drawing things
         
         self.minSizeScale = 1.0 # note: the unit for sizeScale is pixels per meter, so there's no need to make this too small
-        self.maxSizeSale = 2000.0 # zooming in too much makes drawing (the car) really slow (because it has to render the car image at such a high resolution)
+        self.maxSizeScale = 2000.0 # a reasonable limit to how much you can zoom in
+        # self.maxSizeScaleWithCar = 500.0 # zooming in too much makes drawing (the car) really slow (because it has to render the car image at such a high resolution)
         self.centerZooming = False # whether zooming (using the scroll wheel) uses the center of the screen (or the mouse position)
 
         self.bgColor = [50,50,50] #gray
@@ -362,8 +363,12 @@ class pygameDrawer(pygameDrawerCommon):
     def _drawCar(self, carToDraw, polygonMode, headlights, isSimVars=False):
         """(sub function) draws an arbitrary Car object"""
         chassisCenter = carToDraw.getChassisCenterPos()
-        if(GF.distSqrdBetwPos(self.realToPixelPos(chassisCenter), (np.array(self.drawSize) / 2)) > ((self.sizeScale * carToDraw.chassis_length * 2.0)**2 + ((self.drawSize[0]/2)**2 + (self.drawSize[1]/2)**2))):
-            print("NOW")
+        # isInsideWindowPixels
+        screenCenterPixelPos = np.array(self.drawSize) / 2
+        if(GF.distSqrdBetwPos(self.realToPixelPos(chassisCenter), screenCenterPixelPos) > GF.distSqrdBetwPos(np.zeros(2), screenCenterPixelPos + (self.sizeScale * carToDraw.chassis_length * 0.5))):
+            ## skip drawing the car when it's not in frame
+            return
+        # self.sizeScale = min(self.sizeScale, self.maxSizeScaleWithCar) # constrain the sizescale to preserve FPS (but only when the car is actually gonna be rendered. You can still zoom in on non-car stuff much further)
         if(polygonMode):
             if(self.carPointRadius is None):
                 self.carPointRadius = (((carToDraw.chassis_width**2)+(carToDraw.chassis_length**2))**0.5)/2.0 #Pythagoras
@@ -557,22 +562,19 @@ class pygameDrawer3D(pygameDrawerCommon):
         self.flagImg = makeFlagImg((self.drawSize[0]/10, self.drawSize[1]/10), (6,4))
         self.flagImgSizeMult = 1.0 #just a size multiplier, change based on feeling
         
-        # TBD
         self.cameraSurface = pygame.Surface(self.drawSize)
         ## figure out how you are gonna stream in the camera frames
         
-        # constants, TO BE MOVED TO Map.py (to cone- and car classes respectively)
-        self.coneHeight = 0.4
-        self.cameraHeight = 0.3
-        self.cameraFOV = (np.deg2rad(62.2), np.deg2rad(48.8))
+        ## TODO: include camera tilt!
+
         # for exmplanation of math, see self.perspectiveProjection()
-        #  this if for a projection plane at distance 1.0
-        self.camProjPlaneMult = ((drawSize[0]/2) / (1.0*np.tan(self.cameraFOV[0]/2)),
-                                 (drawSize[1]/2) / (1.0*np.tan(self.cameraFOV[1]/2))) # (Yres/2) / plane_height
+        #  this is for a projection plane at distance 1.0
+        self.camProjPlaneMult = ((drawSize[0]/2) / (1.0*np.tan(self.mapToDraw.car.cameraFOV[0]/2)),
+                                 (drawSize[1]/2) / (1.0*np.tan(self.mapToDraw.car.cameraFOV[1]/2))) # (Yres/2) / plane_height
         
-        self.FOVmargin = np.deg2rad(5) #without this, cones will not be rendered even when 0.49 of them is already/still in frame
-        self.renderAngleMax = min((self.cameraFOV[0]/2)+(self.FOVmargin*5), np.deg2rad(88)) #has to be less than pi/2 (90deg)
-        self.renderDistMin = np.tan(min((self.cameraFOV[1]/2)+(self.FOVmargin*5), np.deg2rad(88)))*self.cameraHeight
+        self.coneRenderFOVmargin = np.deg2rad(10) #without this, cones will not be rendered even when 0.49 of them is already/still in frame
+        self.renderAngleMax = min((self.mapToDraw.car.cameraFOV[0]/2) + np.deg2rad(35), np.deg2rad(88)) #has to be less than pi/2 (90deg)
+        self.renderDistMin = self.mapToDraw.car.cameraOffset['pos'][2] / np.tan(min((self.mapToDraw.car.cameraFOV[1]/2) + np.deg2rad(40), np.deg2rad(88)))
         
         #self.lidarHeight = 0.2 #there are currently too many complications (multicore data unavailability) to show lidar data in here
         
@@ -600,7 +602,7 @@ class pygameDrawer3D(pygameDrawerCommon):
         else:
             realPos3D[2] = realPos[2] #if realPos was already 3D
         if(not camHeightIsZeroZ): #if the camera is not considered to be the center of the Z axis (but still the center of X and Y)
-            realPos3D[2] -= self.cameraHeight
+            realPos3D[2] -= self.mapToDraw.car.cameraOffset['pos'][2]
         # for perspective projection, one takes a limited plane (rectangle) with normal-vector N
         # then, given original point (vector) X, you can calculate a vector P that lies (ends) on the plane,
         #  by calculating P = lambda*X. (in other words, lambda is a length-multiplier which makes X end when it hits the plane)
@@ -641,7 +643,7 @@ class pygameDrawer3D(pygameDrawerCommon):
     def drawCones(self, drawLines=True, fillCone=True, drawSlamData=0):
         """draw cones and their connections (closest cones drawn last)
             drawing connections is TBD (because i want to get the drawing order right)"""
-        angleMargin = self.cameraFOV[0]/2 + self.FOVmargin
+        angleMargin = self.mapToDraw.car.cameraFOV[0]/2 + self.coneRenderFOVmargin
         nearbyConeList = self.mapToDraw.distanceToCone(self.mapToDraw.car.position, None, sortBySomething='SORTBY_DIST', 
                                                        angleThreshRange=[self.mapToDraw.car.angle - angleMargin, self.mapToDraw.car.angle + angleMargin])
         coneIDlist = []
@@ -681,7 +683,7 @@ class pygameDrawer3D(pygameDrawerCommon):
             perpAngle = distAngle[1] - self.mapToDraw.car.angle + np.pi/2 # perpendicular angle
             coneRadius = Map.Cone.coneDiam / 2
             coneBottomOffset = np.array([np.cos(perpAngle)*coneRadius, np.sin(perpAngle)*coneRadius])
-            conePoints = [self.perspectiveProjection(respectivePos, self.coneHeight), #top point
+            conePoints = [self.perspectiveProjection(respectivePos, Map.Cone.conePeakHeight), #top point
                           self.perspectiveProjection(respectivePos+coneBottomOffset, 0.0), #bottom point 1
                           self.perspectiveProjection(respectivePos-coneBottomOffset, 0.0)] #bottom point 2
             # draw cone
@@ -743,7 +745,7 @@ class pygameDrawer3D(pygameDrawerCommon):
                 respectivePoses = [GF.distAnglePosToPos(coneDistAngles[0][0], coneDistAngles[0][1], np.zeros(2)), GF.distAnglePosToPos(coneDistAngles[1][0], coneDistAngles[1][1], np.zeros(2))]
                 pygame.draw.line(self.window, self.finishLineColor, self.perspectiveProjection(respectivePoses[0], 0.0), self.perspectiveProjection(respectivePoses[1], 0.0), self.finishLineWidth)
                 if(drawTopLine):
-                    pygame.draw.line(self.window, self.finishLineColor, self.perspectiveProjection(respectivePoses[0], self.coneHeight), self.perspectiveProjection(respectivePoses[1], self.coneHeight), self.finishLineWidth)
+                    pygame.draw.line(self.window, self.finishLineColor, self.perspectiveProjection(respectivePoses[0], Map.Cone.conePeakHeight), self.perspectiveProjection(respectivePoses[1], Map.Cone.conePeakHeight), self.finishLineWidth)
     
     def redraw(self):
         """draw new frame"""

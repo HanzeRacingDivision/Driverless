@@ -51,18 +51,19 @@ class realCar(Map.Car, kartMCUserialClass, kartMCUserialLogger):
     def _rawSteeringToReal(self, rawSteerVal: np.int32):
         return(rawSteerVal * STEERING_RAW_TO_RADIANS)
     
-    def _rawEncodersToMeters(self, rawEncoderValues: np.array):
+    def _rawEncodersToMeters(self, rawEncoderValues: np.ndarray):
         return(np.array([rawEncoderValues*ENCO_COUNT_TO_METERS[i] for i in range(4)], dtype=np.float32))
 
-    def _encodersToForwardSpeed(self, encoderValues: np.array, dTime: float):
-        ## TODO: calculate an appropriate forward velocity based on the distance-travelled of each wheel
-        ## i'm thinking just the average of all wheels might work, or maybe just of the 2 rear wheels or something, i have to think about this some more...
-        return((encoderValues[0] - self.lastEncoderVals[0]) / dTime)
-    
-    def _encodersToForwardMovement(self, encoderValues: np.array):
+    def _encodersToForwardMovement(self, encoderValues: np.ndarray): # note: use encoderValues in meters, NOT RAW!
         ## TODO: calculate an appropriate forward distance-travelled based on the distance-travelled of each wheel
         ## i'm thinking just the average of all wheels might work, or maybe just of the 2 rear wheels or something, i have to think about this some more...
         return(encoderValues[0] - self.lastEncoderVals[0])
+    
+    def _encodersToForwardSpeed(self, encoderValues: np.ndarray, dTime: float): # note: use encoderValues in meters, NOT RAW!
+        ## TODO: calculate an appropriate forward velocity based on the distance-travelled of each wheel
+        ## i'm thinking just the average of all wheels might work, or maybe just of the 2 rear wheels or something, i have to think about this some more...
+        #return((encoderValues[0] - self.lastEncoderVals[0]) / dTime)
+        return(self._encodersToForwardMovement(encoderValues) / dTime)
 
     def _update_pos(self, dTime, dDist=None, applyUpdate=True):
         """ update the position of the car, based on velocity, steering and time-passage """

@@ -215,12 +215,20 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
             ## alternatively, the lidar error was so bad that (due to the unshifting) it now suddenly overlaps a cone when it previously didn't.
             ## in either case, simply update the overlapping cone's position
             updateExistingCone(overlappingCone, unshiftedPos, rightNow, blob)
-        elif(makeNewCones):
-            leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, unshiftedPos, mapToUse.car.angle) < 0.0) #if the angle relative to car is negative (CW), it's a right-side cone
-            
-            conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
-            print("SLAM debug: adding new cone based on lidar measurement:", coneInList)
-            coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
+        elif(makeNewCones): # extra check to make sure SLAM is actually allowed to make new cones
+            # leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, unshiftedPos, mapToUse.car.angle) < 0.0) # (bad) lidar-only test fix: leftOrRight is taken very literally
+            cameraMatchSuccess = False;   leftOrRight = None # init vars
+            for cameraConePos, LorR in cameraLandmarks:
+                if(mapToUse._overlapConeCheck(cameraConePos, unshiftedPos)):
+                    cameraMatchSuccess = True
+                    leftOrRight = LorR
+            if(cameraMatchSuccess):
+                conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
+                print("SLAM debug: adding new cone:", coneInList)
+                coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
+            # else:
+            #     print("SLAM debug: can't add new lidar cone because there is no matching camera cone (to indicate the color)")
+            #     ## coneLimbo.append(unshiftedPos) # add the lidar cone to some kind of temporary waiting list, untill the camera has found it and determined its color
     
     mapToUse.car.slamData = rightNow # save when SLAM was last run
     return() # i'm not sure what would be useful to return yet

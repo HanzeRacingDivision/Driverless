@@ -409,8 +409,8 @@ def handleWindowEvent(pygameDrawerInput, eventToHandle):
             if(simToScale.sizeScale < simToScale.minSizeScale):
                 print("can't zoom out any further")
                 simToScale.sizeScale = simToScale.minSizeScale
-            elif(simToScale.sizeScale > simToScale.maxSizeSale):
-                simToScale.sizeScale = simToScale.maxSizeSale
+            elif(simToScale.sizeScale > simToScale.maxSizeScale):
+                simToScale.sizeScale = simToScale.maxSizeScale
             #if(not simToScale.carCam): #viewOffset is not used in carCam mode, but it won't hurt to change it anyway
             dif = None # init var
             if(simToScale.centerZooming): ## center zooming:

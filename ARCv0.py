@@ -28,7 +28,7 @@ if(simulation):
     from Map import mapSimVarClass
     import simulatedCar   as SC
     import simulatedLidar as SL
-    #import simulatedVision as SV  # simulated computerVision (at least useful to determine the color of detected cones)
+    import simulatedVision as SV  # simulated computerVision (at least useful to determine the color of detected cones)
 else:
     import realCar        as RC
     import realLidars     as RL
@@ -170,17 +170,22 @@ if __name__ == "__main__":
             loopSpeedTimers.append(('car.update', time.time()))
 
             ## lidar update:
-            if(simulation):
-                # simulate the lidar
+            if(simulation): # simulate the lidar:
                 lidarCones = SL.getCones(masterMap) # returns an array (len = num_of_lidars), containing arrays (len = num_of_cones_spotted) containing a tuple (position, simulated_measurement_points)
                 for dataPerLidar in lidarCones:
                     lidarConeBuff += dataPerLidar # for each lidar, add the spotted cones (and the measurement points) to the overall buffer
-            else:
+            else: # get data from lidar (microcontroller(s)):
                 for lidar in lidars:
                     lidarConeBuff += lidar.getCones()
-                #get data from lidar (microcontroller(s))
-                doNothing = 0
             loopSpeedTimers.append(('get lidar data', time.time()))
+
+            ## camera update:
+            if(simulation): # simulate the camera:
+                cameraConeBuff += SV.getCones(masterMap)
+            else: # get data from the camera:
+                ## TBD!
+                doNothing = 0
+            loopSpeedTimers.append(('get camera data', time.time()))
             
             if( (((masterMap.clock() - landmarkBufferTimer) > landmarkBufferTimeInterval) 
                  or (len(lidarConeBuff) > landmarkBufferLengthThreshold))
@@ -192,10 +197,10 @@ if __name__ == "__main__":
                     makeNewConesTemp = makeNewCones
                     if(makeConesOnlyFirstLap and makeNewCones):
                         makeNewConesTemp = (masterMap.car.pathFolData.laps < 1) #only on the first lap
-                    SLAM.updatePosition(masterMap, [lidarConeBuff, []], (1.0, 1.0), makeNewConesTemp)
+                    SLAM.updatePosition(masterMap, [lidarConeBuff, cameraConeBuff], (1.0, 1.0), makeNewConesTemp)
                     #masterMap.car.lastUpdateTimestamp = loopStart
                 
-                lidarConeBuff = [] # empty the buffer
+                lidarConeBuff = [];   cameraConeBuff = [] # empty the buffers
                 if(bufferLandmarks):
                     landmarkBufferTimer = masterMap.clock()
                     #landmarkBufferTimer += landmarkBufferTimeInterval # dangerous

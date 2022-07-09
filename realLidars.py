@@ -8,3 +8,6 @@ from Map import Map
 import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 from HWserialConn import kartMCUserialClass
 from log.HWserialConnLogging import kartMCUserialLogger
+
+
+## TBD
