@@ -32,7 +32,7 @@ class DetectionMoule:
 
     # Get argument first
     #nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/custom_model.blob"
-    nnBlobPath = "640_half_shave.blob"
+    nnBlobPath = "416_half_shave.blob"
 
     if not Path(nnBlobPath).exists():
         import sys
@@ -73,7 +73,7 @@ class DetectionMoule:
     nnNetworkOut.setStreamName("nnNetwork")
 
     # Properties
-    camRgb.setPreviewSize(640, 640)
+    camRgb.setPreviewSize(416, 416)
     camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
     camRgb.setInterleaved(False)
     camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
@@ -104,37 +104,37 @@ class DetectionMoule:
     spatialDetectionNetwork.setCoordinateSize(4)
     spatialDetectionNetwork.setAnchors(
         [
-            10.0,
-            13.0,
-            16.0,
-            30.0,
-            33.0,
+            2.6171875,
+            6.7734375,
+            4.28125,
+            9.484375,
+            6.53515625,
+            14.109375,
+            9.5625,
+            19.484375,
+            12.7578125,
+            26.0625,
+            17.640625,
+            35.46875,
             23.0,
-            30.0,
-            61.0,
-            62.0,
-            45.0,
-            59.0,
-            119.0,
-            116.0,
-            90.0,
-            156.0,
-            198.0,
-            373.0,
-            326.0
+            43.90625,
+            27.8125,
+            57.5,
+            40.25,
+            78.0
         ])
     spatialDetectionNetwork.setAnchorMasks(
-        {"side80": [
+        {"side52": [
             0,
             1,
             2
         ],
-            "side40": [
+            "side26": [
             3,
             4,
             5
         ],
-            "side20": [
+            "side13": [
             6,
             7,
             8
