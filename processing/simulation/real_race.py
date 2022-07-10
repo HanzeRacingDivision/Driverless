@@ -31,7 +31,7 @@ class FakeCar():
         self.desired_steering = 0
         self.desired_velocity = 0
         self.angle = 0
-        self.position = [CAR_X_START_POSITION, CAR_Y_START_POSITION]
+        self.position = [CAR_X_START_POSITION, -CAR_Y_START_POSITION]
         self.lastUpdateTimestamp = env.pp.clock.time_running
         self.velocity = 0
 
@@ -47,8 +47,11 @@ class RealCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
 
 
         if COLLECT_STEERING_DATA:
-            self.connect(comPort=None, autoFind=True, tryAny=False, printDebug=True)
+            self.connect(comPort=None, autoFind=True, tryAny=True, printDebug=True)
             self.doHandshakeIndef(resetESP=True, printDebug=True)
+            self.requestSetSteeringEnable(self, False)
+            self.requestSetPedalPassthroughEnable(self, True)
+            #self.setSteeringEnable(True)
 
         # self.desired_steering_raw = np.int32(0) # see the @property for this value
         self.lastEncoderVals = [0, 0, 0, 0]
@@ -132,7 +135,7 @@ class RealCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
                 self.position[0] = self.position[0] + returnVal[0][0]  # for some reason += doesnt work at the start
                 self.position[1] = self.position[1] + returnVal[0][1]
 
-        return (returnVal)  # return position and angle
+        return returnVal  # return position and angle
 
     def update(self):
         dTime = self.clockFunc() - self.lastUpdateTimestamp
@@ -160,7 +163,7 @@ class RealCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
         self.lastEncoderVals = newData['encoders']  # save (the distance-travelled of each wheel) for next time
 
 
-def collect_cones_from_lidar(lidar, real_car):
+def collect_cones_from_lidar(lidar, real_car, car_position):
     # 1) Receive data using HWserialConn.py
     lidar.DEBUG_checkIgnoredSerialData()
     lidar_data = lidar.requestLidarData(real_car)
@@ -169,7 +172,7 @@ def collect_cones_from_lidar(lidar, real_car):
     # 3) Make cone objects for the simulation
     perceived_cones = []
     for cone_info in cone_data:
-        cone = Cone(cone_info[0], cone_info[1], Side.LEFT, None)
+        cone = Cone(cone_info[0], -cone_info[1], Side.LEFT, None)
         perceived_cones.append(cone)
     return perceived_cones
 
@@ -177,10 +180,12 @@ def collect_cones_from_lidar(lidar, real_car):
     # TODO: For now all cones are LEFT, this is already assigned in previous step
 
 
-def init_lidar():
+def init_lidar(port):
     lidar = lidarESPserialClass(clockFunc=time.time, identifierIndex=0)
-    lidar.connect(comPort=None, autoFind=True, tryAny=False, printDebug=True)
+    lidar.connect(comPort=None, autoFind=True, tryAny=True, printDebug=True, exclusionList=[port])
     lidar.doHandshakeIndef(resetESP=True, printDebug=True)
+    car = FakeCar()
+    lidar.requestSetMaxRange(car, LIDAR_RANGE)
     return lidar
 
 
@@ -191,14 +196,18 @@ def match_cones(no_label_no_color, previous):
     for category in Side:
         for cone in previous[category]:
             for to_match in no_label_no_color:
-                if (cone.position.x - to_match.position.x)**2 + (cone.position.y - to_match.position.y)**2 < DISTANCE_TO_MATCH:
+                if (cone.position.x - to_match.position.x)**2 + (cone.position.y - to_match.position.y)**2 < DISTANCE_TO_MATCH**2:
                     to_match.category = cone.category
                     to_match.id = cone.id
+
+                    cone.position.x = to_match.position.x
+                    cone.position.y = to_match.position.y
+
                     matched.append(to_match)
                     no_label_no_color.remove(to_match)
                     counter += 1
 
-    # print("Perceived:", initial_size , "Matched:", counter)
+    print("Perceived:", initial_size , "Matched:", counter)
     return matched, no_label_no_color
 
 
@@ -230,9 +239,12 @@ if __name__ == "__main__":
     car = RealCar(time.time)
 
     if COLLECT_LIDAR_DATA:
-        lidar = init_lidar()
+        lidar = init_lidar(car.comPort)
     else:
         lidar = None
+
+    if COLLECT_STEERING_DATA and COLLECT_LIDAR_DATA:
+        print("shuffleSerials success:", shuffleSerials([car, lidar]))
 
     for i in range(episodes):
         done = False
@@ -261,17 +273,16 @@ if __name__ == "__main__":
                 # read the encoders
                 # update its position using those encoders
             car.update()
-            print(car.angle, car.velocity)
             # retrieve the position from Thijs' car and update the environment
             env.pp.car.position.x = car.position[0]
-            env.pp.car.position.y = car.position[1]
+            env.pp.car.position.y = -car.position[1]
             env.pp.car.true_position.x = car.position[0]
-            env.pp.car.true_position.y = car.position[1]
+            env.pp.car.true_position.y = -car.position[1]
             env.pp.car.true_angle = -np.rad2deg(car.angle)
             env.pp.car.angle = -np.rad2deg(car.angle)
 
             if COLLECT_LIDAR_DATA:
-                cones_no_label_no_color = collect_cones_from_lidar(lidar, car)
+                cones_no_label_no_color = collect_cones_from_lidar(lidar, car, env.pp.car.position)
                 matched_cones, leftover_cones = match_cones(cones_no_label_no_color, env.pp.cones.visible)
                 # TODO: Match new cones with camera data to get labels
                 #leftover_cones = give_cones_color(leftover_cones)
@@ -281,6 +292,10 @@ if __name__ == "__main__":
                 # Add new cones to the simulation environment
                 for new in new_cones:
                     env.pp.cones.visible[new.category].append(new)
+
+                # for category in Side:
+                #     for cone in env.pp.cones.visible[category]:
+                #         print(cone.position)
 
             env.render()
 

@@ -1,5 +1,9 @@
 import numpy as np
 
+# Processing
+LIDAR_CONE_ACCURACY = 1000
+LIDAR_RANGE = 1500  # in millimeters
+
 # Race
 MODEL_NAME = "PPO"
 MODEL_NUMBER = "1649940839"  # disc: 1649940839/ cont: 1651669206
@@ -7,8 +11,8 @@ TIME_STEPS = 500000   # disc: 500000, cont: 580000
 CONVERSION = "disc_to_cont"  # disc_to_cont
 
 # Path Planning
-DISTANCE_TO_MATCH = 0.3
-MODE = "race"  #
+DISTANCE_TO_MATCH = 0.2
+MODE = "race"
 # "race": one lap slam and midpoint method, then agent without SLAM
 # "testing": everything else :)
 STEERING_METHOD = "autonomous"  # "user"/"autonomous"
@@ -18,7 +22,7 @@ SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 PIXELS_PER_UNIT = 32
 LOGGING = False  # True/False switch for logging information from the simulation
-COLLECT_STEERING_DATA = False  # True/False switch to get data from the encoders
+COLLECT_STEERING_DATA = True  # True/False switch to get data from the encoders
 COLLECT_LIDAR_DATA = True  # True/False for trying to get data from the LiDAR
 
 # Clock
