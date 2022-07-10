@@ -1,6 +1,6 @@
 import os
 import pygame
-import random
+import csv
 
 from car import Car
 from cone import *
@@ -8,10 +8,17 @@ from target import *
 from slam import *
 from clock import *
 from constants import *
+from datetime import datetime
 
 import pp_functions
 import pp_functions.manual_controls
 import pp_functions.drawing
+
+
+def pol2cart(rho, phi):
+    x = rho * np.cos(phi)
+    y = rho * np.sin(phi)
+    return Vector2(x, y)
 
 
 class PathPlanning:
@@ -26,14 +33,14 @@ class PathPlanning:
         self.slam_active = SLAM_ACTIVATED
 
         self.LEVEL_ID = 'None'
-        self.initialize_images()
+
         if not BLANK_MAP:
             self.initialize_map()
 
         pygame.init()
         pygame.display.set_caption("Car")
-
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.initialize_images()
         self.fullscreen = False
         self.exit = False
         self.mouse_pos_list = []
@@ -56,11 +63,22 @@ class PathPlanning:
         self.episode_num = None
         self.num_steps = 0
         self.cruising_speed = 1
+        self.last_time_lap_changed = self.clock.time_running
+
+        if LOGGING:
+            now = datetime.now()
+            self.f = open(str(now.strftime("%H_%M_%S"))+".csv", 'w')
+            self.writer = csv.writer(self.f)
+            text = ("Timestamp", "FPS", "Car(x, y)", "Car speed", "Car angle", "Cones detected", 1)
+            self.writer.writerow(text)
 
     def initialize_images(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         image_path = os.path.join(current_dir, "images/car_r_30.png")
-        self.car.car_image = pygame.image.load(image_path)
+
+        car_image = pygame.image.load(image_path)
+        self.car.car_image = pygame.transform.smoothscale(car_image.convert_alpha(), (CAR_LENGTH*PIXELS_PER_UNIT, CAR_WIDTH*PIXELS_PER_UNIT))
+
 
         # image_path7 = os.path.join(current_dir, "explosion_image.png")
         # explosion_image = pygame.image.load(image_path7)
@@ -81,7 +99,8 @@ class PathPlanning:
         self.path.spline_image[Side.RIGHT] = pygame.image.load(image_path6)
 
     def initialize_map(self):
-        random_number = random.randint(1, 7)
+        # random_number = random.randint(1, 7)
+        random_number = "simple"
         self.LEVEL_ID = f"MAP_{random_number}"
 
         left_cones, right_cones = pp_functions.utils.load_existing_map(self.LEVEL_ID)
@@ -97,8 +116,8 @@ class PathPlanning:
             self.targets.reset_targets()
 
     def track_logic(self):
+        self.path.compute_boundaries(self)
         if self.cones.first_visible_cone[Side.LEFT] != 0 and self.cones.first_visible_cone[Side.RIGHT] != 0:
-
             # Setting the finishing line/point
             if not self.midpoint_created and self.track:
                 self.path.start_midpoint_x = np.mean([self.cones.first_visible_cone[Side.LEFT].true_position.x,
@@ -111,9 +130,12 @@ class PathPlanning:
             elif (np.linalg.norm(
                     Vector2(self.path.start_midpoint_x,
                             self.path.start_midpoint_y) - self.car.true_position) < 20 / self.ppu
-                  and not self.track_number_changed and self.track):
+                  and not self.track_number_changed and self.track and (self.clock.time_running - self.last_time_lap_changed > 10)):
                 self.track_number += 1
                 self.track_number_changed = True
+                # self.targets.reset_targets()
+                if self.slam_active and MODE == "race":
+                    self.slam_active = False
 
             # Setting track_number_changed to false when not on finishing line
             elif (np.linalg.norm((self.path.start_midpoint_x - self.car.true_position[0],
@@ -176,6 +198,20 @@ class PathPlanning:
 
         return midpoint_steering_angle
 
+    def logging(self):
+        """ Creates a log of simulation data at each step in the simulation and saves it to a .csv file."""
+        precision = 2
+        time_stamp = round(self.clock.time_running, precision)
+        x = round(self.car.position.x, precision)
+        y = round(self.car.position.y, precision)
+        num_cones = len(self.cones.visible[Side.LEFT]) + len(self.cones.visible[Side.RIGHT])
+        fps = round(1/(self.clock.dt + 10**-1000), precision)
+        speed = round(self.car.velocity[0], precision)
+        angle = round(self.car.steering_angle, precision)
+        row = time_stamp, fps, (x, y), speed, angle, num_cones, 1
+        self.writer.writerow(row)
+        print(row)
+
     def get_observation(self, num_obs: int, noise_scale: float = 0) -> np.ndarray:
         observation = np.zeros(num_obs, dtype=np.float32)
         observation[0] = np.interp(self.car.velocity.x, [0, MAX_VELOCITY], [-1, 1])
@@ -189,10 +225,91 @@ class PathPlanning:
             observation[12 + 2 * i] = np.interp(cone[0], [0, CAR_FIELD_OF_VIEW / PIXELS_PER_UNIT], [-1, 1])
             observation[13 + 2 * i] = np.interp(cone[1], [-1 * CAR_FOV_RANGE, CAR_FOV_RANGE], [-1, 1])
 
-        # add noise
-        noise = np.float32(np.random.normal(1, noise_scale, size=num_obs))
+        noise = np.float32(np.random.normal(1, noise_scale, size=num_obs))  # add noise
         observation = np.clip(np.multiply(observation, noise), -1, 1)
         return observation
+
+    # def get_fake_observation(self):
+    #     ANGLE_OFFSET = 0  # in radians
+    #     observation = {Side.LEFT: [], Side.RIGHT: []}
+    #     for category in Side:
+    #         for cone in self.cones.in_fov[category]:
+    #             r = cone.true_dist_car + np.random.normal(0, SLAM_NOISE)
+    #             theta = cone.alpha/180*np.pi + np.random.normal(0, SLAM_NOISE)
+    #             observation[category].append([r, theta, cone.position])
+    #
+    #     return observation
+    #
+    # def match_observation_to_get_ids(self, observation):
+    #     observation_with_ids = {Side.LEFT: [], Side.RIGHT: []}
+    #     for category in Side:
+    #         for cone in self.cones.perceived[category]:
+    #             for [r, theta, position] in (observation[category]):
+    #                 distance_sqr = cone.dist_car**2 + r**2 - 2*r*cone.dist_car*np.cos(cone.alpha*np.pi/180 - theta)
+    #                 if distance_sqr < DISTANCE_TO_MATCH:
+    #                     # TODO: Use new information, not only match!
+    #                     observation_with_ids[category].append(cone)
+    #                     observation[category].remove([r, theta, position])
+    #
+    #     return observation_with_ids, observation
+    #
+    # def make_new_cones(self, observation):
+    #     current_highest_id = len(self.cones.perceived[Side.RIGHT]) + len(self.cones.perceived[Side.LEFT])
+    #     observation_with_ids = {Side.LEFT: [], Side.RIGHT: []}
+    #     for category in Side:
+    #         for [r, theta, position] in observation[category]:
+    #             current_highest_id += 1
+    #             x_y_in_dir_of_car = pol2cart(r, theta)
+    #             rotate = np.matrix(
+    #                 [[np.cos(-self.car.angle * np.pi / 180), -1 * np.sin(-self.car.angle * np.pi / 180)],
+    #                  [np.sin(-self.car.angle * np.pi / 180), np.cos(-self.car.angle * np.pi / 180)]])
+    #
+    #             a_b = np.transpose(np.matrix([x_y_in_dir_of_car.x, -1 * x_y_in_dir_of_car.y]))
+    #             x, y = rotate * a_b
+    #             car_x, car_y = self.car.position
+    #             x += car_x
+    #             y += car_y
+    #             new_cone = Cone(x, y, category, current_highest_id)
+    #             new_cone.alpha = theta/np.pi*180
+    #             new_cone.dist_car = r
+    #             observation_with_ids[category].append(new_cone)
+    #
+    #     return observation_with_ids
+
+    def get_fake_observation(self):
+        observation = {Side.LEFT: [], Side.RIGHT: []}
+        for category in Side:
+            for cone in self.cones.in_fov[category]:
+                x = cone.position.x + np.random.normal(0, SLAM_NOISE)
+                y = cone.position.y + np.random.normal(0, SLAM_NOISE)
+                observation[category].append([x, y])
+
+        return observation
+
+    def match_observation_to_get_ids(self, observation):
+        observation_with_ids = {Side.LEFT: [], Side.RIGHT: []}
+        for category in Side:
+            for cone in self.cones.perceived[category]:
+                for [x, y] in (observation[category]):
+                    distance_sqr = (cone.position.x - x)**2 + (cone.position.y - y)**2
+                    if distance_sqr < DISTANCE_TO_MATCH:
+                        cone.position.x = x
+                        cone.position.y = y
+                        observation_with_ids[category].append(cone)
+                        observation[category].remove([x, y])
+
+        return observation_with_ids, observation
+
+    def make_new_cones(self, observation):
+        current_highest_id = len(self.cones.perceived[Side.RIGHT]) + len(self.cones.perceived[Side.LEFT])
+        observation_with_ids = {Side.LEFT: [], Side.RIGHT: []}
+        for category in Side:
+            for [x, y] in observation[category]:
+                current_highest_id += 1
+                new_cone = Cone(x, y, category, current_highest_id)
+                observation_with_ids[category].append(new_cone)
+
+        return observation_with_ids
 
     def run(self, method):
 
@@ -207,6 +324,7 @@ class PathPlanning:
 
             self.num_steps += 1
             self.clock.update()
+            self.episode_time_running = self.clock.time_running  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
             # Event queue
             events = pygame.event.get()
@@ -216,11 +334,8 @@ class PathPlanning:
 
             if method == "autonomous":
                 pp_functions.manual_controls.enable_dragging_screen(self, events)
-            else:
-                # user inputs
+            else:  # user inputs
                 pp_functions.manual_controls.user_input(self, events, self.clock.dt)
-
-            self.episode_time_running = self.clock.time_running  # I HAVE NO CLUE IF THIS MAKES ANY SENSE
 
             # update target list
             self.targets.update_target_lists()
@@ -265,7 +380,24 @@ class PathPlanning:
             # Drawing
             pp_functions.drawing.render(self)
 
+            if LOGGING:
+                self.logging()
+
+            # observation = self.get_fake_observation()
+            # obs_with_ids, remainder = self.match_observation_to_get_ids(observation)
+            # new = self.make_new_cones(remainder)
+            # print("NEW LINE:")
+            # print("obs:", observation)
+            # print("matched:", obs_with_ids)
+            # if len(new[Side.LEFT])+len(new[Side.RIGHT]) != 0:
+            #     print("found:", new)
+            # for category in Side:
+            #     self.cones.perceived[category] += new[category]
+            # print("perceived:", self.cones.perceived)
+
         pygame.quit()
+        if LOGGING:
+            self.f.close()
 
 
 if __name__ == '__main__':

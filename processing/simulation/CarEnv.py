@@ -9,6 +9,7 @@ import pygame
 import pp_functions
 from pp_functions.reward_function import calculate_reward
 from stable_baselines3.common.env_checker import check_env
+from cone import *
 
 
 class CarEnv(gym.Env):
@@ -108,6 +109,13 @@ class CarEnv(gym.Env):
         # update cone list
         self.pp.cones.update_cone_list(self.pp)
 
+        # SLAM
+        if self.pp.slam_active:
+            self.pp.slam.update_slam_vars(self.pp.cones.visible[Side.LEFT], self.pp.cones.visible[Side.RIGHT], self.pp.car)
+            self.pp.slam.EKF_predict(self.pp.clock.dt)
+            if self.num_steps % SLAM_FRAME_LIMIT == 0 or self.num_steps < 5:
+                self.pp.slam.EKF_update(self.pp.car, self.pp.cones.visible)
+
         # calculate closest target
         self.pp.targets.update_closest_target()
 
@@ -125,10 +133,11 @@ class CarEnv(gym.Env):
         # Retrieve observation
         observation = self.pp.get_observation(self.num_obs, noise_scale=self.noise)
 
-        done, episode_end = self.pp.set_done(self.episode_time_running, self.episode_num, self.num_steps)
-        if episode_end:
-            self.data_logger['episode_end'].append(episode_end)
-            self.pp.track_number = 1
+        # done, episode_end = self.pp.set_done(self.episode_time_running, self.episode_num, self.num_steps)
+        # if episode_end:
+        #     self.data_logger['episode_end'].append(episode_end)
+        #     self.pp.track_number = 1
+        done = False
 
         reward = calculate_reward(self)
         self.pp.reward = reward  # this is only for drawing purposes

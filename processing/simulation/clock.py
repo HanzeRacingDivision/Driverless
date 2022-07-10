@@ -1,5 +1,6 @@
 import time
 from typing import Optional
+from constants import *
 
 
 class Clock:
@@ -15,7 +16,7 @@ class Clock:
             self._sim_dt = sim_dt
 
         self._time_running = 0  # time from the start of the simulation with change of speed accounted for
-        self._speed = 1
+        self._speed = CLOCK_SPEED
 
     def update(self):
         if self._in_real_time:

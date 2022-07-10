@@ -1,19 +1,12 @@
 import pygame
-from math import sin, radians, degrees, copysign
+from math import radians
 from pygame.math import Vector2
-import time
 import numpy as np
-from PIL import Image, ImageDraw
-from scipy.interpolate import splprep, splev
-import pandas as pd
 
 import os
 import sys
-
-sys.path.append(os.path.abspath(os.path.join('..', '')))
 from cone import Side
-from pp_functions.utils import bound_angle_180
-
+sys.path.append(os.path.abspath(os.path.join('..', '')))
 
 def draw_line_dashed(surface, color, start_pos, end_pos, offset, width=1, dash_length=10, exclude_corners=True):
     """simply a function that draws dashed lines in pygame"""
@@ -41,7 +34,6 @@ def render(pp):
     pp.screen.fill((0, 0, 0))
     rotated = pygame.transform.rotate(pp.car.car_image, pp.car.true_angle)
     rect = rotated.get_rect()
-
     pos_temp = pp.car.true_position * pp.ppu
     pos_1 = int(pos_temp.x)
     pos_2 = int(pos_temp.y)
@@ -84,6 +76,9 @@ def render(pp):
             # x, y = apply_view_offset(cone.position * pp.ppu - (3, 3)) - Vector2(cone.cov.x / 2, cone.cov.y / 2)
             # pygame.draw.rect(pp.screen, (200, 200, 0), pygame.Rect(x, y, cone.cov.x, cone.cov.y), 1)
         # lines to cones which are in field-of-view
+        for cone in pp.cones.perceived[category]:
+            # picture of a cone
+            pp.screen.blit(pp.targets.image, apply_view_offset(cone.position * pp.ppu - (3, 3)))
         for cone in pp.cones.in_fov[category]:
             if cone.in_fov:
                 draw_line_dashed(pp.screen, (150, 150, 150), (pos_1, pos_2), cone.true_position * pp.ppu, offset,
@@ -172,9 +167,9 @@ def render(pp):
         # text_pos = [10, 15]
         # pp.screen.blit(text_surf, text_pos)
 
-        text_surf = text_font.render(f'Steering : {round(pp.car.steering_angle, 1)}', True, (255, 255, 255))
-        text_pos = [10, 2 * line_offset]
-        pp.screen.blit(text_surf, text_pos)
+        # text_surf = text_font.render(f'Steering : {round(pp.car.steering_angle[0], 1)}', True, (255, 255, 255))
+        # text_pos = [10, 2 * line_offset]
+        # pp.screen.blit(text_surf, text_pos)
 
         text_surf = text_font.render(f'Speed : {round(pp.car.velocity.x, 1)}', True, (255, 255, 255))
         text_pos = [10, 3 * line_offset]
