@@ -265,20 +265,14 @@ class DetectionMoule:
                 
                 dict = {
                     "Label" : label,
-                    "Distance": int(detection.spatialCoordinates.z),
-                    "Top_Left_Point" : Top_Left_Point,
-                    "Top_Right_Point" : Top_Right_Point,
-                    "Bottom_Left_Point": Bottom_Left_Point,
-                    "Bottom_Right_Point": Bottom_Right_Point,
+                    "Z": int(detection.spatialCoordinates.z),
+                    "X": int(detection.spatialCoordinates.x),
                     "Time": time.time()
                 }
 
                 if int(detection.spatialCoordinates.z) != 0 and int(detection.spatialCoordinates.z) < MAXIMUM_DISTANCE :
                     with open("detection.json", "r+") as file:
-                        data = json.load(file)
-                        data.append(dict)
-                        file.seek(0)
-                        json.dump(data, file)
+                        json.dump(dict, file)
 
                     print(Top_Left_Point)
                     print(Top_Right_Point)
