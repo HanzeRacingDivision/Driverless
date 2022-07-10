@@ -1,12 +1,11 @@
 from pathlib import Path
-import sys
 from turtle import st
-import cv2
 import depthai as dai
 import numpy as np
 import time
-import os
 import json
+import cv2
+import os
 
 
 Type = {
@@ -26,12 +25,6 @@ class DetectionMoule:
     origin_x = resolution_x / 2
     origin_y = resolution_y / 2
 
-    '''
-    Spatial Tiny-yolo example
-    Performs inference on RGB camera and retrieves spatial location coordinates: x,y,z relative to the center of depth map.
-    Can be used for tiny-yolo-v3 or tiny-yolo-v4 networks
-    '''
-
     # Get argument first
     #nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/custom_model.blob"
     nnBlobPath = "416_half_shave.blob"
@@ -41,7 +34,6 @@ class DetectionMoule:
         raise FileNotFoundError(
             f'Required file/s not found, please run "{sys.executable} install_requirements.py"')
 
-    # Tiny yolo v3 / 4 label texts
     labelMap = [
         "Blue", "Yellow"
     ]
@@ -50,6 +42,7 @@ class DetectionMoule:
 
     syncNN = True
     start = time.time()
+    MAXIMUM_DISTANCE = 3200
 
     # Create pipeline
     pipeline = dai.Pipeline()
@@ -237,7 +230,7 @@ class DetectionMoule:
                     ymax = int(bottomRight.y)
 
                     cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax,
-                                                                  ymax), color, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
+                                                                  ymax), color, cv2.FONT_HERSHEY_SIMPLEX)
 
             # If the frame is available, draw bounding boxes on it and show the frame
             height = frame.shape[0]
@@ -253,17 +246,17 @@ class DetectionMoule:
                 except:
                     label = detection.label
                 frame_aug = cv2.putText(frame, str(label), (x1 + 10, y1 + 20),
-                                        cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
                 frame_aug = cv2.putText(frame, "{:.2f}".format(
-                    detection.confidence), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                    detection.confidence), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
                 print("Label = ", end="")
                 print(str(label))
                 frame_aug = cv2.putText(frame, f"X: {int(detection.spatialCoordinates.x)} mm",
-                                        (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                                        (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
                 frame_aug = cv2.putText(frame, f"Y: {int(detection.spatialCoordinates.y)} mm",
-                                        (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                                        (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
                 frame_aug = cv2.putText(frame, f"Z: {int(detection.spatialCoordinates.z)} mm",
-                                        (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                                        (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
 
                 Top_Left_Point = x1, y1
                 Top_Right_Point = x2, y1
@@ -280,19 +273,20 @@ class DetectionMoule:
                     "Time": time.time()
                 }
 
-                with open("detection.json", "r+") as file:
-                    data = json.load(file)
-                    data.append(dict)
-                    file.seek(0)
-                    json.dump(data, file)
+                if int(detection.spatialCoordinates.z) != 0 and int(detection.spatialCoordinates.z) < MAXIMUM_DISTANCE :
+                    with open("detection.json", "r+") as file:
+                        data = json.load(file)
+                        data.append(dict)
+                        file.seek(0)
+                        json.dumps(data, file)
 
-                print(Top_Left_Point)
-                print(Top_Right_Point)
-                print(Bottom_Left_Point)
-                print(Bottom_Right_Point)
+                    print(Top_Left_Point)
+                    print(Top_Right_Point)
+                    print(Bottom_Left_Point)
+                    print(Bottom_Right_Point)
 
-                print("Time: ", end='')
-                print(time.time() - start)
+                    print("Time: ", end='')
+                    print(time.time() - start)
 
                 print()
 
@@ -300,7 +294,7 @@ class DetectionMoule:
                               color, cv2.FONT_HERSHEY_SIMPLEX)
 
             frame_aug = cv2.putText(frame, "NN fps: {:.2f}".format(
-                fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
+                fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color)
             cv2.imshow("Depth frame", depthFrameColor)
             cv2.imshow("Cone detection", frame)
             out.write(frame_aug)
