@@ -650,18 +650,18 @@ class kartMCUserialClass(handshakeESPserial): # handles communication between th
         # packet = self._recvPacket()
         # return(packet)
 
-def shuffleSerials(serialHandlers: list):
-    ## TODO: think of the (most efficient?) way to shuffle arbetrary handshakeESPserial-derived objects.
+def shuffleSerials(*serialHandlers): # input any number of handshakeESPserial
+    ## TODO: think of a more efficient way to shuffle arbetrary handshakeESPserial-derived objects.
     for i in range(len(serialHandlers)):
-        if(not serialHandlers[i]._handshakeIdentifierCheck()): # if the serialHandler in question found the wrong 
+        if(not serialHandlers[i]._handshakeIdentifierCheck): # if the serialHandler in question found the wrong 
             for j in range(i+1, len(serialHandlers)):
                 if(serialHandlers[j].handshakeReceivedIdentifier == serialHandlers[i].correctHandshakeIdentifier):
                     serialHandlers[i].switchSerials(serialHandlers[j]) # switch serials, so serialHandlers[i] has the correct serial. (serialHandlers[j] may still have the wrong)
                     break # break the second forloop
-    ## at the end of the shuffle, check if all objects pass the _handshakeIdentifierCheck()
+    ## at the end of the shuffle, check if all objects pass the _handshakeIdentifierCheck
     allGood = True
     for i in range(len(serialHandlers)):
-        if(not serialHandlers[i]._handshakeIdentifierCheck()): # if a serialHandler is STILL wrong (even after shuffling)
+        if(not serialHandlers[i]._handshakeIdentifierCheck): # if a serialHandler is STILL wrong (even after shuffling)
             allGood = False
             print("shuffleSerials() not all good:", i, serialHandlers[i])
     return(allGood)
@@ -674,38 +674,38 @@ if __name__ == '__main__':
     printConnectionDebug = True # so you dont have to change it for all the functions below
     printResults = True
 
-    ## lidar only test (with logging):
-    try:
-        test = lidarESPserialClass(clockFunc=clockFunc, identifierIndex=0)
-        test.connect(comPort=None, autoFind=True, tryAny=False, printDebug=printConnectionDebug)
-        test.doHandshakeIndef(resetESP=True, printDebug=True)
-        if(test.is_ready):
-            class tempCarClass:
-                position = np.array([0.0, 0.0])
-                angle = 0.0
-            tempCar = tempCarClass()
-            print("conn test success:", test.requestSetMaxRange(tempCar, 1000))
-            if(test.is_ready):
-                from log.HWserialConnLogging import LIDARserialLogger
-                lidarLogger = LIDARserialLogger()
-                if(not printResults):
-                    print("(not gonna print results)")
-                while(True):
-                    test.DEBUG_checkIgnoredSerialData()
-                    lidarData = test.requestLidarData(tempCar)
-                    if(printResults):
-                        print("test requestLidarData:", lidarData)
-                    for conePos in lidarData: # lidarData is always an array, but sometimes empty (if requestLidarData failed)
-                        lidarLogger.logConePos(conePos)
-                    time.sleep(0.02) # 20ms == 50Hz == probably enough to keep up
-            test.DEBUG_checkIgnoredSerialData()
-    finally:
-        print("newSerialComTest ending")
-        try:
-            test.disconnect()
-            print("serial close success:", not test.is_open)
-        except Exception as excep:
-            print("couldn't disconnect serial:", excep)
+    # ## lidar only test (with logging):
+    # try:
+    #     test = lidarESPserialClass(clockFunc=clockFunc, identifierIndex=0)
+    #     test.connect(comPort=None, autoFind=True, tryAny=False, printDebug=printConnectionDebug)
+    #     test.doHandshakeIndef(resetESP=True, printDebug=True)
+    #     if(test.is_ready):
+    #         class tempCarClass:
+    #             position = np.array([0.0, 0.0])
+    #             angle = 0.0
+    #         tempCar = tempCarClass()
+    #         print("conn test success:", test.requestSetMaxRange(tempCar, 200))
+    #         if(test.is_ready):
+    #             from log.HWserialConnLogging import LIDARserialLogger
+    #             lidarLogger = LIDARserialLogger()
+    #             if(not printResults):
+    #                 print("(not gonna print results)")
+    #             while(True):
+    #                 test.DEBUG_checkIgnoredSerialData()
+    #                 lidarData = test.requestLidarData(tempCar)
+    #                 if(printResults):
+    #                     print("test requestLidarData:", lidarData)
+    #                 for conePos in lidarData: # lidarData is always an array, but sometimes empty (if requestLidarData failed)
+    #                     lidarLogger.logConePos(conePos)
+    #                 time.sleep(0.02) # 20ms == 50Hz == probably enough to keep up
+    #         test.DEBUG_checkIgnoredSerialData()
+    # finally:
+    #     print("newSerialComTest ending")
+    #     try:
+    #         test.disconnect()
+    #         print("serial close success:", not test.is_open)
+    #     except Exception as excep:
+    #         print("couldn't disconnect serial:", excep)
     
     # ## kartMCU only test (with logging):
     # try:
@@ -748,40 +748,41 @@ if __name__ == '__main__':
     #     except Exception as excep:
     #         print("couldn't close kartMCULogger:", excep)
 
-    # ## lidar and kartMCU test:
-    # try:
-    #     lidar = lidarESPserialClass(clockFunc=clockFunc, identifierIndex=0)
-    #     while(not lidar.connect(comPort=None, autoFind=True, tryAny=True, printDebug=printConnectionDebug)):
-    #         time.sleep(0.5)
-    #     lidar.doHandshakeIndef(resetESP=True, printDebug=True)
-    #     kartMCU = kartMCUserialClass(clockFunc=clockFunc)
-    #     while(not kartMCU.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=[lidar.comPort], printDebug=printConnectionDebug)):
-    #         time.sleep(0.5)
-    #     kartMCU.doHandshakeIndef(resetESP=True, printDebug=True)
-    #     if((not lidar._handshakeIdentifierCheck) and (not kartMCU._handshakeIdentifierCheck)): # if both have done a handshake (by definition, as doIndefHandshake was used on initialization)
-    #         print("SWITCHING COM PORTS!")
-    #         lidar.switchSerials(kartMCU)
-    #     class tempCarClass:
-    #         position = np.array([0.0, 0.0])
-    #         angle = 0.0
-    #         desired_steering = 0.0
-    #         desired_steering_raw = 0
-    #         desired_velocity = 0.0
-    #     tempCar = tempCarClass()
-    #     print("lidar conn test success:", lidar.requestSetMaxRange(tempCar, 1000))
-    #     print("kartMCU conn test success:", kartMCU.requestSetSteeringEnable(tempCar, False))
-    # finally:
-    #     print("newSerialComTest ending")
-    #     try:
-    #         lidar.disconnect()
-    #         print("lidar serial close success:", not lidar.is_open)
-    #     except Exception as excep:
-    #         print("couldn't disconnect lidar serial:", excep)
-    #     try:
-    #         kartMCU.disconnect()
-    #         print("kartMCU serial close success:", not kartMCU.is_open)
-    #     except Exception as excep:
-    #         print("couldn't disconnect kartMCU serial:", excep)
+    ## lidar and kartMCU test:
+    try:
+        lidar = lidarESPserialClass(clockFunc=clockFunc, identifierIndex=0)
+        while(not lidar.connect(comPort=None, autoFind=True, tryAny=True, printDebug=printConnectionDebug)):
+            time.sleep(0.5)
+        lidar.doHandshakeIndef(resetESP=True, printDebug=True)
+        kartMCU = kartMCUserialClass(clockFunc=clockFunc)
+        while(not kartMCU.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=[lidar.comPort], printDebug=printConnectionDebug)):
+            time.sleep(0.5)
+        kartMCU.doHandshakeIndef(resetESP=True, printDebug=True)
+        # if((not lidar._handshakeIdentifierCheck) and (not kartMCU._handshakeIdentifierCheck)): # if both have done a handshake (by definition, as doIndefHandshake was used on initialization)
+        #     print("SWITCHING COM PORTS!")
+        #     lidar.switchSerials(kartMCU)
+        print("shuffleSerials success:", shuffleSerials(kartMCU, lidar))
+        class tempCarClass:
+            position = np.array([0.0, 0.0])
+            angle = 0.0
+            desired_steering = 0.0
+            desired_steering_raw = 0
+            desired_velocity = 0.0
+        tempCar = tempCarClass()
+        print("lidar conn test success:", lidar.requestSetMaxRange(tempCar, 1000))
+        print("kartMCU conn test success:", kartMCU.requestSetSteeringEnable(tempCar, False))
+    finally:
+        print("newSerialComTest ending")
+        try:
+            lidar.disconnect()
+            print("lidar serial close success:", not lidar.is_open)
+        except Exception as excep:
+            print("couldn't disconnect lidar serial:", excep)
+        try:
+            kartMCU.disconnect()
+            print("kartMCU serial close success:", not kartMCU.is_open)
+        except Exception as excep:
+            print("couldn't disconnect kartMCU serial:", excep)
 
     # ## two lidar test:
     # try:
