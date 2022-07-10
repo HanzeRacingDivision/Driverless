@@ -524,7 +524,7 @@ class lidarESPserialClass(handshakeESPserial): # handles serial communication wi
         deletionLoopIndex = 0
         while(deletionLoopIndex < len(lidarData)): # checksum checking loop
             if(lidarData[deletionLoopIndex]['CRCbyte'] != _calcChecksum_connStruct(lidarData[deletionLoopIndex])):
-                print("lidarData entry CRC failed!", lidarData[i])
+                print("lidarData entry CRC failed!", lidarData[deletionLoopIndex])
                 self.DEBUG_ignoredSerialData += readBytes[(deletionLoopIndex*payloadDtype.itemsize):((deletionLoopIndex+1)*payloadDtype.itemsize)] # save the bad data for debugging
                 # now to remove the bad entry from the list:
                 lidarData = np.concatenate((lidarData[0:deletionLoopIndex], lidarData[(deletionLoopIndex+1):len(lidarData)])) # (not efficient, i know) carve entry out of array
