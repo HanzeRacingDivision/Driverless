@@ -1,6 +1,6 @@
 # see changelog and README for explenation
 
-simulation = True
+simulation = False
 
 bufferLandmarks = True
 simulatePositionalDrift = True # (only for simulations) the sensor data for steering&velocity have some error IRL, this simulates that (used to test SLAM)
@@ -32,6 +32,7 @@ if(simulation):
 else:
     import realCar        as RC
     import realLidars     as RL
+    from HWserialConn import shuffleSerials
     #import visionTBD      as RV   # real computerVision is TBD
 
 if(useDrawer):
@@ -101,20 +102,20 @@ if __name__ == "__main__":
             if(not masterMap.car.is_ready):
                 print("realCar handshake failed or something, i don't feel like dealing with this")
                 raise(Exception("nah, bro"))
-            # ## initialize the lidar(s)
-            # lidars = [RL.lidarClass(masterMap.clock, lidarIndex) for lidarIndex in range(   1   )]
-            # for lidar in lidars:
-            #     while(not lidar.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=[lidar.comPort for lidar in lidars], printDebug=printConnectionDebug)):
-            #         time.sleep(0.5) # wait a little bit, to avoid spamming the terminal
-            #     lidar.doHandshakeIndef(resetESP=True, printDebug=True)
-            # ## now make sure the serial ports are actually connected to the correct objects:
-            # HWserialConn.shuffleSerials([masterMap.realCar,] + lidars)
+            ## initialize the lidar(s)
+            lidars = [RL.lidarClass(masterMap.clock, lidarIndex) for lidarIndex in range(   1   )]
+            for lidar in lidars:
+                while(not lidar.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=[lidar.comPort for lidar in lidars], printDebug=printConnectionDebug)):
+                    time.sleep(0.5) # wait a little bit, to avoid spamming the terminal
+                lidar.doHandshakeIndef(resetESP=True, printDebug=True)
+            ## now make sure the serial ports are actually connected to the correct objects:
+            shuffleSerials([masterMap.realCar,] + lidars) # pass a list of all things with a handshakeSerial, so they can be shuffled untill correct
             
             ## now that all the connections are established, let's start initializing some stuff:
-            masterMap.car.setSteeringEnable(False) # enable/disable the steering motor (so a human can drive the kart)
-            masterMap.car.setPedalPassthroughEnable(True) # enable/disable the steering motor (so a human can drive the kart)
-            # for lidar in lidars:
-            #     lidar.requestSetMaxRange(masterMap.car, 10000) # set the max lidar range (in millimeters)
+            masterMap.car.setSteeringEnable(True) # enable/disable the steering motor (so a human can drive the kart)
+            masterMap.car.setPedalPassthroughEnable(False) # enable/disable the steering motor (so a human can drive the kart)
+            for lidar in lidars:
+                lidar.setMaxRange(masterMap.car, 16000) # set the max lidar range (in millimeters)
         
         lidarConeBuff = [] #init var
         cameraConeBuff = [] 
@@ -176,7 +177,7 @@ if __name__ == "__main__":
                     lidarConeBuff += dataPerLidar # for each lidar, add the spotted cones (and the measurement points) to the overall buffer
             else: # get data from lidar (microcontroller(s)):
                 for lidar in lidars:
-                    lidarConeBuff += lidar.getCones()
+                    lidarConeBuff += lidar.getCones(masterMap.car)
             loopSpeedTimers.append(('get lidar data', time.time()))
 
             ## camera update:
@@ -233,16 +234,18 @@ if __name__ == "__main__":
             except:
                 print("couldn't run pygameEnd()")
         if(not simulation):
-           try:
-               #close car communication interface here
-               doNothing = 0
-               print("closing car comm success")
-           except:
-               print("couldn't stop car communication")
-           try:
-               #close lidar communication interface here
-               doNothing = 0
-               print("closing lidar comm success")
-           except: 
-               print("couldn't stop lidar communication")
+            try:
+                masterMap.car.desired_velocity = 0.0;   masterMap.car.desired_steering = 0.0
+                masterMap.car.setSteeringEnable(False) # this has the useful side-effect of sending the desired velocity and steering to the kartMCU (hopefully stopping it)
+                masterMap.car.disconnect()
+                print("closing car comm success")
+            except:
+                print("couldn't stop car communication")
+            try:
+                #close lidar communication interface(s) here
+                for lidar in lidars:
+                    lidar.disconnect()
+                print("closing lidar comm success")
+            except: 
+                print("couldn't stop lidar communication")
     print("main ended")

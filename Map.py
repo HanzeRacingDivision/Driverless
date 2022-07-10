@@ -30,15 +30,15 @@ class Map:
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
         ## some static constants:
-        maxSteeringAngle = np.deg2rad(25) #the car can't steer harder than this, (and will not accept HW commands outside this range)
+        maxSteeringAngle = np.deg2rad(23.115) #the car can't steer harder than this, (and will not accept HW commands outside this range)
         wheelbase = 1.03 # (meters) distance between front and rear axle
         # axleWidth = 0.71 # (meters) distance between the centers of the wheels (a.k.a. 'track')
         chassis_length = 1.56 # (meters) distance bumper to bumper (for drawing/colision-detection)
         chassis_width = 1.06 # (meters) car chassis width ('skirt to skirt', one might say). NOT distance between wheel centers
         chassis_center_offset = (wheelbase/2) + 0.0 # (meters) car pos (rear axle center) + this = chassis center (mostly used for drawing)
-        lidarOffsets = (np.array([1.2, 0.0, 0.1]), ) # the positions of the lidars, as ((forward offset, perpendicular offset, height), for all lidars) from the car position (not chassis center)
-        cameraOffset = {"pos" : np.array([0.0, 0.0, 1.0]), "tilt" : 0.0} # the position of the camera where pos=(forward offset, perpendicular offset, height), positive tilt means looking upwards
-        cameraFOV = np.deg2rad(np.array([75, 55])) # camera Field-Of-View as (horizontal, vertical) in radians
+        lidarOffsets = (np.array([1.26, 0.0, 0.115]), ) # the positions of the lidars, as ((forward offset, perpendicular offset, height), for all lidars) from the car position (not chassis center)
+        cameraOffset = {"pos" : np.array([0.12, 0.0, 1.1]), "tilt" : 0.0} # the position of the camera where pos=(forward offset, perpendicular offset, height), positive tilt means looking upwards
+        cameraFOV = np.deg2rad(np.array([69, 55])) # camera Field-Of-View as (horizontal, vertical) in radians
         
         def __init__(self):
             self.position = np.array([0.0, 0.0], dtype=np.float64)

@@ -12,15 +12,16 @@ import GF.generalFunctions as GF #(homemade) some useful functions for everyday 
 from HWserialConn import kartMCUserialClass
 from log.HWserialConnLogging import kartMCUserialLogger
 
-USE_RAW_DATA = True # if true, the kart will provide raw values (so they can be processed in python instead of on the kartMCU)
+USE_RAW_DATA = False # if true, the kart will provide raw values (so they can be processed in python instead of on the kartMCU)
 
 WHEEL_CIRCUMFERENCE = np.pi * 0.3 # (meters) circumference of the car's wheels
 ENCO_COUNT_TO_METERS = (WHEEL_CIRCUMFERENCE/12, WHEEL_CIRCUMFERENCE/12, WHEEL_CIRCUMFERENCE/12, WHEEL_CIRCUMFERENCE/12) # raw encoder count to meter convesion multiplier (for each wheel)
 
-STEERING_RAW_TO_RADIANS = Map.Car.maxSteeringAngle / 3500  # TBD!
+STEERING_RAW_TO_RADIANS = Map.Car.maxSteeringAngle / (-3370)  # calibrated value
+STEERING_RAW_TO_RAD_OFFSET = np.deg2rad(0.642)  # calibrated value
 
 class realCar(Map.Car, kartMCUserialClass, kartMCUserialLogger):
-    """a class that simulates the car
+    """a class that handles the connection to the car (IRL, not simulated)
         (replace Map.Car object with this)"""
     def __init__(self, clockFunc, logfilename=None):
         Map.Car.__init__(self) # init Car object
@@ -46,18 +47,25 @@ class realCar(Map.Car, kartMCUserialClass, kartMCUserialLogger):
     
     @property
     def desired_steering_raw(self):
-        return(np.int32(self.desired_steering / STEERING_RAW_TO_RADIANS))
+        return(np.int32((self.desired_steering - STEERING_RAW_TO_RAD_OFFSET) / STEERING_RAW_TO_RADIANS))
     
     def _rawSteeringToReal(self, rawSteerVal: np.int32):
-        return(rawSteerVal * STEERING_RAW_TO_RADIANS)
+        return((rawSteerVal * STEERING_RAW_TO_RADIANS) + STEERING_RAW_TO_RAD_OFFSET)
     
     def _rawEncodersToMeters(self, rawEncoderValues: np.ndarray):
         return(np.array([rawEncoderValues*ENCO_COUNT_TO_METERS[i] for i in range(4)], dtype=np.float32))
 
+    def _encodersDiff(self, encoderValues: np.ndarray):
+        if(self.lastEncoderVals is None):
+            return(encoderValues)
+        else:
+            return(encoderValues - self.lastEncoderVals) # numpy array subtraction
+
     def _encodersToForwardMovement(self, encoderValues: np.ndarray): # note: use encoderValues in meters, NOT RAW!
         ## TODO: calculate an appropriate forward distance-travelled based on the distance-travelled of each wheel
         ## i'm thinking just the average of all wheels might work, or maybe just of the 2 rear wheels or something, i have to think about this some more...
-        return(encoderValues[0] - self.lastEncoderVals[0])
+        encoDiff = self._encodersDiff(encoderValues)
+        return((encoDiff[0] + encoDiff[1]) / 2) # the average of the 2 rear wheels
     
     def _encodersToForwardSpeed(self, encoderValues: np.ndarray, dTime: float): # note: use encoderValues in meters, NOT RAW!
         ## TODO: calculate an appropriate forward velocity based on the distance-travelled of each wheel
@@ -116,16 +124,18 @@ class realCar(Map.Car, kartMCUserialClass, kartMCUserialLogger):
             return(False)
         self.lastFeedbackTimestamp = self.clockFunc() # save when the sensors last provided feedback
         self.logPacket(newData, self.lastFeedbackTimestamp) # first of all, log the packet
+        dTime = self.clockFunc()-self.lastUpdateTimestamp
         dDist = 0.0 # init var
         if(USE_RAW_DATA): # TODO: raw data
             self.steering = self._rawSteeringToReal(newData['steerAngle'])
             convertedEncoders = self._rawEncodersToMeters(newData['encoders'])
-            self.velocity = self._encodersToForwardSpeed(convertedEncoders)
+            self.velocity = self._encodersToForwardSpeed(convertedEncoders, dTime)
             dDist = self._encodersToForwardMovement(convertedEncoders)
+            self.lastEncoderVals = convertedEncoders
         else:
             self.steering = newData['steerAngle']
-            self.velocity = self._encodersToForwardSpeed(newData['encoders'])
+            self.velocity = self._encodersToForwardSpeed(newData['encoders'], dTime)
             dDist = self._encodersToForwardMovement(newData['encoders'])
-        self._update_pos(self.clockFunc()-self.lastUpdateTimestamp, dDist, True)
+            self.lastEncoderVals = newData['encoders'] # save (the distance-travelled of each wheel) for next time
+        self._update_pos(dTime, dDist, True)
         self.lastUpdateTimestamp = self.clockFunc() # save when the car last updated its position (also done at SLAM)
-        self.lastEncoderVals = newData['encoders'] # save (the distance-travelled of each wheel) for next time

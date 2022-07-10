@@ -108,10 +108,11 @@ class handshakeESPserial:
         uses a constant handshake protocol (must be present on all counterparts),
          the rest of the communication is for you to decide ;)"""
     ownHandshakeIdentifier = PC_HANDSHAKE_IDENTIFIER # static property
+    correctHandshakeIdentifier = INVALID_HANDSHAKE_IDENTIFIER # to be overwritten by child class (or user directly) (i just wanted to be sure it exists, given )
     def __init__(self):
         self._serial = serial.Serial()
         self._serial.baudrate = CONN_COMMON_BAUD
-        self._serial.timeout = 0.005 # a 5ms timeout. is used whenever you use _serial.read() (at least if you're not assured by the number of bytes .in_waiting)
+        self._serial.timeout = 0.010 # a 10ms timeout. is used whenever you use _serial.read() (at least if you're not assured by the number of bytes .in_waiting)
         self._serial.rts = 0
         self._serial.dtr = 0
         #_serial.port = comPort #already done in connect()
@@ -133,6 +134,14 @@ class handshakeESPserial:
     def comPort(self): # just pass through values from _serial (under a slightly more specific name)
         """macro to ._serial.port"""
         return(self._serial.port)
+
+    @property
+    def _handshakeIdentifierCheck(self):
+        """just a macro to make things sightly more legible (given the long-ass variable names and whatnot)"""
+        return((self.handshakeReceivedIdentifier == self.correctHandshakeIdentifier) and (self.handshakeReceivedIdentifier != INVALID_HANDSHAKE_IDENTIFIER)) # check both, in case some maniac didn't overwrite/change the default
+    @property
+    def is_ready(self): # note: could/should be overwritten with a more specific/comprehensive connection check
+        return(self.handshake_done and self._handshakeIdentifierCheck)
     
     def __del__(self): # doesn't seem to work very well
         try:
@@ -410,15 +419,7 @@ class lidarESPserialClass(handshakeESPserial): # handles serial communication wi
     def __init__(self, clockFunc=time.time, identifierIndex=0):
         handshakeESPserial.__init__(self)
         self.clockFunc = clockFunc
-        self.correctHandshakeIdentifier = LIDAR_HANDSHAKE_IDENTIFIERS[identifierIndex] # there are several lidarESPs, so this   
-    
-    @property
-    def _handshakeIdentifierCheck(self):
-        """just a macro to make things sightly more legible (given the long-ass variable names and whatnot)"""
-        return(self.handshakeReceivedIdentifier == self.correctHandshakeIdentifier)
-    @property
-    def is_ready(self):
-        return(self.handshake_done and self._handshakeIdentifierCheck)
+        self.correctHandshakeIdentifier = LIDAR_HANDSHAKE_IDENTIFIERS[identifierIndex] # there are several lidarESPs, so this helps identify which one you want to connect to
 
     def doHandshake(self, timeout=1.0, resetESP=False, printDebug=True):
         self.handshake_done = False
@@ -513,19 +514,22 @@ class lidarESPserialClass(handshakeESPserial): # handles serial communication wi
         if(len(readBytes) < howManyBytesToRead):
             print("requestLidarData() readBytes is smaller than expected!", len(readBytes), howManyBytesToRead, len(readBytes) // payloadDtype.itemsize)
             #return(np.empty((0,), dtype=payloadDtype)) # no need per-se
-            howManyBytesToRead = len(readBytes) // payloadDtype.itemsize
+            howManyBytesToRead = int((len(readBytes) // payloadDtype.itemsize) * payloadDtype.itemsize)
             self.DEBUG_ignoredSerialData += readBytes[howManyBytesToRead:] # save the ignored data for debugging
             if(howManyBytesToRead == 0):
                 return(np.empty((0,), dtype=payloadDtype))
             readBytes = readBytes[:howManyBytesToRead] # ensure perfect item sizes
         lidarData = np.frombuffer(readBytes, dtype=payloadDtype) # with
         # print("DEBUG lidarData:", len(lidarData), lidarData)
-        # for i in range(len(lidarData)): # checksum checking loop
-        #     if(lidarData[i]['CRCbyte'] != _calcChecksum_connStruct(lidarData[i])):
-        #         print("lidarData entry CRC failed!", lidarData[i])
-        #         self.DEBUG_ignoredSerialData += readBytes[(i*payloadDtype.itemsize):((i+1)*payloadDtype.itemsize)] # save the bad data for debugging
-        #     # now to remove the bad entry from the list:
-        #     lidarData = np.concatenate((lidarData[0:i], lidarData[(i+1):len(lidarData)])) # (not efficient, i know) carve entry out of array
+        deletionLoopIndex = 0
+        while(deletionLoopIndex < len(lidarData)): # checksum checking loop
+            if(lidarData[deletionLoopIndex]['CRCbyte'] != _calcChecksum_connStruct(lidarData[deletionLoopIndex])):
+                print("lidarData entry CRC failed!", lidarData[i])
+                self.DEBUG_ignoredSerialData += readBytes[(deletionLoopIndex*payloadDtype.itemsize):((deletionLoopIndex+1)*payloadDtype.itemsize)] # save the bad data for debugging
+                # now to remove the bad entry from the list:
+                lidarData = np.concatenate((lidarData[0:deletionLoopIndex], lidarData[(deletionLoopIndex+1):len(lidarData)])) # (not efficient, i know) carve entry out of array
+            else:
+                deletionLoopIndex += 1 # only advace the index if the CRC passed. If an entry was deleted, keep the index the same so it goes to the entry that has moved to that index
         return(lidarData)
     
     def requestSetMaxRange(self, carToUse, newMaxRange: int): # note: newMaxRange is in millimeters
@@ -547,18 +551,10 @@ class lidarESPserialClass(handshakeESPserial): # handles serial communication wi
         return(True)
 
 class kartMCUserialClass(handshakeESPserial): # handles communication between the kartMCU and the main PC. the PC sends desired speed & steering and the kartMCU responds with sensor data
-    correctHandshakeIdentifier = KART_MCU_HANDSHAKE_IDENTIFIER # static property
+    correctHandshakeIdentifier = KART_MCU_HANDSHAKE_IDENTIFIER # static property (overwrite handshakeESPserial's static property, as intended)
     def __init__(self, clockFunc=time.time):
         handshakeESPserial.__init__(self)
         self.clockFunc = clockFunc
-
-    @property
-    def _handshakeIdentifierCheck(self):
-        """just a macro to make things sightly more legible (given the long-ass variable names and whatnot)"""
-        return(self.handshakeReceivedIdentifier == self.correctHandshakeIdentifier)
-    @property
-    def is_ready(self):
-        return(self.handshake_done and self._handshakeIdentifierCheck)
     
     def doHandshake(self, timeout=1.0, resetESP=False, printDebug=True):
         self.handshake_done = False
@@ -613,7 +609,7 @@ class kartMCUserialClass(handshakeESPserial): # handles communication between th
             return(None)
         return(packet)
     
-    def _requestPacket(self, requestToSend, carToUse, requestCMD): # set request payload before using this function
+    def _requestPacket(self, requestToSend: LIDARconnRequest, carToUse, requestCMD: int): # set request payload before using this function
         if(not self.is_open):
             print("can't _requestPacket(), serial port is not open!")
             return()
@@ -634,7 +630,7 @@ class kartMCUserialClass(handshakeESPserial): # handles communication between th
         packet = self._recvPacket(raw)
         return(packet)
     
-    def requestSetSteeringEnable(self, carToUse, enabled): # note: carToUse is either a Map.Car object (thijs sim) or a car.py Car object (alex sim). the values .position and .angle have the same name in both
+    def requestSetSteeringEnable(self, carToUse, enabled: bool): # note: carToUse is either a Map.Car object (thijs sim) or a car.py Car object (alex sim). the values .position and .angle have the same name in both
         if(not self.is_open):
             print("can't requestKartData(), serial port is not open!")
             return(None)
@@ -644,7 +640,7 @@ class kartMCUserialClass(handshakeESPserial): # handles communication between th
         # packet = self._recvPacket()
         # return(packet)
 
-    def requestSetPedalPassthroughEnable(self, carToUse, enabled): # note: carToUse is either a Map.Car object (thijs sim) or a car.py Car object (alex sim). the values .position and .angle have the same name in both
+    def requestSetPedalPassthroughEnable(self, carToUse, enabled: bool): # note: carToUse is either a Map.Car object (thijs sim) or a car.py Car object (alex sim). the values .position and .angle have the same name in both
         if(not self.is_open):
             print("can't requestKartData(), serial port is not open!")
             return(None)
@@ -654,9 +650,21 @@ class kartMCUserialClass(handshakeESPserial): # handles communication between th
         # packet = self._recvPacket()
         # return(packet)
 
-def shuffleSerials(serialHandlers):
-    orderArray = []
-    ## TODO!
+def shuffleSerials(serialHandlers: list):
+    ## TODO: think of the (most efficient?) way to shuffle arbetrary handshakeESPserial-derived objects.
+    for i in range(len(serialHandlers)):
+        if(not serialHandlers[i]._handshakeIdentifierCheck()): # if the serialHandler in question found the wrong 
+            for j in range(i+1, len(serialHandlers)):
+                if(serialHandlers[j].handshakeReceivedIdentifier == serialHandlers[i].correctHandshakeIdentifier):
+                    serialHandlers[i].switchSerials(serialHandlers[j]) # switch serials, so serialHandlers[i] has the correct serial. (serialHandlers[j] may still have the wrong)
+                    break # break the second forloop
+    ## at the end of the shuffle, check if all objects pass the _handshakeIdentifierCheck()
+    allGood = True
+    for i in range(len(serialHandlers)):
+        if(not serialHandlers[i]._handshakeIdentifierCheck()): # if a serialHandler is STILL wrong (even after shuffling)
+            allGood = False
+            print("shuffleSerials() not all good:", i, serialHandlers[i])
+    return(allGood)
 
 
 if __name__ == '__main__':
@@ -664,62 +672,32 @@ if __name__ == '__main__':
     startTime = time.time()
     clockFunc = lambda : (time.time() - startTime)
     printConnectionDebug = True # so you dont have to change it for all the functions below
+    printResults = True
 
-    # ## lidar only test (with logging):
-    # try:
-    #     test = lidarESPserialClass(clockFunc=clockFunc, identifierIndex=0)
-    #     test.connect(comPort=None, autoFind=True, tryAny=False, printDebug=printConnectionDebug)
-    #     test.doHandshakeIndef(resetESP=True, printDebug=True)
-    #     if(test.is_ready):
-    #         class tempCarClass:
-    #             position = np.array([0.0, 0.0])
-    #             angle = 0.0
-    #         tempCar = tempCarClass()
-    #         print("conn test success:", test.requestSetMaxRange(tempCar, 1000))
-    #         if(test.is_ready):
-    #             from log.HWserialConnLogging import LIDARserialLogger
-    #             lidarLogger = LIDARserialLogger()
-    #             while(True):
-    #                 test.DEBUG_checkIgnoredSerialData()
-    #                 lidarData = test.requestLidarData(tempCar)
-    #                 print("test requestLidarData:", lidarData)
-    #                 for conePos in lidarData: # lidarData is always an array, but sometimes empty (if requestLidarData failed)
-    #                     lidarLogger.logConePos(conePos)
-    #                 time.sleep(0.02) # 20ms == 50Hz == probably enough to keep up
-    #         test.DEBUG_checkIgnoredSerialData()
-    # finally:
-    #     print("newSerialComTest ending")
-    #     try:
-    #         test.disconnect()
-    #         print("serial close success:", not test.is_open)
-    #     except Exception as excep:
-    #         print("couldn't disconnect serial:", excep)
-    
-    ## kartMCU only test (with logging):
+    ## lidar only test (with logging):
     try:
-        test = kartMCUserialClass(clockFunc=clockFunc)
+        test = lidarESPserialClass(clockFunc=clockFunc, identifierIndex=0)
         test.connect(comPort=None, autoFind=True, tryAny=False, printDebug=printConnectionDebug)
         test.doHandshakeIndef(resetESP=True, printDebug=True)
         if(test.is_ready):
             class tempCarClass:
-                desired_steering = 0.0
-                desired_steering_raw = 0
-                desired_velocity = 0.0
+                position = np.array([0.0, 0.0])
+                angle = 0.0
             tempCar = tempCarClass()
-            test.requestSetSteeringEnable(tempCar, False)
-            test.requestSetPedalPassthroughEnable(tempCar, True)
+            print("conn test success:", test.requestSetMaxRange(tempCar, 1000))
             if(test.is_ready):
-                from log.HWserialConnLogging import kartMCUserialLogger
-                kartMCULogger = kartMCUserialLogger()
+                from log.HWserialConnLogging import LIDARserialLogger
+                lidarLogger = LIDARserialLogger()
+                if(not printResults):
+                    print("(not gonna print results)")
                 while(True):
                     test.DEBUG_checkIgnoredSerialData()
-                    # regularPacket = test.requestKartData(tempCar)
-                    rawPacket = test.requestKartData(tempCar, True)
-                    # print("test requestKartData:", regularPacket)
-                    print("test requestKartData raw:", rawPacket)
-                    if(rawPacket is not None):
-                        kartMCULogger.logPacket(rawPacket, clockFunc())
-                    time.sleep(0.01) # 10ms == 100Hz == plenty
+                    lidarData = test.requestLidarData(tempCar)
+                    if(printResults):
+                        print("test requestLidarData:", lidarData)
+                    for conePos in lidarData: # lidarData is always an array, but sometimes empty (if requestLidarData failed)
+                        lidarLogger.logConePos(conePos)
+                    time.sleep(0.02) # 20ms == 50Hz == probably enough to keep up
             test.DEBUG_checkIgnoredSerialData()
     finally:
         print("newSerialComTest ending")
@@ -728,10 +706,47 @@ if __name__ == '__main__':
             print("serial close success:", not test.is_open)
         except Exception as excep:
             print("couldn't disconnect serial:", excep)
-        try:
-            kartMCULogger.close()
-        except Exception as excep:
-            print("couldn't close kartMCULogger:", excep)
+    
+    # ## kartMCU only test (with logging):
+    # try:
+    #     test = kartMCUserialClass(clockFunc=clockFunc)
+    #     test.connect(comPort=None, autoFind=True, tryAny=False, printDebug=printConnectionDebug)
+    #     test.doHandshakeIndef(resetESP=True, printDebug=True)
+    #     if(test.is_ready):
+    #         class tempCarClass:
+    #             desired_steering = 0.0
+    #             desired_steering_raw = 0
+    #             desired_velocity = 0.0
+    #         tempCar = tempCarClass()
+    #         test.requestSetSteeringEnable(tempCar, False) # disable steering (so a human can steer the kart)
+    #         test.requestSetPedalPassthroughEnable(tempCar, True) # enable throttle pedal (so a human can drive the kart)
+    #         if(test.is_ready):
+    #             from log.HWserialConnLogging import kartMCUserialLogger
+    #             kartMCULogger = kartMCUserialLogger()
+    #             if(not printResults):
+    #                 print("(not gonna print results)")
+    #             while(True):
+    #                 test.DEBUG_checkIgnoredSerialData()
+    #                 # regularPacket = test.requestKartData(tempCar)
+    #                 rawPacket = test.requestKartData(tempCar, True)
+    #                 if(printResults):
+    #                     # print("test requestKartData:", regularPacket)
+    #                     print("test requestKartData raw:", rawPacket)
+    #                 if(rawPacket is not None):
+    #                     kartMCULogger.logPacket(rawPacket, clockFunc())
+    #                 time.sleep(0.01) # 10ms == 100Hz == plenty
+    #         test.DEBUG_checkIgnoredSerialData()
+    # finally:
+    #     print("newSerialComTest ending")
+    #     try:
+    #         test.disconnect()
+    #         print("serial close success:", not test.is_open)
+    #     except Exception as excep:
+    #         print("couldn't disconnect serial:", excep)
+    #     try:
+    #         kartMCULogger.close()
+    #     except Exception as excep:
+    #         print("couldn't close kartMCULogger:", excep)
 
     # ## lidar and kartMCU test:
     # try:
