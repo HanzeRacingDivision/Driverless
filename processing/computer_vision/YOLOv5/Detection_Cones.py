@@ -178,7 +178,7 @@ class DetectionMoule:
         startTime = time.monotonic()
         counter = 0
         fps = 0
-        color = (255, 255, 255)
+        color = (0, 255, 0)
         printOutputLayersOnce = True
 
         out = cv2.VideoWriter(
@@ -278,7 +278,7 @@ class DetectionMoule:
                         data = json.load(file)
                         data.append(dict)
                         file.seek(0)
-                        json.dumps(data, file)
+                        json.dump(data, file)
 
                     print(Top_Left_Point)
                     print(Top_Right_Point)
