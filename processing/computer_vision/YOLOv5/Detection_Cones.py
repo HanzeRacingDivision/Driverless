@@ -15,7 +15,7 @@ Type = {
 }
 
 
-class DetectionMoule:
+class DetectionModule:
 
     file = "detection.json"
 
@@ -28,6 +28,7 @@ class DetectionMoule:
     # Get argument first
     #nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/custom_model.blob"
     nnBlobPath = "416_half_shave.blob"
+    #nnBlobPath = "C:/Users/micha/Documents/GitHub/Car_Simulation/processing/computer_vision/YOLOv5/416_half_shave.blob"
 
     if not Path(nnBlobPath).exists():
         import sys

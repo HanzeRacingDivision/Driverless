@@ -6,11 +6,14 @@ from constants import *
 
 from CarEnv import CarEnv
 from cone import *
+import json
+
 
 # encoders and lidars
 import GF.generalFunctionsNoNumba as GF #(homemade) some useful functions for everyday ease of use
 from log.HWserialConnLogging import kartMCUserialLogger
 from HWserialConn import *
+# from processing.computer_vision.YOLOv5.Detection_Cones import DetectionModule
 
 
 def disc_to_cont(action):
@@ -51,7 +54,6 @@ class RealCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
             self.doHandshakeIndef(resetESP=True, printDebug=True)
             self.requestSetSteeringEnable(self, False)
             self.requestSetPedalPassthroughEnable(self, True)
-            #self.setSteeringEnable(True)
 
         # self.desired_steering_raw = np.int32(0) # see the @property for this value
         self.lastEncoderVals = [0, 0, 0, 0]
@@ -189,13 +191,13 @@ def init_lidar(port):
     return lidar
 
 
-def match_cones(no_label_no_color, previous):
-    initial_size = len(no_label_no_color)
+def match_cones(no_color, previous):
+    initial_size = len(no_color)
     matched = []
     counter = 0
     for category in Side:
         for cone in previous[category]:
-            for to_match in no_label_no_color:
+            for to_match in no_color:
                 if (cone.position.x - to_match.position.x)**2 + (cone.position.y - to_match.position.y)**2 < DISTANCE_TO_MATCH**2:
                     to_match.category = cone.category
                     to_match.id = cone.id
@@ -204,11 +206,11 @@ def match_cones(no_label_no_color, previous):
                     cone.position.y = to_match.position.y
 
                     matched.append(to_match)
-                    no_label_no_color.remove(to_match)
+                    no_color.remove(to_match)
                     counter += 1
 
     print("Perceived:", initial_size , "Matched:", counter)
-    return matched, no_label_no_color
+    return matched, no_color
 
 
 def add_new_ids(left_over_cones, current_highest_id):
@@ -218,6 +220,32 @@ def add_new_ids(left_over_cones, current_highest_id):
         cone.id = current_highest_id
         observation_with_ids.append(cone)
     return observation_with_ids
+
+
+def collect_cones_from_camera(camera, car_position):
+    perceived_cones = []
+    f = open("C:/Users/micha/Documents/GitHub/Car_Simulation/processing/computer_vision/YOLOv5/detection.json")
+    data = json.load(f)
+    for cone_data in data:
+        x = data["X"]
+        y = data["Z"]
+        label = data["Label"]
+        # rotate
+        phi = car.angle
+        x, y = x * np.cos(phi) - y * np.sin(phi), x * np.cos(phi) - y * np.sin(phi)
+        # add car x and y coordinates
+        x += car_position[0]
+        y += car_position[1]
+        # add to the array
+        if label == "Yellow":
+            label = Side.LEFT
+        else:
+            label = Side.RIGHT
+        print(x, y, label)
+        cone = Cone(x, y, label, None)
+        perceived_cones.append(cone)
+    json.dump("[]", f, indent=4, sort_keys=True)
+    return perceived_cones
 
 
 if __name__ == "__main__":
@@ -237,6 +265,11 @@ if __name__ == "__main__":
     episodes = 1
 
     car = RealCar(time.time)
+
+    # if COLLECT_CAMERA_DATA:
+    #     camera = DetectionModule()
+    # else:
+    #     camera = None
 
     if COLLECT_LIDAR_DATA:
         lidar = init_lidar(car.comPort)
@@ -272,21 +305,28 @@ if __name__ == "__main__":
                 # send the desired steering data
                 # read the encoders
                 # update its position using those encoders
-            car.update()
-            # retrieve the position from Thijs' car and update the environment
-            env.pp.car.position.x = car.position[0]
-            env.pp.car.position.y = -car.position[1]
-            env.pp.car.true_position.x = car.position[0]
-            env.pp.car.true_position.y = -car.position[1]
-            env.pp.car.true_angle = -np.rad2deg(car.angle)
-            env.pp.car.angle = -np.rad2deg(car.angle)
+            if COLLECT_STEERING_DATA:
+                car.update()
+                # retrieve the position from Thijs' car and update the environment
+                env.pp.car.position.x = car.position[0]
+                env.pp.car.position.y = -car.position[1]
+                env.pp.car.true_position.x = car.position[0]
+                env.pp.car.true_position.y = -car.position[1]
+                env.pp.car.true_angle = -np.rad2deg(car.angle)
+                env.pp.car.angle = -np.rad2deg(car.angle)
+
+            if COLLECT_CAMERA_DATA:
+                collected_cones = collect_cones_from_camera(env.pp.car.position)
+                matched_cones, leftover_cones = match_cones(collected_cones, env.pp.cones.visible)
+                current_highest_cone_id = len(env.pp.cones.list[Side.LEFT]) + len(env.pp.cones.list[Side.RIGHT])
+                new_cones = add_new_ids(leftover_cones, current_highest_cone_id)
 
             if COLLECT_LIDAR_DATA:
-                cones_no_label_no_color = collect_cones_from_lidar(lidar, car, env.pp.car.position)
-                matched_cones, leftover_cones = match_cones(cones_no_label_no_color, env.pp.cones.visible)
-                # TODO: Match new cones with camera data to get labels
-                #leftover_cones = give_cones_color(leftover_cones)
+                cones_no_color = collect_cones_from_lidar(lidar, car, env.pp.car.position)
+                matched_cones, leftover_cones = match_cones(cones_no_color, env.pp.cones.visible)
                 current_highest_cone_id = len(env.pp.cones.list[Side.LEFT]) + len(env.pp.cones.list[Side.RIGHT])
+                # TODO: Match new cones with camera data to get labels
+                # new_cones = add_color_and_add_ids_to_cones(leftover_cones, current_highest_cone_id)
                 new_cones = add_new_ids(leftover_cones, current_highest_cone_id)
 
                 # Add new cones to the simulation environment
@@ -297,6 +337,8 @@ if __name__ == "__main__":
                 #     for cone in env.pp.cones.visible[category]:
                 #         print(cone.position)
 
+            # Run SLAM and all the other epic stuff
+            # observation, reward, done, info = env.step(action)
             env.render()
 
             if done:

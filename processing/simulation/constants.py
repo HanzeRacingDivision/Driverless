@@ -16,14 +16,15 @@ MODE = "race"
 # "race": one lap slam and midpoint method, then agent without SLAM
 # "testing": everything else :)
 STEERING_METHOD = "autonomous"  # "user"/"autonomous"
-BLANK_MAP = True  # use blank map at the start
+BLANK_MAP = False  # use blank map at the start
 EPISODE_TIME_LIMIT = 100
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 PIXELS_PER_UNIT = 32
 LOGGING = False  # True/False switch for logging information from the simulation
-COLLECT_STEERING_DATA = True  # True/False switch to get data from the encoders
-COLLECT_LIDAR_DATA = True  # True/False for trying to get data from the LiDAR
+COLLECT_STEERING_DATA = False  # True/False switch to get data from the encoders
+COLLECT_LIDAR_DATA = False  # True/False for trying to get data from the LiDAR
+COLLECT_CAMERA_DATA = False
 
 # Clock
 CLOCK_SPEED = 1
