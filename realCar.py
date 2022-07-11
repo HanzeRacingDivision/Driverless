@@ -85,14 +85,9 @@ class realCar(Map.Car, kartMCUserialClass, kartMCUserialLogger):
             angular_velocity = self.velocity/turning_radius
             arcMov = angular_velocity * dTime
             
-            #one way to do it
-            # turning_center = GF.distAnglePosToPos(turning_radius, self.angle+(np.pi/2), self.position) #get point around which car turns
-            # newPosition = GF.distAnglePosToPos(turning_radius, self.angle+arcMov-(np.pi/2), turning_center)      #the car has traveled a a certain distancec (velocity*dt) along the circumference of the turning circle, that arc is arcMov radians long
-            
-            #another way of doing it
             forwardMov = np.sin(arcMov)*turning_radius #sin(arc)*turning radius = movement paralel with (old) carAngle
-            lateralMov = turning_radius - (np.cos(arcMov)*turning_radius) #sin(arc)*turning radius = movement perpendicular to (old) carAngle
-            movAngle = np.arctan2(lateralMov, forwardMov) #
+            lateralMov = turning_radius - (np.cos(arcMov)*turning_radius) #cos(arc)*turning radius = movement perpendicular to (old) carAngle
+            movAngle = np.arctan2(lateralMov, forwardMov)
             diagonalMov = forwardMov/np.cos(movAngle) #the length of a line between the start of the arc and the end of the arc
             newPosition = GF.distAnglePosToPos(diagonalMov, self.angle+movAngle, self.position)
             # newPosition[0] = self.position[0] + diagonalMov * np.cos(self.angle+movAngle) #same as using distAnglePosToPos

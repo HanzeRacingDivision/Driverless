@@ -12,7 +12,7 @@ import GF.generalFunctions as GF #(homemade) some useful functions for everyday 
 SIMULATE_SAMPLING = True # simulate the whole process of sampling points on the surface of the cone (slightly more realistic data)
 
 RANGE_LIMIT = 6.0 # (meters) lidar range limit
-ANGLE_LIMITS = np.deg2rad(np.array([[-179, 179], [-179, 179]])) # angle limits (for each lidar). The kart itself is in the way of a certain portion of the lidar's FOV
+ANGLE_LIMITS = np.deg2rad(np.array([[-95, 95], [-179, 179]])) # angle limits (for each lidar). The kart itself is in the way of a certain portion of the lidar's FOV
 
 ## for SIMULATE_SAMPLING == False
 STD_DEV_LIDAR_POS_ERROR = 1.0/1000 # (in meters)
