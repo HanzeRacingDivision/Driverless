@@ -24,7 +24,7 @@ PIXELS_PER_UNIT = 32
 LOGGING = False  # True/False switch for logging information from the simulation
 COLLECT_STEERING_DATA = False  # True/False switch to get data from the encoders
 COLLECT_LIDAR_DATA = False  # True/False for trying to get data from the LiDAR
-COLLECT_CAMERA_DATA = False
+COLLECT_CAMERA_DATA = True
 
 # Clock
 CLOCK_SPEED = 1

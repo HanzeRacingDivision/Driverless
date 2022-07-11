@@ -13,7 +13,7 @@ import json
 import GF.generalFunctionsNoNumba as GF #(homemade) some useful functions for everyday ease of use
 from log.HWserialConnLogging import kartMCUserialLogger
 from HWserialConn import *
-# from processing.computer_vision.YOLOv5.Detection_Cones import DetectionModule
+from processing.computer_vision.YOLOv5.Detection_Cones import *
 
 
 def disc_to_cont(action):
@@ -222,29 +222,36 @@ def add_new_ids(left_over_cones, current_highest_id):
     return observation_with_ids
 
 
-def collect_cones_from_camera(camera, car_position):
+def collect_cones_from_camera(cone_data, car_position):
     perceived_cones = []
-    f = open("C:/Users/micha/Documents/GitHub/Car_Simulation/processing/computer_vision/YOLOv5/detection.json")
-    data = json.load(f)
-    for cone_data in data:
-        x = data["X"]
-        y = data["Z"]
-        label = data["Label"]
-        # rotate
-        phi = car.angle
-        x, y = x * np.cos(phi) - y * np.sin(phi), x * np.cos(phi) - y * np.sin(phi)
-        # add car x and y coordinates
-        x += car_position[0]
-        y += car_position[1]
-        # add to the array
-        if label == "Yellow":
-            label = Side.LEFT
-        else:
-            label = Side.RIGHT
-        print(x, y, label)
-        cone = Cone(x, y, label, None)
-        perceived_cones.append(cone)
-    json.dump("[]", f, indent=4, sort_keys=True)
+    #f = open("C:/Users/micha/Documents/GitHub/Car_Simulation/processing/computer_vision/YOLOv5/detection.json")
+    #data = json.load(f)
+
+    #for cone_data in data:
+    #print(cone_data.get("label"))
+    label = cone_data[2]
+    if label == "Yellow":
+        label = Side.LEFT
+    else:
+        label = Side.RIGHT
+    x = cone_data[0]/1000
+    y = cone_data[1]/1000
+
+    # rotate
+    phi = car.angle
+    x, y = x * np.cos(phi) - y * np.sin(phi), x * np.cos(phi) - y * np.sin(phi)
+    # add car x and y coordinates
+    x += car_position.x
+    y += car_position.y
+    # add to the array
+    print(x, y, label)
+    cone = Cone(x, y, label, None)
+    perceived_cones.append(cone)
+
+    # f = open("C:/Users/micha/Documents/GitHub/Car_Simulation/processing/computer_vision/YOLOv5/detection.json", "w")
+    # #data = json.load(f)
+    # data = []
+    # json.dump(data, f)
     return perceived_cones
 
 
@@ -266,10 +273,33 @@ if __name__ == "__main__":
 
     car = RealCar(time.time)
 
-    # if COLLECT_CAMERA_DATA:
-    #     camera = DetectionModule()
-    # else:
-    #     camera = None
+    if COLLECT_CAMERA_DATA:
+        #camera = DetectionModule()
+        camera = None
+        pipeline = start_Camera()
+
+        # Tiny yolo v3 / 4 label texts
+        labelMap = [
+            "Blue", "Yellow"
+        ]
+
+        start = time.time()
+
+        # Connect to device and start pipeline
+        device = dai.Device(pipeline)
+        # with dai.Device(pipeline) as device:
+        previewQueue = device.getOutputQueue(
+            name="rgb", maxSize=4, blocking=False)
+        detectionNNQueue = device.getOutputQueue(
+            name="detections", maxSize=4, blocking=False)
+        xoutBoundingBoxDepthMappingQueue = device.getOutputQueue(
+            name="boundingBoxDepthMapping", maxSize=4, blocking=False)
+        depthQueue = device.getOutputQueue(
+            name="depth", maxSize=4, blocking=False)
+        networkQueue = device.getOutputQueue(
+            name="nnNetwork", maxSize=4, blocking=False)
+    else:
+        camera = None
 
     if COLLECT_LIDAR_DATA:
         lidar = init_lidar(car.comPort)
@@ -316,10 +346,15 @@ if __name__ == "__main__":
                 env.pp.car.angle = -np.rad2deg(car.angle)
 
             if COLLECT_CAMERA_DATA:
-                collected_cones = collect_cones_from_camera(env.pp.car.position)
+                data = getCones(previewQueue, detectionNNQueue, depthQueue, networkQueue,
+                               xoutBoundingBoxDepthMappingQueue, labelMap, start)
+                collected_cones = collect_cones_from_camera(data, env.pp.car.position)
                 matched_cones, leftover_cones = match_cones(collected_cones, env.pp.cones.visible)
                 current_highest_cone_id = len(env.pp.cones.list[Side.LEFT]) + len(env.pp.cones.list[Side.RIGHT])
                 new_cones = add_new_ids(leftover_cones, current_highest_cone_id)
+
+                for new in new_cones:
+                    env.pp.cones.visible[new.category].append(new)
 
             if COLLECT_LIDAR_DATA:
                 cones_no_color = collect_cones_from_lidar(lidar, car, env.pp.car.position)
