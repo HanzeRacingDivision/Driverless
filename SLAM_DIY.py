@@ -120,7 +120,7 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
     blobList = [] # may be filled with only None objects, depending on the contents of the landmarkLists
     newCones = []
     for i in range(len(lidarLandmarks)):
-        measurementPos, blob = lidarLandmarks[i]
+        measurementPos = lidarLandmarks[i][0];   blob = lidarLandmarks[i][1]
         overlapsCone, overlappingCone = mapToUse.overlapConeCheck(measurementPos)
         if(overlapsCone):
             

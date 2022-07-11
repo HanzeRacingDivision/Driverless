@@ -36,7 +36,7 @@ class Map:
         chassis_length = 1.56 # (meters) distance bumper to bumper (for drawing/colision-detection)
         chassis_width = 1.06 # (meters) car chassis width ('skirt to skirt', one might say). NOT distance between wheel centers
         chassis_center_offset = (wheelbase/2) + 0.0 # (meters) car pos (rear axle center) + this = chassis center (mostly used for drawing)
-        lidarOffsets = (np.array([1.26, 0.0, 0.115]), ) # the positions of the lidars, as ((forward offset, perpendicular offset, height), for all lidars) from the car position (not chassis center)
+        lidarOffsets = (np.array([1.26, 0.0, 0.115]), np.array([-0.27, 0.0, 0.10])) # the positions of the lidars, as ((forward offset, perpendicular offset, height), for all lidars) from the car position (not chassis center)
         cameraOffset = {"pos" : np.array([0.12, 0.0, 1.1]), "tilt" : 0.0} # the position of the camera where pos=(forward offset, perpendicular offset, height), positive tilt means looking upwards
         cameraFOV = np.deg2rad(np.array([69, 55])) # camera Field-Of-View as (horizontal, vertical) in radians
         
@@ -136,7 +136,7 @@ class Map:
         """ a small class to hold all pertinent information about boundry cones (like position, left-or-right-ness, whether it's part of the finish line, etc) """
         coneDiam = 0.2 #cone diameter in meters (constant) (NOTE: no longer used by lidar math, mostly for drawing)
         conePeakHeight = (0.135*0.220)/0.124 + 0.024 # NOTE: not the height of the cone, but rather the height the cone WOULD HAVE reached, were it's peak actually sharp
-        coneLidarDiam = lambda height : ((-0.124/0.220)*(height-0.024) + Map.Cone.conePeakHeight)
+        coneLidarDiam = lambda height : ((-0.124/0.220)*(height-0.024) + 0.135)
         defaultOverlapTolerance = 3.0 # multiple of coneDiam in all directions (radius, but square)
         ## cone connection spacing is set in coneConnecting.py
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):

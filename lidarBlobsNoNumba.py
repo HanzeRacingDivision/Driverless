@@ -11,13 +11,11 @@ blobInProgress = None
 #whenever a point is added, new end angle = max(current end angle, new point angle)
 #the average point is just the average value of the list of points
 
-adjustedConeDiam = Map.Cone.coneLidarDiam
-
 maxBlobPointCount = 30 #points, not angle
 #maxBlobAverageGapSizeSqrd = 0.075**2 #if the average distance between points is larger than this, only applied if pointCount >= maxBlobAverageGapPoints
 #maxBlobAverageGapPoints = 3 #number of points in blob required to activate maxBlobAverageGapSizeSqrd check
-maxBlobSingleGap = adjustedConeDiam * 0.75 #if the distance between the new datapoint and the last blob-point is larger than this, don't append, (make a new blob)
-## maxBlobSingleGap must equal adjustedConeDiam, because otherwise the np.arcsin() in blobToConePos() will fail to compute.
+maxBlobSingleGap = Map.Cone.coneDiam * 0.5 #if the distance between the new datapoint and the last blob-point is larger than this, don't append, (make a new blob)
+## maxBlobSingleGap must equal at least Map.Cone.coneDiam, because otherwise the np.arcsin() in blobToConePos() will fail to compute.
 
 MIN_BLOB_CONE_LEN = 4 #used for blobToConePos
 
@@ -84,7 +82,7 @@ def blobify(point, origin, timestamp, uponExist=None, uponExistArgs=None, uponEx
     return(makeNewBlob, blobInProgress)
 
 #@njit
-def blobToConePos(blob): #calculate the position the cone would have over here, to save some processing time on the main thread
+def blobToConePos(blob, coneDiam): #calculate the position the cone would have over here, to save some processing time on the main thread
     """estimates the (center) position of a cone based on the LiDAR measurements of its surface"""
     if(blob['pointCount'] < MIN_BLOB_CONE_LEN):
         #print("warning: blob too few points to make into cone")
@@ -97,17 +95,19 @@ def blobToConePos(blob): #calculate the position the cone would have over here, 
         #     perpAdd = -perpAdd
         #     print("warning: lidar measurement not simply CW?")
         for i in range(blob['pointCount']-1):
+            coneRadius = coneDiam / 2
             ## the indirect way:
-            # superAdjustedConeRadius = np.cos(np.arcsin((blob['lines'][i][0]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
+            # superAdjustedConeRadius = np.cos(np.arcsin((blob['lines'][i][0]/2) / coneRadius) * coneRadius
             # lineCenter = GF.distAnglePosToPos(blob['lines'][i][0]/2, blob['lines'][i][1], blob['points'][i])
             # conePos = GF.distAnglePosToPos(superAdjustedConeRadius, blob['lines'][i][1] + perpAdd, lineCenter)
             ## the direct way:
-            conePos = GF.distAnglePosToPos((adjustedConeDiam/2), blob['lines'][i][1] + perpAdd - np.arcsin(blob['lines'][i][0] / adjustedConeDiam), blob['points'][i]) # alt version (untested)
+
+            conePos = GF.distAnglePosToPos(coneRadius, blob['lines'][i][1] + perpAdd - np.arcsin(blob['lines'][i][0] / coneDiam), blob['points'][i]) # alt version (untested)
             coneCenterPos[0][i] = conePos[0];   coneCenterPos[1][i] = conePos[1]
         conePos = np.array([GF.average(coneCenterPos[0]), GF.average(coneCenterPos[1])], dtype=np.float64)
         return(True, conePos)
     else:
-        conePos = GF.distAnglePosToPos(adjustedConeDiam, GF.get_norm_angle_between(blob['origins'][0], blob['points'][0], 0.0), blob['points'][0])
+        conePos = GF.distAnglePosToPos(coneRadius, GF.get_norm_angle_between(blob['origins'][0], blob['points'][0], 0.0), blob['points'][0])
         return(True, conePos)
 
 # def compileAll(verbose=False):

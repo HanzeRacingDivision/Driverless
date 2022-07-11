@@ -12,7 +12,7 @@ import GF.generalFunctions as GF #(homemade) some useful functions for everyday 
 SIMULATE_SAMPLING = True # simulate the whole process of sampling points on the surface of the cone (slightly more realistic data)
 
 RANGE_LIMIT = 6.0 # (meters) lidar range limit
-ANGLE_LIMITS = np.deg2rad(np.array([[-95, 95], [-179, 179]])) # angle limits (for each lidar). The kart itself is in the way of a certain portion of the lidar's FOV
+ANGLE_LIMITS = np.deg2rad(np.array([[-95, 95], [80, -80]])) # angle limits (for each lidar). The kart itself is in the way of a certain portion of the lidar's FOV
 
 ## for SIMULATE_SAMPLING == False
 STD_DEV_LIDAR_POS_ERROR = 1.0/1000 # (in meters)
@@ -22,16 +22,13 @@ STD_DEV_LIDAR_MEASUREMENT_ERROR = 1.0/1000 # (in meters) std dev of error in ind
 
 if(SIMULATE_SAMPLING):
     import lidarBlobsNoNumba as LB
-    LIDAR_SURFACE_REFLECTION_ARC = np.deg2rad(90) # at some point, the surface is insufficiently perpendicular to correctly reflect the laser
-    ## the quick-n-dirty way:
-    # DATAPOINTS_PER_DISTANCE_NUMERATOR = 3.6 * (Map.Cone.coneLidarDiam / (Map.Cone.coneDiam/2))
-    # LIDAR_SAMPLES_AT_DIST = lambda dist : int(DATAPOINTS_PER_DISTANCE_NUMERATOR / dist) # not very accurate, but gives an approximate curve
     ## the accurate way: (see 'lidar resolution vs range calculator.xlsx' for explanatory diagram)
+    LIDAR_SURFACE_REFLECTION_ARC = np.deg2rad(90) # at some point, the surface is insufficiently perpendicular to correctly reflect the laser
     LIDAR_SAMPLERATE = 7500 # (Hz) lidar samples per second
     LIDAR_ROTATIONS_PER_SECOND = 5 # (Hz) lidar full rotations per second (5 RPS == 300 RPM)
     LIDAR_ANGULAR_RESOLUTION = (LIDAR_ROTATIONS_PER_SECOND * 2 * np.pi) / LIDAR_SAMPLERATE # radians between samples
-    LIDAR_REFLECTION_ARC_RATIO = (Map.Cone.coneLidarDiam/2) * np.sin(LIDAR_SURFACE_REFLECTION_ARC/2)
-    LIDAR_SAMPLES_AT_DIST = lambda dist : int((2 * np.arcsin(LIDAR_REFLECTION_ARC_RATIO / dist)) / LIDAR_ANGULAR_RESOLUTION)
+    LIDAR_REFLECTION_ARC_RATIO = lambda coneDiam : ((coneDiam/2) * np.sin(LIDAR_SURFACE_REFLECTION_ARC/2))
+    LIDAR_SAMPLES_AT_DIST = lambda dist, coneDiam : int((2 * np.arcsin(LIDAR_REFLECTION_ARC_RATIO(coneDiam) / dist)) / LIDAR_ANGULAR_RESOLUTION)
 
     # RANGE_LIMIT = min(RANGE_LIMIT, LIDAR_REFLECTION_ARC_RATIO / np.sin(LB.MIN_BLOB_CONE_LEN*LIDAR_ANGULAR_RESOLUTION/2)) # recalculate true max range based on the parameters above. NOTE: comment this to overwrite
     # print("simulatedLidar RANGE_LIMIT:", RANGE_LIMIT)
@@ -51,6 +48,7 @@ def getCones(mapToUse: Map):
     rightNow = mapToUse.clock()
     returnList = []
     for lidarIndex in range(len(mapToUse.car.lidarOffsets)):
+        returnList.append([]) # initialize an empy array (for each lidar)
         simVariables = mapToUse.simVars.lidarSimVars[lidarIndex]
         timeSinceLastSampling = rightNow - simVariables.lidarLastSampleTimestamp
         prevLidarAngle = simVariables.lidarSimulatedAngle
@@ -62,6 +60,7 @@ def getCones(mapToUse: Map):
         nearbyConeList = None;    simVarsLidarPos = None # init vars
         regularLidarPos = mapToUse.car.calcLidarPos(lidarIndex) # fallback value, in case simVars.car is None (and an initialzation of the variable)
         detectionAngleLimits = ANGLE_LIMITS[lidarIndex] + mapToUse.car.angle # (numpy matrix addition) fallback value, in case simVars.car is None (and an initialzation of the variable)
+        coneDiam = Map.Cone.coneLidarDiam(mapToUse.car.lidarOffsets[lidarIndex][2]) # calculate cone diameter at the height of this lidar
         coneLists = mapToUse.cone_lists[False] + mapToUse.cone_lists[True] # fallback value, in case simVars is None (and an initialzation of the variable)
         if(mapToUse.simVars.undiscoveredCones or ((len(mapToUse.simVars.cone_lists[False]) + len(mapToUse.simVars.cone_lists[True])) > 0)): # undiscoveredCones is also used by UI stuff, so may not be entirely helpful
             coneLists = mapToUse.simVars.cone_lists[False] + mapToUse.simVars.cone_lists[True]
@@ -82,7 +81,6 @@ def getCones(mapToUse: Map):
                 continue # skip this lidar's update entirely
         nearbyConeList = mapToUse.distanceToCone((simVarsLidarPos if (mapToUse.simVars.car is not None) else regularLidarPos), coneLists, sortBySomething='SORTBY_ANGL', simpleThreshold=RANGE_LIMIT, angleThreshRange=detectionAngleLimits)
         
-        returnList.append([]) # initialize an empy array (for each lidar)
         for i in range(len(nearbyConeList)):
             cone, _ = nearbyConeList[i] # just makes things more legible
 
@@ -93,7 +91,7 @@ def getCones(mapToUse: Map):
                 distAngle[1] += mapToUse.car.angle - mapToUse.simVars.car.angle # now distAngle holds the 'measured' distance and angle
                 conePos = GF.distAnglePosToPos(distAngle[0], distAngle[1], regularLidarPos) # apply true (what the real lidar would measure) dist&angle data to the believed (drifted) car pos&angle.
             
-            outerEdgeAngleOffset = np.arctan2(Map.Cone.coneLidarDiam/2, distAngle[0]) # (draw it out, it's not complicated.) the angle between the center and outer edge of the cone at this distance
+            outerEdgeAngleOffset = np.arctan2(coneDiam/2, distAngle[0]) # (draw it out, it's not complicated.) the angle between the center and outer edge of the cone at this distance
             outerEdgeAngles = [distAngle[1] - outerEdgeAngleOffset, distAngle[1] + outerEdgeAngleOffset]
             nearbyConeList[i].append(outerEdgeAngles)
             obscured = False
@@ -112,16 +110,15 @@ def getCones(mapToUse: Map):
             if(not obscured): # if the cone would be visible to the lidar
                 if(SIMULATE_SAMPLING):
                     # print("simulatedLidar.SIMULATE_SAMPLING is TBD!")
-                    adjustedConeDiam = Map.Cone.coneLidarDiam # cone diameter (at the height of the lidar!)
                     lidarPoints = LB.MIN_BLOB_CONE_LEN #init var
                     if(distAngle[0] > 0.1): # avoid divide by zero, and generally approaching unreasonable numbers
-                        lidarPoints = max(LIDAR_SAMPLES_AT_DIST(distAngle[0]), LB.MIN_BLOB_CONE_LEN) #the number of datapoints decreases with distance
+                        lidarPoints = max(LIDAR_SAMPLES_AT_DIST(distAngle[0], coneDiam), LB.MIN_BLOB_CONE_LEN) #the number of datapoints decreases with distance
                     invCarToConeAngle = GF.radInv(distAngle[1])
                     dataPointAngles = [((-LIDAR_SURFACE_REFLECTION_ARC + ((LIDAR_SURFACE_REFLECTION_ARC/(lidarPoints-1))*i*2))+invCarToConeAngle) for i in range(lidarPoints)]
                     newBlob = None;  appendSuccess=True; #init var
                     for j in range(len(dataPointAngles)):
                         randomMeasurementError = np.random.normal() * STD_DEV_LIDAR_MEASUREMENT_ERROR #add error in a normal distribution (you could scale with dist, but whatever)
-                        pointPos = GF.distAnglePosToPos((adjustedConeDiam/2) + randomMeasurementError, dataPointAngles[j], conePos)
+                        pointPos = GF.distAnglePosToPos((coneDiam/2) + randomMeasurementError, dataPointAngles[j], conePos)
                         if(j == 0):
                             newBlob = LB.blobCreate(pointPos, mapToUse.car.position, mapToUse.clock())
                         else:
@@ -141,7 +138,7 @@ def getCones(mapToUse: Map):
             invalidConePoses = 0
             for i in range(len(nearbyConeList)):
                 if(len(nearbyConeList[i]) > 3):
-                    posIsValid, conePos = LB.blobToConePos(nearbyConeList[i][3])
+                    posIsValid, conePos = LB.blobToConePos(nearbyConeList[i][3], coneDiam)
                     if(posIsValid): #only send if the pos was successfully calculated
                         returnList[lidarIndex].append((conePos, nearbyConeList[i][3]))
                     else:

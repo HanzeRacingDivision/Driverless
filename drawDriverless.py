@@ -281,7 +281,7 @@ class pygameDrawer(pygameDrawerCommon):
                         if(drawSlamData >= 2):
                             blob = cone.slamData.blobs[-1]
                             if(blob is not None):
-                                adjustedConeDiam = Map.Cone.coneLidarDiam #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
+                                adjustedConeDiam = Map.Cone.coneLidarDiam(Map.Car.lidarOffsets[0][2]) #TBD: calculate the diamter of the cone AT THE HEIGHT OF THE LIDAR (this does not have to be done dynamically, it can be constant)
                                 for i in range(blob['pointCount']-1):
                                     superAdjustedConeRadius = np.cos(np.arcsin((blob['lines'][i][0]/2) / (adjustedConeDiam/2))) * (adjustedConeDiam/2)
                                     pygame.draw.line(self.window, invConeColor, self.realToPixelPos(blob['points'][i]), self.realToPixelPos(blob['points'][i+1]), self.coneConnectionLineWidth)
