@@ -216,16 +216,16 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
             ## in either case, simply update the overlapping cone's position
             updateExistingCone(overlappingCone, unshiftedPos, rightNow, blob)
         elif(makeNewCones): # extra check to make sure SLAM is actually allowed to make new cones
-            leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, unshiftedPos, mapToUse.car.angle) < 0.0) # (bad) lidar-only test fix: leftOrRight is taken very literally
-            # cameraMatchSuccess = False;   leftOrRight = None # init vars
-            # for cameraConePos, LorR in cameraLandmarks:
-            #     if(mapToUse._overlapConeCheck(cameraConePos, unshiftedPos)):
-            #         cameraMatchSuccess = True
-            #         leftOrRight = LorR
-            # if(cameraMatchSuccess):
-            conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
-            print("SLAM debug: adding new cone:", coneInList)
-            coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
+            # leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, unshiftedPos, mapToUse.car.angle) < 0.0) # (bad) lidar-only test fix: leftOrRight is taken very literally
+            cameraMatchSuccess = False;   leftOrRight = None # init vars
+            for cameraConePos, LorR in cameraLandmarks:
+                if(mapToUse._overlapConeCheck(cameraConePos, unshiftedPos)):
+                    cameraMatchSuccess = True
+                    leftOrRight = LorR
+            if(cameraMatchSuccess):
+                conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
+                print("SLAM debug: adding new cone:", coneInList)
+                coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
             # else:
             #     print("SLAM debug: can't add new lidar cone because there is no matching camera cone (to indicate the color)")
             #     ## coneLimbo.append(unshiftedPos) # add the lidar cone to some kind of temporary waiting list, untill the camera has found it and determined its color

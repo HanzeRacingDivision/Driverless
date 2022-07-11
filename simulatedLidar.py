@@ -78,7 +78,7 @@ def getCones(mapToUse: Map):
                 detectionAngleLimits[1] = lidarMeasuredAngleRange[1] # overwrite upper limit, but leave lower limit at the detection limit
             elif(not (GF.radRange(detectionAngleLimits[0], *lidarMeasuredAngleRange) and GF.radRange(detectionAngleLimits[1], *lidarMeasuredAngleRange))): # if the measurement encompasses the limit area, then just do nothing
                 # if the whole measurement range lies outside the limits
-                print("debug, ass", np.round(detectionAngleLimits, 3), np.round(lidarMeasuredAngleRange, 3), GF.radRange(lidarMeasuredAngleRange[0], *detectionAngleLimits), GF.radRange(lidarMeasuredAngleRange[1], *detectionAngleLimits))
+                # print("debug, ass", np.round(detectionAngleLimits, 3), np.round(lidarMeasuredAngleRange, 3), GF.radRange(lidarMeasuredAngleRange[0], *detectionAngleLimits), GF.radRange(lidarMeasuredAngleRange[1], *detectionAngleLimits))
                 continue # skip this lidar's update entirely
         nearbyConeList = mapToUse.distanceToCone((simVarsLidarPos if (mapToUse.simVars.car is not None) else regularLidarPos), coneLists, sortBySomething='SORTBY_ANGL', simpleThreshold=RANGE_LIMIT, angleThreshRange=detectionAngleLimits)
         

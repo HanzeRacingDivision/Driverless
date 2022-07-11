@@ -1,6 +1,6 @@
 # see changelog and README for explenation
 
-simulation = False
+simulation = True
 
 bufferLandmarks = True
 simulatePositionalDrift = True # (only for simulations) the sensor data for steering&velocity have some error IRL, this simulates that (used to test SLAM)
