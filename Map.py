@@ -134,9 +134,9 @@ class Map:
 
     class Cone:
         """ a small class to hold all pertinent information about boundry cones (like position, left-or-right-ness, whether it's part of the finish line, etc) """
-        coneDiam = 0.2 #cone diameter in meters (constant)
-        coneLidarDiam = 0.1 # TODO: make a little formula for this instead (requires knowing the slope)
-        conePeakHeight = 0.4 # NOTE: not the height of the cone, but rather the height the cone WOULD HAVE reached, were it's peak actually sharp
+        coneDiam = 0.2 #cone diameter in meters (constant) (NOTE: no longer used by lidar math, mostly for drawing)
+        conePeakHeight = (0.135*0.220)/0.124 + 0.024 # NOTE: not the height of the cone, but rather the height the cone WOULD HAVE reached, were it's peak actually sharp
+        coneLidarDiam = lambda height : ((-0.124/0.220)*(height-0.024) + Map.Cone.conePeakHeight)
         ## cone connection spacing is set in coneConnecting.py
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING

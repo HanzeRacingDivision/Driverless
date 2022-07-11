@@ -1,6 +1,6 @@
 # see changelog and README for explenation
 
-simulation = True
+simulation = False
 
 bufferLandmarks = True
 simulatePositionalDrift = True # (only for simulations) the sensor data for steering&velocity have some error IRL, this simulates that (used to test SLAM)
@@ -14,6 +14,7 @@ useDrawer = True # whether to draw stuff on the screen (pretty useful for debugg
 printConnectionDebug = True # whether to explicitely print out the details of the kartMCU and LiDAR connections (serial port stuff)
 
 from doctest import master
+from socket import TCP_NODELAY
 from Map import Map
 import GF.generalFunctions as GF
 
@@ -33,7 +34,7 @@ else:
     import realCar        as RC
     import realLidars     as RL
     from HWserialConn import shuffleSerials
-    #import visionTBD      as RV   # real computerVision is TBD
+    # import realVisionReworked as RV
 
 if(useDrawer):
     import drawDriverless as DD
@@ -136,11 +137,19 @@ if __name__ == "__main__":
             masterMap.simVars.car.angle = masterMap.car.angle
             simDriftVelocityError = 0.1
             simDriftSteeringError = np.deg2rad(5)
+
+        lastCones = []
         
         ######################################################################################## main loop ###############################################################################
         while (DD.windowKeepRunning if useDrawer else True):
             loopStart = masterMap.clock()
             loopSpeedTimers = [('start', time.time()),]
+
+            # if((len(masterMap.conelists[False])>0) and (len(masterMap.conelists[True])>0)):
+            #     try to connec last cones
+            # else:
+            #     if()
+            #     find first cones
             
             if(masterMap.car.pathFolData.auto):
                 PP.calcAutoDriving(masterMap)
