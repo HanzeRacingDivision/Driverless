@@ -96,8 +96,9 @@ if __name__ == "__main__":
             masterMap.simVars.lidarSimVars = [SL.simulatedLidarVariables() for _ in masterMap.car.lidarOffsets]
         else:
             #### connect the kartMCU and lidar(s):
+            defaultExclusionList = ["COM256",] # a quick fix for the bad MB drivers (which make an un-blockable COM port for no reason)
             ## first the kartMCU:
-            while(not masterMap.car.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=[], printDebug=printConnectionDebug)):
+            while(not masterMap.car.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=defaultExclusionList, printDebug=printConnectionDebug)):
                 time.sleep(0.5) # a nice long delay, to avoid spamming the terminal output
             masterMap.car.doHandshakeIndef(resetESP=True, printDebug=True)
             if(not masterMap.car.is_ready):
@@ -106,17 +107,17 @@ if __name__ == "__main__":
             ## initialize the lidar(s)
             lidars = [RL.lidarClass(masterMap.clock, lidarIndex) for lidarIndex in range(   1   )]
             for lidar in lidars:
-                while(not lidar.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=([masterMap.car.comPort,] + [lidar.comPort for lidar in lidars]), printDebug=printConnectionDebug)):
+                while(not lidar.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=(defaultExclusionList + [masterMap.car.comPort,] + [lidar.comPort for lidar in lidars]), printDebug=printConnectionDebug)):
                     time.sleep(0.5) # wait a little bit, to avoid spamming the terminal
                 lidar.doHandshakeIndef(resetESP=True, printDebug=True)
             ## now make sure the serial ports are actually connected to the correct objects:
             shuffleSerials(masterMap.car, *lidars) # pass a list of all things with a handshakeSerial, so they can be shuffled untill correct
             
             ## now that all the connections are established, let's start initializing some stuff:
-            masterMap.car.setSteeringEnable(True) # enable/disable the steering motor (so a human can drive the kart)
-            masterMap.car.setPedalPassthroughEnable(False) # enable/disable the steering motor (so a human can drive the kart)
+            masterMap.car.setSteeringEnable(False) # enable/disable the steering motor (so a human can drive the kart)
+            masterMap.car.setPedalPassthroughEnable(True) # enable/disable the steering motor (so a human can drive the kart)
             for lidar in lidars:
-                lidar.setMaxRange(masterMap.car, 1500) # set the max lidar range (in millimeters)
+                lidar.setMaxRange(masterMap.car, 4000) # set the max lidar range (in millimeters)
         
         lidarConeBuff = [] #init var
         cameraConeBuff = [] 

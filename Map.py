@@ -137,6 +137,7 @@ class Map:
         coneDiam = 0.2 #cone diameter in meters (constant) (NOTE: no longer used by lidar math, mostly for drawing)
         conePeakHeight = (0.135*0.220)/0.124 + 0.024 # NOTE: not the height of the cone, but rather the height the cone WOULD HAVE reached, were it's peak actually sharp
         coneLidarDiam = lambda height : ((-0.124/0.220)*(height-0.024) + Map.Cone.conePeakHeight)
+        defaultOverlapTolerance = 3.0 # multiple of coneDiam in all directions (radius, but square)
         ## cone connection spacing is set in coneConnecting.py
         def __init__(self, coneID=-1, pos=[0,0], leftOrRight=False, isFinish=False):
             self.ID = coneID  #TO BE REPLACED BY PANDAS INDEXING
@@ -306,7 +307,7 @@ class Map:
     def _overlapConeCheck(self, posToCheck, conePosToUse, coneDistToler=None):
         """ return whether or not posToCheck overlaps a cone at conePosToUse"""
         if(coneDistToler is None):
-            coneDistToler = self.Cone.coneDiam * 0.75  #overlap tolerance  NOTE: area is square, not round
+            coneDistToler = self.Cone.coneDiam * self.Cone.defaultOverlapTolerance  #overlap tolerance  NOTE: area is square, not round
         return((posToCheck[0] > (conePosToUse[0]-coneDistToler)) and (posToCheck[0] < (conePosToUse[0]+coneDistToler)) and (posToCheck[1] > (conePosToUse[1]-coneDistToler)) and (posToCheck[1] < (conePosToUse[1]+coneDistToler)))
 
     def overlapConeCheck(self, posToCheck):
