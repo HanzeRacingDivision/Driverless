@@ -1,7 +1,10 @@
 ## some quick'n'dirty code for logging the main loop (ARCv0)
 
 import datetime # used to auto-generate filenames
-from basiclogger import basicLogger
+try:
+    from basiclogger import basicLogger
+except:
+    from log.basiclogger import basicLogger
 
 class mapLoggerClass(basicLogger):
     def __init__(self, filename=None):
