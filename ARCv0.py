@@ -109,14 +109,9 @@ if __name__ == "__main__":
             ## initialize the lidar(s)
             lidars = [RL.lidarClass(masterMap.clock, masterMap.car, lidarIndex) for lidarIndex in range(   1   )]
             for lidarIndex in range(len(lidars)):
-                working = False
-                while(not working):
-                    while(not lidars[lidarIndex].connect(comPort=None, autoFind=True, tryAny=True, exclusionList=(defaultExclusionList + [masterMap.car.comPort,] + [lidars[j].comPort for j in range(lidarIndex)]), printDebug=printConnectionDebug)):
-                        time.sleep(0.5) # wait a little bit, to avoid spamming the terminal
-                    lidars[lidarIndex].doHandshakeIndef(resetESP=True, printDebug=True)
-                    # time.sleep(1.0) # give the lidar some time to start  (this much is perhaps not needed?)
-                    # working = lidars[lidarIndex].requestReady() # if this returns true, it will continue to the next lidar.
-                    working = True # skip function check 
+                while(not lidars[lidarIndex].connect(comPort=None, autoFind=True, tryAny=True, exclusionList=(defaultExclusionList + [masterMap.car.comPort,] + [lidars[j].comPort for j in range(lidarIndex)]), printDebug=printConnectionDebug)):
+                    time.sleep(0.5) # wait a little bit, to avoid spamming the terminal
+                lidars[lidarIndex].doHandshakeIndef(resetESP=True, printDebug=True)
             ## now make sure the serial ports are actually connected to the correct objects:
             shuffleSerials(masterMap.car, *lidars) # pass all things with a handshakeSerial, so they can be shuffled untill correct
             
@@ -124,7 +119,8 @@ if __name__ == "__main__":
             masterMap.car.setSteeringEnable(False) # enable/disable the steering motor (so a human can drive the kart)
             masterMap.car.setPedalPassthroughEnable(True) # enable/disable the steering motor (so a human can drive the kart)
             for lidar in lidars:
-                lidar.setMaxRange(4000) # set the max lidar range (in millimeters)
+                lidar.setMaxRange(500) # set the max lidar range (in millimeters)
+                time.sleep(0.5) # needed for lidar.requestReady to be accurate
                 print("lidar requestReady success:", lidar.requestReady())
         
         lidarConeBuff = [] #init var
