@@ -35,17 +35,13 @@ def makePath(mapToUse):
         #search cones here
         firstCones = [None, None]
         strengths = [0.0, 0.0]
-        if(len(mapToUse.finish_line_cones) > 0):
+        finishCones = mapToUse.find_finish_cones()
+        if((finishCones[False] is not None) or (finishCones[True] is not None)):
             print("using finish cone(s) to make first pathLine")
-            if(mapToUse.finish_line_cones[0].LorR):
-                firstCones[1] = mapToUse.finish_line_cones[0]
-            else:
-                firstCones[0] = mapToUse.finish_line_cones[0]
-            if(len(mapToUse.finish_line_cones) > 1): #if both finish cones are set
-                if(mapToUse.finish_line_cones[1].LorR):
-                    firstCones[1] = mapToUse.finish_line_cones[1]
-                else:
-                    firstCones[0] = mapToUse.finish_line_cones[1]
+            if(finishCones[False] is not None):
+                firstCones[0] = finishCones[False]
+            if(finishCones[True] is not None):
+                firstCones[1] = finishCones[True]
         for LorR in range(2):
             if(firstCones[LorR] is None):
                 bestCandidateIndex = -1;   highestStrength = 0;   candidatesDiscarded = 0
@@ -240,7 +236,7 @@ class pathFinder():
     pathFirstLineCarAngleDeltaMax = np.deg2rad(45) #if the radDiff() between car (.angle) and the first line's connections is bigger than this, switch connections or stop
     pathFirstLineCarSideAngleDelta = np.deg2rad(80) #left cones should be within +- pathFirstLineCarSideAngleDelta radians of the side of the car (asin, car.angle + or - pi/2, depending on left/right side)
     pathFirstLinePosDist = minBoundarySpacing * 0.9 # simple center to center distance, hard threshold, used to filter out very far cones
-    pathFirstLineCarDist = minBoundarySpacing * 0.5 # real distance, not hard threshold, just distance at which lowest strength-score is given
+    pathFirstLineCarDist = minBoundarySpacing * 0.5 # (shortest dist to chassis) not hard threshold, just distance at which lowest strength-score is given
         
     #this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
     @staticmethod

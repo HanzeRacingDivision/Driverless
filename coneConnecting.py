@@ -151,6 +151,9 @@ def connectConeSuperSimple(mapToUse, coneToConnect, applyResult=True, printDebug
             winningCone.coneConData.append(coneConnection(GF.radInv(angle), dist, highestStrength))
         return(True, winningCone) #return the cone you connected with (or are capable of connecting with, if applyResult=False)
 
+def findFirstCones(mapToUse):
+    """find the first left/right cones"""
+    returnList = [None, None] # return a left and a right cone
 
 
 class coneConnecter():

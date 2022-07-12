@@ -78,12 +78,12 @@ def handleMousePress(pygameDrawerInput, buttonDown, button, pos, eventToHandle):
 
         normalMap = pygameDrawerInput.mapToDraw # just a more legible pointer
         overlaps, overlappingCone = normalMap.overlapConeCheck(posToPlace)
-        allowFinish = (len(normalMap.finish_line_cones) < 2) and ((normalMap.finish_line_cones[0].LorR != (overlappingCone.LorR if overlaps else leftOrRight)) if (len(normalMap.finish_line_cones) > 0) else True)
+        allowFinish = (normalMap.find_finish_cones(overlappingCone.LorR if overlaps else leftOrRight) is None)
         allowConnect = ((len(overlappingCone.connections) < 2) if overlaps else True)
 
         simMap = pygameDrawerInput.mapToDraw.simVars # either a map object or None
         overlapsUndis, overlappingUndisCone = (simMap.overlapConeCheck(posToPlace) if (simMap is not None) else (False, None))
-        allowUndisFinish = ((len(simMap.finish_line_cones) < 2) and ((simMap.finish_line_cones[0].LorR != (overlappingUndisCone.LorR if overlapsUndis else leftOrRight)) if (len(simMap.finish_line_cones) > 0) else True) if (simMap is not None) else False)
+        allowUndisFinish = ((simMap.find_finish_cones(overlappingUndisCone.LorR if overlapsUndis else leftOrRight) is None) if (simMap is not None) else False)
         allowUndisConnect = ((len(overlappingUndisCone.connections) < 2) if overlapsUndis else True)
         prioritizeSimMap = (pygameDrawerInput.mapToDraw.simVars.undiscoveredCones if (simMap is not None) else False) # if 'undiscoveredCones' == True, then prioritize the simMap for certain things
         
@@ -115,7 +115,7 @@ def handleMousePress(pygameDrawerInput, buttonDown, button, pos, eventToHandle):
                 if(clickRequestFinish):
                     if(allowUndisFinish):
                         print("setting simVars cone as finish:", overlappingUndisCone.ID)
-                        simMap.finish_line_cones.append(overlappingUndisCone)
+                        overlappingUndisCone.isFinish = True # as this is a pointer (not a copy) of the cone, this should affect the cone in the list
                     else:
                         print("could not set simVars finish cone!")
                 # if(clickRequestConnect): # clickRequestConnect is implicit from clicking on an existing cone, but i might use prioritizeSimMap to require it or something (idk)
@@ -131,7 +131,7 @@ def handleMousePress(pygameDrawerInput, buttonDown, button, pos, eventToHandle):
                 if(clickRequestFinish):
                     if(allowFinish):
                         print("setting cone as finish:", overlappingCone.ID)
-                        normalMap.finish_line_cones.append(overlappingCone)
+                        overlappingCone.isFinish = True
                     else:
                         print("could not set finish cone!")
                 # if(clickRequestConnect): # clickRequestConnect is implicit from clicking on an existing cone, but i might use prioritizeSimMap to require it or something (idk)

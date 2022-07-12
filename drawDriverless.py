@@ -354,11 +354,14 @@ class pygameDrawer(pygameDrawerCommon):
                 pygame.draw.line(self.window, self.pathColor, self.realToPixelPos(self.mapToDraw.target_list[-1].position), self.realToPixelPos(self.mapToDraw.target_list[0].position), self.pathLineWidth) #line that loops around to start
     
     def drawFinishLine(self):
-        """draw finish line (between finish_line_cones)"""
-        if((len(self.mapToDraw.simVars.finish_line_cones) >= 2) if (self.mapToDraw.simVars is not None) else False): # draw simVars finish line first (underneath the main one)
-            pygame.draw.line(self.window, self.undetectedFinishLineColor, self.realToPixelPos(self.mapToDraw.simVars.finish_line_cones[0].position), self.realToPixelPos(self.mapToDraw.simVars.finish_line_cones[1].position), self.finishLineWidth)
-        if(len(self.mapToDraw.finish_line_cones) >= 2):
-            pygame.draw.line(self.window, self.finishLineColor, self.realToPixelPos(self.mapToDraw.finish_line_cones[0].position), self.realToPixelPos(self.mapToDraw.finish_line_cones[1].position), self.finishLineWidth)
+        """draw finish line (between finish line cones)"""
+        if (self.mapToDraw.simVars is not None):
+            simVarsFinishCones = self.mapToDraw.simVars.find_finish_cones()
+            if((simVarsFinishCones[False] is not None) and (simVarsFinishCones[True] is not None)): # draw simVars finish line first (underneath the main one)
+                pygame.draw.line(self.window, self.undetectedFinishLineColor, self.realToPixelPos(simVarsFinishCones[False].position), self.realToPixelPos(simVarsFinishCones[True].position), self.finishLineWidth)
+        finishCones = self.mapToDraw.find_finish_cones()
+        if((finishCones[False] is not None) and (finishCones[True] is not None)):
+            pygame.draw.line(self.window, self.finishLineColor, self.realToPixelPos(finishCones[False].position), self.realToPixelPos(finishCones[True].position), self.finishLineWidth)
     
     def _drawCar(self, carToDraw, polygonMode, headlights, isSimVars=False):
         """(sub function) draws an arbitrary Car object"""
@@ -737,9 +740,10 @@ class pygameDrawer3D(pygameDrawerCommon):
                 pygame.draw.line(self.window, self.pathColor, self.distAngleToPixelPos(endDistAngles[0], 0.0), self.distAngleToPixelPos(endDistAngles[1], 0.0), self.pathLineWidth) #line that loops around to start
     
     def drawFinishLine(self, drawTopLine=True):
-        """draw finish line (between finish_line_cones)"""
-        if(len(self.mapToDraw.finish_line_cones) >= 2):
-            coneDistAngles = [GF.distAngleBetwPos(self.mapToDraw.car.position, self.mapToDraw.finish_line_cones[0].position), GF.distAngleBetwPos(self.mapToDraw.car.position, self.mapToDraw.finish_line_cones[1].position)]
+        """draw finish line (between finish line cones)"""
+        finishCones = self.mapToDraw.find_finish_cones()
+        if((finishCones[False] is not None) and (finishCones[True] is not None)):
+            coneDistAngles = [GF.distAngleBetwPos(self.mapToDraw.car.position, finishCones[False].position), GF.distAngleBetwPos(self.mapToDraw.car.position, finishCones[True].position)]
             coneDistAngles[0][1] = GF.radRoll(coneDistAngles[0][1]-self.mapToDraw.car.angle);     coneDistAngles[1][1] = GF.radRoll(coneDistAngles[1][1]-self.mapToDraw.car.angle)
             if((abs(coneDistAngles[0][1]) < self.renderAngleMax) and (coneDistAngles[0][0] > self.renderDistMin) and (abs(coneDistAngles[1][1]) < self.renderAngleMax) and (coneDistAngles[1][0] > self.renderDistMin)): #if both cones lie ahead of (not behind) car
                 respectivePoses = [GF.distAnglePosToPos(coneDistAngles[0][0], coneDistAngles[0][1], np.zeros(2)), GF.distAnglePosToPos(coneDistAngles[1][0], coneDistAngles[1][1], np.zeros(2))]

@@ -15,7 +15,7 @@ from log.HWserialConnLogging import kartMCUserialLogger
 USE_RAW_DATA = False # if true, the kart will provide raw values (so they can be processed in python instead of on the kartMCU)
 
 WHEEL_CIRCUMFERENCE = np.pi * 0.3 # (meters) circumference of the car's wheels
-ENCO_COUNT_TO_METERS = (WHEEL_CIRCUMFERENCE/12, WHEEL_CIRCUMFERENCE/12, WHEEL_CIRCUMFERENCE/12, WHEEL_CIRCUMFERENCE/12) # raw encoder count to meter convesion multiplier (for each wheel)
+ENCO_COUNT_TO_METERS = (WHEEL_CIRCUMFERENCE/12, WHEEL_CIRCUMFERENCE/12, WHEEL_CIRCUMFERENCE/(18*2), WHEEL_CIRCUMFERENCE/(18*2)) # raw encoder count to meter convesion multiplier (for each wheel)
 
 STEERING_RAW_TO_RADIANS = Map.Car.maxSteeringAngle / (-3370)  # calibrated value
 STEERING_RAW_TO_RAD_OFFSET = np.deg2rad(0.642)  # calibrated value

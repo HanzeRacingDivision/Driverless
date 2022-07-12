@@ -7,6 +7,8 @@ from scipy.interpolate import splprep, splev
 from Map import Map
 import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
+IDEAL_VELOCITY = 1.0 # (m/s) the ideal velocity (at which the pathfollowing works best)
+
 
 class pathPlannerCarData: #a class to go in Map.Car.coneConData or Map.Car.pathFolData, if Alex approves
     """some data to go in .pathFolData of the car"""
@@ -16,7 +18,7 @@ class pathPlannerCarData: #a class to go in Map.Car.coneConData or Map.Car.pathF
         
         self.laps = 0
         
-        self.targetVelocity = 2.0
+        self.targetVelocity = IDEAL_VELOCITY
 
 class pathPlannerMapData: #a class to go in Map.pathFolData (with these variables seperate (instead of inside pathPlanner class), pathPlanner is now fully static)
     """some data to go in .pathFolData of the Map"""
@@ -122,18 +124,18 @@ def calcAutoDriving(mapToUse, saveOutput=True):
                 
                 ## this is for setting up for sharp corners (going towards the outside corner, so you have the distance you need to actually make the turn)
                 ## note: this code is pretty fiddly (and should be replaced by AI as soon as possible), but it does help sometimes
-                ##TBD
-                prevPredictTarget = getPrevTarget(mapToUse, lastPredictTarget, False)
-                if(prevPredictTarget != lastPredictTarget):
-                    prevAngle = GF.distAngleBetwPos(prevPredictTarget.position, lastPredictTarget.position)[1]
-                    nextAngle = GF.distAngleBetwPos(lastPredictTarget.position, predictTarget.position)[1]
-                    angleDiff = GF.radDiff(prevAngle, nextAngle) #use this angle difference to determine how sharp the turn is
-                    #if(abs(angleDiff) > pathPlanner.steeringPredictCounterThresh):
-                    #    desired_steering += pathPlanner.steeringPredictDepthCurve(i+1) * \
-                    #                        pathPlanner.steeringPredictDistCurve(predictDist, desired_velocity) * \
-                    #                        pathPlanner.steeringPredictCounterCurve(angleDiff) #calculate how aggressively to countersteer
-                #else:
-                #    print("cant do the thing with the countersteer or whatever")
+                ##TBD!
+                # prevPredictTarget = getPrevTarget(mapToUse, lastPredictTarget, False)
+                # if(prevPredictTarget != lastPredictTarget):
+                #     prevAngle = GF.distAngleBetwPos(prevPredictTarget.position, lastPredictTarget.position)[1]
+                #     nextAngle = GF.distAngleBetwPos(lastPredictTarget.position, predictTarget.position)[1]
+                #     angleDiff = GF.radDiff(prevAngle, nextAngle) #use this angle difference to determine how sharp the turn is
+                #     #if(abs(angleDiff) > pathPlanner.steeringPredictCounterThresh):
+                #     #    desired_steering += pathPlanner.steeringPredictDepthCurve(i+1) * \
+                #     #                        pathPlanner.steeringPredictDistCurve(predictDist, desired_velocity) * \
+                #     #                        pathPlanner.steeringPredictCounterCurve(angleDiff) #calculate how aggressively to countersteer
+                # #else:
+                # #    print("cant do the thing with the countersteer or whatever")
 
                 lastPredictTarget = predictTarget
             else:
@@ -160,10 +162,9 @@ def makeBoundrySpline(mapToUse, inputConeList):
     returnList = [[], []]
     if(len(inputConeList) > 1):
         startingCone = inputConeList[0] #start at any random cone
-        if(len(mapToUse.finish_line_cones) > 0):
-            for finishCone in mapToUse.finish_line_cones:
-                if(inputConeList[0].LorR == finishCone.LorR):
-                    startingCone = finishCone #use finish line cone as start of chain
+        finishCone = mapToUse.find_finish_cones(inputConeList[0].LorR)[inputConeList[0].LorR]
+        if(finishCone is not None):
+            startingCone = finishCone #use finish line cone as start of chain
         itt = 0
         while((len(startingCone.connections) < 1) and (itt < len(inputConeList))): #try to find a cone that has a connection
             startingCone = inputConeList[itt] #try the next entry
@@ -226,30 +227,31 @@ def makePathSpline(mapToUse):
 class pathPlanner():
     """a static class with constants and (pointers to) functions for (rudimentary) auto-driving and cubic-spline creation.
         The variables that the functions make use of are stored in the Map object in Map.pathFolData and Map.Car.pathFolData"""
-    boundrySplineSamplingDividend = 0.35
+    boundrySplineSamplingDividend = 0.35 # trial and error coefficients about how dense/strict the splines are generated
     boundrySplineSamplingPower = 1.2
     pathSplineSamplingDividend = 0.35
     pathSplineSamplingPower = 1.2
     pathSplineSmoothing = 0.075 #0 means it MUST cross all points, 1 is too much for the scale car, so just pick whatever looks decent
     
     
-    targetDistSpeedMultiplier = 0.25 #at high speed, the tolerance for targer reached distance should increase (because turning radius increases and accuracy does not). To disable this, set it to 0
-    targetReachedThreshold = 0.4 #if distance to target (regardless of orientation) is less than this, target is reached (larger means less likely to spin off, smaller means more accurate)
-    targetDistSpeedMargin = lambda velocity : (pathPlanner.targetDistSpeedMultiplier*pathPlanner.targetReachedThreshold*(velocity-1.0)) #note: 1.0 is in m/s, it's the value for which targetReachedThreshold is intended
+    targetDistSpeedMultiplier = 0.15 #at high speed, the tolerance for targer reached distance should increase (because turning radius increases and accuracy does not). To disable this, set it to 0
+    targetReachedThreshold = Map.Car.wheelbase*0.5 #if distance to target (regardless of orientation) is less than this, target is reached (larger means less likely to spin off, smaller means more accurate)
+    targetDistSpeedMargin = lambda velocity : (pathPlanner.targetDistSpeedMultiplier*pathPlanner.targetReachedThreshold*(velocity-IDEAL_VELOCITY)) #note: IDEAL_VELOCITY is the value for which targetReachedThreshold is intended
     ##if the target can't be reached, due to turning radius limitations (TBD: slowing down), then passing is enough
     targetPassedDistThreshold = targetReachedThreshold*2.0 #if it passes a target (without hitting it perfectly), the distance to target should still be less than this
     targetPassedAngleThreshold = np.deg2rad(75) #if it passes a target (without hitting it perfectly), the angle to target will probably be more than this
     targetMissedAngleThreshold = np.deg2rad(140) #if the angle to target is larger than this, (panic, and) move on to the next target (or something)
 
     steeringPredictDepth = 1 #how many targets to predictively steer towards
-    steeringPredictDepthStrength = 1.5 #(higher = stronger)
-    steeringPredictDepthCurve = lambda depth : (pathPlanner.steeringPredictDepthStrength / (max(depth, 1.0)**2)) #inverse exponential, starting at a depth of 1 (0 depth would be the current target)
+    steeringPredictDepthStrength = 1.6 #(higher = stronger)
+    steeringPredictDepthCurve = lambda depth : (pathPlanner.steeringPredictDepthStrength / (max(depth, 1)**2)) #inverse exponential, starting at a depth of 1 (0 depth would be the current target)
     ##a distance-based steering power curve may be useful (especially for predictive steering)
-    steeringPredictDistStrength = 1.75 #(higher = stronger) how sharp/strong the inverse exponential curve of distance over prediction_relevance (plot 1/((x+1)^2) in a graphing calculator)
-    steeringPredictDistExpon = 5.0 #(higher = more exponential (sharper)) how sharp/strong the inverse exponential curve of distance over prediction_relevance (plot 1/((x+1)^2) in a graphing calculator)
+    steeringPredictDistStrength = 1.7 #(higher = stronger) how sharp/strong the inverse exponential curve of distance over prediction_relevance (plot 1/((x+1)^2) in a graphing calculator)
+    steeringPredictDistExpon = 4.0 #(higher = more exponential (sharper)) how sharp/strong the inverse exponential curve of distance over prediction_relevance (plot 1/((x+1)^2) in a graphing calculator)
     steeringPredictDistCurve = lambda dist, velocity=1.0 : min((pathPlanner.steeringPredictDistStrength / (((max(dist, 0.0) * pathPlanner.steeringPredictDistExpon) + (1.0 - ((pathPlanner.targetReachedThreshold + pathPlanner.targetDistSpeedMargin(velocity)) * pathPlanner.steeringPredictDistExpon)))**2)), pathPlanner.steeringPredictDistStrength)
+    ## still TODO:
     ##in some situations the car should (besides slowing down), start at the outer edge of the corner, because the turn would otherwise be too tight
-    steeringPredictCounterThresh = np.deg2rad(30) #only if the angle is sharper than this, do we need to perform this pre-emptive counter-steer
+    #steeringPredictCounterThresh = np.deg2rad(30) #only if the angle is sharper than this, do we need to perform this pre-emptive counter-steer
     #steeringPredictCounterCurve = lambda turnAngle : TBD  (also note, maybe this should use the same distance function, as this countersteer needs to happen a little further away maybe)
     ##TBD: consider the distance to the predicted target as well (if it's far away, there's less need to cut corners, there will be time to react normally)
     

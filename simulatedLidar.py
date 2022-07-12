@@ -15,10 +15,10 @@ RANGE_LIMIT = 6.0 # (meters) lidar range limit
 ANGLE_LIMITS = np.deg2rad(np.array([[-95, 95], [80, -80]])) # angle limits (for each lidar). The kart itself is in the way of a certain portion of the lidar's FOV
 
 ## for SIMULATE_SAMPLING == False
-STD_DEV_LIDAR_POS_ERROR = 1.0/1000 # (in meters)
+STD_DEV_LIDAR_POS_ERROR = 0.0/1000 # (in meters)
 #STD_DEV_LIDAR_POS_ERROR_PER_METER = 0.01 # (in meters) std dev of positional error (directly added to (x,y)) at 1 meter. More distance means more error
 ## for SIMULATE_SAMPLING == True
-STD_DEV_LIDAR_MEASUREMENT_ERROR = 1.0/1000 # (in meters) std dev of error in individual LiDAR distance measurements (get from datasheet?)
+STD_DEV_LIDAR_MEASUREMENT_ERROR = 0.0/1000 # (in meters) std dev of error in individual LiDAR distance measurements (get from datasheet?)
 
 if(SIMULATE_SAMPLING):
     import lidarBlobsNoNumba as LB

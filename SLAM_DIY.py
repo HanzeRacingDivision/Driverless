@@ -7,7 +7,6 @@ MIN_LANDMARK_COUNT = 4
 MAX_SLAM_CORRECTION = 1.0 #meters of distance
 MAX_BLOB_HISTORY = 10
 
-
 ## TBD: improve error magnitudes:
 ##                  - based on time since last SLAM (plus a certain minimum value?)
 ##                  - based on the measured distance (to equalize error, instead of closer cones being more important (pythangorean is not linear))
@@ -28,14 +27,19 @@ class coneSlamData: #a class to go in Map.Cone.coneConData. This carries some ex
             self.positions.pop(1);   self.timestamps.pop(1);   self.blobs.pop(1) # delete the second extry (keep the first data point as a sort of anchor)
         self.counter += 1
     def getConePos(self, depth=-1): # calculate the cone position based on the positions[] array
-        returnPos = np.zeros(2)
-        depth = (min(depth, len(self.positions)) if (depth>0) else len(self.positions))
-        for i in range(depth):
-            returnPos[0] += self.positions[len(self.positions)-1-i][0] # add to sum
-            returnPos[1] += self.positions[len(self.positions)-1-i][1] # add to sum
-        returnPos[0] /= depth
-        returnPos[1] /= depth
-        # returnPos[0] = GF.average(np.array([self.positions[len(self.positions)-1-i][0] for i in range(depth)]))
+        returnPos = self.positions[0]
+        for i in range(len(self.positions)-1):
+            proportion = 1.0 # TODO: make a fun function for this (favor new data or old data?)
+            returnPos[0] += (self.positions[i][0]-self.positions[0][0]) * proportion # add to sum
+            returnPos[1] += (self.positions[i][1]-self.positions[0][1]) * proportion # add to sum
+        # returnPos = np.zeros(2)
+        # depth = (min(depth, len(self.positions)) if (depth>0) else len(self.positions))
+        # for i in range(depth):
+        #     returnPos[0] += self.positions[len(self.positions)-1-i][0] # add to sum
+        #     returnPos[1] += self.positions[len(self.positions)-1-i][1] # add to sum
+        # returnPos[0] /= depth
+        # returnPos[1] /= depth
+        # returnPos[0] = GF.average(np. array([self.positions[len(self.positions)-1-i][0] for i in range(depth)]))
         # returnPos[1] = GF.average(np.array([self.positions[len(self.positions)-1-i][1] for i in range(depth)]))
         return(returnPos)
 
@@ -170,6 +174,7 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
         #print("SLAM list sizes:", len(conePointers), len(newCones))
         calculatedLinearOffset, calculatedRotationalOffset, unshiftedConesOnlyLinear, unshiftedCones = calculateOffsets(mapToUse.car.position, knownCones, measuredCones, magnitudes)
         
+        
         # if((mapToUse.simVars.car is not None) if (mapToUse.simVars is not None) else False):
         #     print("true offsets:", mapToUse.car.position - mapToUse.simVars.car.position, mapToUse.car.angle - mapToUse.simVars.car.angle)
         
@@ -193,6 +198,7 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
         else:
             print("SLAM overcorrected?:", calculatedLinearOffset, np.rad2deg(calculatedRotationalOffset))
         
+        linearTrust = abs(1.0) # TODO!
         mapToUse.car.position -= (calculatedLinearOffset * trust[0])
         mapToUse.car.angle -= (calculatedRotationalOffset * trust[1])
         mapToUse.car.lastUpdateTimestamp = rightNow # save when the car position was last updated

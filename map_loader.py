@@ -108,7 +108,6 @@ def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
         #     whereToLoad = whereToLoad.simVars
         #copyImportMap(whereToLoad, returnMap) #has problems with car objects and clocks and all that nastyness
         whereToLoad.cone_lists = returnMap.cone_lists
-        whereToLoad.finish_line_cones = returnMap.finish_line_cones
         try:
             import pathPlanningTemp as PP
             PP.makeBoundrySplines(whereToLoad)

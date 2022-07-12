@@ -3,7 +3,7 @@
 simulation = False
 
 bufferLandmarks = True
-simulatePositionalDrift = True # (only for simulations) the sensor data for steering&velocity have some error IRL, this simulates that (used to test SLAM)
+simulatePositionalDrift = False # (only for simulations) the sensor data for steering&velocity have some error IRL, this simulates that (used to test SLAM)
 
 makeConesAfterMapload = False #whether to completely rely on the loaded map, or to allow for new cone detection
 ## TBD: stop cone creation after a drag-drop mapload (currently only cmdline argumented mapfiles stop cone creation)
@@ -24,6 +24,8 @@ import pathFinding      as PF
 import pathPlanningTemp as PP    #autodriving and splines
 
 import SLAM_DIY as SLAM  # TODO: replace/improve SLAM_DIY
+
+from log.mainLog import mapLoggerClass # some basic logging for the masterMap
 
 if(simulation):
     from Map import mapSimVarClass
@@ -105,19 +107,25 @@ if __name__ == "__main__":
                 print("realCar handshake failed or something, i don't feel like dealing with this")
                 raise(Exception("nah, bro"))
             ## initialize the lidar(s)
-            lidars = [RL.lidarClass(masterMap.clock, lidarIndex) for lidarIndex in range(   1   )]
-            for lidar in lidars:
-                while(not lidar.connect(comPort=None, autoFind=True, tryAny=True, exclusionList=(defaultExclusionList + [masterMap.car.comPort,] + [lidar.comPort for lidar in lidars]), printDebug=printConnectionDebug)):
-                    time.sleep(0.5) # wait a little bit, to avoid spamming the terminal
-                lidar.doHandshakeIndef(resetESP=True, printDebug=True)
+            lidars = [RL.lidarClass(masterMap.clock, masterMap.car, lidarIndex) for lidarIndex in range(   1   )]
+            for lidarIndex in range(len(lidars)):
+                working = False
+                while(not working):
+                    while(not lidars[lidarIndex].connect(comPort=None, autoFind=True, tryAny=True, exclusionList=(defaultExclusionList + [masterMap.car.comPort,] + [lidars[j].comPort for j in range(lidarIndex)]), printDebug=printConnectionDebug)):
+                        time.sleep(0.5) # wait a little bit, to avoid spamming the terminal
+                    lidars[lidarIndex].doHandshakeIndef(resetESP=True, printDebug=True)
+                    # time.sleep(1.0) # give the lidar some time to start  (this much is perhaps not needed?)
+                    # working = lidars[lidarIndex].requestReady() # if this returns true, it will continue to the next lidar.
+                    working = True # skip function check 
             ## now make sure the serial ports are actually connected to the correct objects:
-            shuffleSerials(masterMap.car, *lidars) # pass a list of all things with a handshakeSerial, so they can be shuffled untill correct
+            shuffleSerials(masterMap.car, *lidars) # pass all things with a handshakeSerial, so they can be shuffled untill correct
             
             ## now that all the connections are established, let's start initializing some stuff:
             masterMap.car.setSteeringEnable(False) # enable/disable the steering motor (so a human can drive the kart)
             masterMap.car.setPedalPassthroughEnable(True) # enable/disable the steering motor (so a human can drive the kart)
             for lidar in lidars:
-                lidar.setMaxRange(masterMap.car, 4000) # set the max lidar range (in millimeters)
+                lidar.setMaxRange(4000) # set the max lidar range (in millimeters)
+                print("lidar requestReady success:", lidar.requestReady())
         
         lidarConeBuff = [] #init var
         cameraConeBuff = [] 
@@ -138,6 +146,8 @@ if __name__ == "__main__":
             masterMap.simVars.car.angle = masterMap.car.angle
             simDriftVelocityError = 0.1
             simDriftSteeringError = np.deg2rad(5)
+
+        mapLogger = mapLoggerClass()
 
         lastCones = []
         
@@ -187,7 +197,7 @@ if __name__ == "__main__":
                     lidarConeBuff += dataPerLidar # for each lidar, add the spotted cones (and the measurement points) to the overall buffer
             else: # get data from lidar (microcontroller(s)):
                 for lidar in lidars:
-                    lidarConeBuff += lidar.getCones(masterMap.car)
+                    lidarConeBuff += lidar.getCones()
             loopSpeedTimers.append(('get lidar data', time.time()))
 
             ## camera update:
@@ -228,6 +238,9 @@ if __name__ == "__main__":
                 UI.handleAllWindowEvents(drawer) #handle all window events like key/mouse presses, quitting and most other things
                 loopSpeedTimers.append(('drawer', time.time()))
             
+            mapLogger.logMap(masterMap)
+            loopSpeedTimers.append(('mapLogger', time.time()))
+
             # print("speed times:", [(loopSpeedTimers[i][0], round((loopSpeedTimers[i][1]-loopSpeedTimers[i-1][1])*1000, 1)) for i in range(1,len(loopSpeedTimers))])
 
             loopEnd = masterMap.clock() #this is only for the 'framerate' limiter (time.sleep() doesn't accept negative numbers, this solves that)

@@ -37,9 +37,18 @@ BIG ADDITION: HWserialConn, HWserialLogging, realCar and realLidar all added (se
 fixed high zoom FPS issues by (limiting zoom, and) ensuring the car (which takes very long to render when zoomed in a lot) is only rendered when actually in frame (allow me to inspect lidardata at my leasure)
 added simulatedVision (bad positions, good color data) to help simulatedLidar do its thing
 make use of the (now available) vision data in DIY_SLAM (note: preliminary! simulatedVision is pretty simple, i suspect the real camera will have a little more nuance)
-realLidar ready to test
+made realLidar ready to test
+massively increased defaultOverlapTolerance
+removed Map.finish_line_cones in favor of a function that just searches the cone_lists. More CPU intensive, easier to program tho
+realLidar lidarClass now stores self.carToUse to make the functions a little easier to read/use
+made mainLog.py, which logs some general values (car positions and stuff)
+
+in-progress:
+temporarly set simulatedLidar and vision error to 0
+SLAM_DIY change the way trust works to over- or undervalue newer/older cone positions AND how much SLAM can alter the car position
 
 next up:
+tune pathFollowingTemp
 allow camera tilt (oh god, rendering math...)
 another round of function labels """""" couldn't hurt
 update target positions if cone positions change

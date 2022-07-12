@@ -10,7 +10,7 @@ RENDER_FRAMES = False # whether to render a fake camera frame
 
 RANGE_LIMIT = 6.0 # (meters) camera range limit (based mostly on resolution and how well the AI model is working, value is TBD!)
 
-STD_DEV_CAMERA_POS_ERROR = 0.05 # (in meters)
+STD_DEV_CAMERA_POS_ERROR = 0.0 # (in meters)
 #STD_DEV_CAMERA_POS_ERROR_PER_METER = 0.01 # (in meters) std dev of positional error (directly added to (x,y)) at 1 meter. More distance means more error
 
 ## TODO: use drawer3D to render a simulated camera frame

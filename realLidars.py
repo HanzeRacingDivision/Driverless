@@ -31,36 +31,40 @@ LIDAR_SAMPLES_AT_DIST = lambda dist, coneDiam : int((2 * np.arcsin(LIDAR_REFLECT
 class lidarClass(lidarESPserialClass, LIDARserialLogger):
     """a class that handles the connection to a LIDAR (IRL, not simulated)
         (make one of these for every lidar on the car)"""
-    def __init__(self, clockFunc, identifierIndex=0, logfilename=None):
+    def __init__(self, clockFunc, carToUse, identifierIndex=0, logfilename=None):
         Map.Car.__init__(self) # init Car object
         lidarESPserialClass.__init__(self, clockFunc, identifierIndex) # init Car object
         LIDARserialLogger.__init__(self, logfilename) # init logger
+        self.carToUse = carToUse
         self.identifierIndex = identifierIndex # save it (specifically for calculating the lidar height (for calculating the cone diam))
     
     def __del__(self): # the automatically generated __del__ function only calls 1 (custom?) __del__ function, the first parent class's one. This solves that
         lidarESPserialClass.__del__(self) # make sure to close the serial
         LIDARserialLogger.__del__(self) # make sure to close the logfile
     
-    def setMaxRange(self, carToUse: Map.Car, newMaxRange):
+    def setMaxRange(self, newMaxRange):
         """set max range
             (just a macro to requestSetMaxRange())"""
-        self.requestSetMaxRange(carToUse, newMaxRange) # pass 'self' as carToUse
+        self.requestSetMaxRange(self.carToUse, newMaxRange) # pass 'self' as carToUse
+    
+    def requestReady(self):
+        return super().requestReady(self.carToUse)
 
-    def getCones(self, carToUse: Map.Car):
+    def getCones(self):
         if(not self.is_ready):
             print("can't run lidarClass.getCones(), the connection is not ready:", self.is_ready)
             return([])
-        lidarData = self.requestLidarData(carToUse) # sends position and angle while retrieving cone positions
+        lidarData = self.requestLidarData(self.carToUse) # sends position and angle while retrieving cone positions
         for conePosType in lidarData: # lidarData is always an array, but sometimes empty (if requestLidarData failed)
             self.logConePos(conePosType)
         ## here might be a good time to do some extra validity checking. Stuff like a simple ['inaccuracy'] threshold, or maybe checking whether the ['pointCount'] makes sense for a cone at that distance
         ## although that checking could also be done on the lidarESP already
         #returnList = [(conePosType['pos'], None) for conePosType in lidarData] # TODO: save more useful data
         returnList = []
-        coneDiam = Map.Cone.coneLidarDiam(carToUse.lidarOffsets[self.identifierIndex][2])
+        coneDiam = Map.Cone.coneLidarDiam(self.carToUse.lidarOffsets[self.identifierIndex][2])
         for conePosType in lidarData:
             if(conePosType['inaccuracy'] < INACCURACY_THRESHOLD):
-                dist = GF.distAngleBetwPos(carToUse.calcLidarPos(self.identifierIndex), conePosType['pos'])[0]
+                dist = GF.distAngleBetwPos(self.carToUse.calcLidarPos(self.identifierIndex), conePosType['pos'])[0]
                 expectedPointCount = LIDAR_SAMPLES_AT_DIST(dist, coneDiam)
                 if(abs(conePosType['pointCount'] - expectedPointCount) < ACCEPTABLE_POINTCOUNT_DISCREPANCY):
                     returnList.append((conePosType['pos'], None))

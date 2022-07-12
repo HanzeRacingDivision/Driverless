@@ -1,3 +1,4 @@
+from turtle import left
 import numpy as np
 import time
 import GF.generalFunctions as GF
@@ -13,7 +14,7 @@ class Map:
         
         self.car = self.Car()
         self.cone_lists = {False: [], True: []}
-        self.finish_line_cones = [] #holds 2 Cone objects, 1 left and 1 right (redundant, becuase Cone.isFinish attribute, but this will save a lot of list-searching time)
+        #self.coneLimbo = [] # TBD: all (recent?) cone detections which lack sufficient data to (confidently) put them into cone_lists. (e.g. lidar cones with no color)
         
         self.target_list = [] #list of Target objects, the order of the list is the order in which they need to be driven
         self.targets_full_circle = False #if the target list loops around
@@ -25,7 +26,7 @@ class Map:
         self.simVars = None # holds simulatedLidar variables (and/or other: ...)
     
     def __repr__(self): #print map objects in a legible fashion
-        return("Map(typ="+(self.__class__.__name__)+",LEFT:"+str(len(self.cone_lists[False]))+",RIGHT:"+str(len(self.cone_lists[True]))+",FINISH:"+str(len(self.finish_line_cones))+",TARGETS:"+str(len(self.target_list))+(",TARG_FULL_CIRC,"if self.targets_full_circle else ",")+str(self.car)+")")
+        return("Map(typ="+(self.__class__.__name__)+",LEFT:"+str(len(self.cone_lists[False]))+",RIGHT:"+str(len(self.cone_lists[True]))+",TARGETS:"+str(len(self.target_list))+(",TARG_FULL_CIRC,"if self.targets_full_circle else ",")+str(self.car)+")")
     
     class Car:
         """ A (parent) car class that holds all the variables that make up a (basic) car """
@@ -49,7 +50,6 @@ class Map:
             self.desired_velocity = 0.0 #desired velocity in m/s (sent to car MCU)
             self.desired_steering = 0.0 #desired steering angle in radians (sent to car MCU)
             
-            self.totalDistTraveled = 0.0
             self.lastFeedbackTimestamp = 0.0
             self.lastUpdateTimestamp = 0.0
             
@@ -154,6 +154,12 @@ class Map:
         def __repr__(self): #print cone objects in a legible fashion
             return("Cone(ID="+str(self.ID)+","+("RIGHT" if self.LorR else "LEFT")+",pos=["+str(round(self.position[0],2))+','+str(round(self.position[1],2))+"],{"+(",".join([str(conn.ID) for conn in self.connections]))+("},FINISH)" if self.isFinish else "})"))
 
+    # class limboCone:
+    #     """ when cone measurements are not ready to be turned into full-blown cones, but you don't want to throw away data, use this class"""
+    #     def __init__(self, pos=None, leftOrRight=None):
+    #         self.position = pos
+    #         self.leftOrRight = leftOrRight
+
     class Target:
         """ a single point in the path of the car (a target to aim for) """
         def __init__(self, pos=[0,0]):
@@ -200,7 +206,17 @@ class Map:
             else:
                 return(self.getConeChainLen(currentCone.connections[(1 if (currentCone.connections[0].ID == prevCone.ID) else 0)], currentCone, lengthMem+1)) #continue sequence
         
-    
+    def find_finish_cones(self, onlyOneSide=None):
+        returnList = {False : None, True :None}
+        for LorR in self.cone_lists:
+            if((LorR != onlyOneSide) if (onlyOneSide is not None) else False):
+                continue # skip this loop if the user specified onlyOneSide (and it wasn't this side)
+            for cone in self.cone_lists[LorR]:
+                if(cone.isFinish):
+                    if(returnList[LorR] is not None):
+                        print("ERROR: more than 1 finish cone of the same color exist:", returnList[LorR], cone)
+                    returnList[LorR] = cone
+        return(returnList)
     
     def distanceToConeSquared(self, pos, conelist=None, sortByDistance=False, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, coneConnectionExclusions='NO_CONN_EXCL', ignoreLinkedConeIDs=[]):
         """ returns a list with squared distances to cones from a given position, 
@@ -335,13 +351,11 @@ class Map:
         if(overlaps):
             print("cant addConeObj(), there's already a cone there with ID:", overlappingCone.ID)
             return(False, overlappingCone)
-        if((len(self.finish_line_cones) >= 2) and isFinish):
+        if((len(self.find_finish_cones()) >= 2) and isFinish):
             print("addCone warning: there's already 2 finish cones. adding as non-finish cone...")
             isFinish = False
         aNewCone = self.Cone(self.maxConeID()+1, pos, leftOrRight, bool(isFinish)) #bool is just to make sure it's not a 0/1 int
         self.cone_lists[leftOrRight].append(aNewCone)
-        if(isFinish):
-            self.finish_line_cones.append(aNewCone)
         return(True, aNewCone)
     
     def addConeObj(self, coneObj: Cone, checkMaxConeID=True):
@@ -355,12 +369,10 @@ class Map:
             if((coneObj.ID <= maxConeID) and ((len(self.cone_lists[False])+len(self.cone_lists[True]))>0)):
                 print("addConeObj warning, ID (", coneObj.ID ,") too low! changing it to:", maxConeID+1)
                 coneObj.ID = maxConeID+1
-        if(coneObj.isFinish and ((len(self.finish_line_cones)>=2) or ((self.finish_line_cones[0].LorR == coneObj.LorR) if (len(self.finish_line_cones)==1) else False))):
-            print("addConeObj warning: there's already 2 finish cones. adding as non-finish cone...")
+        if(coneObj.isFinish and (self.find_finish_cones(coneObj.LorR) is None)):
+            print("addConeObj warning: there's already a finish cone. adding as non-finish cone...")
             coneObj.isFinish = False
         self.cone_lists[coneObj.LorR].append(coneObj)
-        if(coneObj.isFinish):
-            self.finish_line_cones.append(coneObj)
         return(True, coneObj)
     
     def removeCone(self, ID: int, LorRhint=None): #LorRhint is either a boolean (indicating which conelist to search) or None, at which point both lists will be searched
@@ -382,12 +394,6 @@ class Map:
             listToSearch = (self.cone_lists[True] if (coneIndexInList >= len(self.cone_lists[False])) else self.cone_lists[False])
             coneIndexInList = ((coneIndexInList-len(self.cone_lists[False])) if (coneIndexInList >= len(self.cone_lists[False])) else coneIndexInList)
         ##first, cleanly sever all ties to other things in the system
-        if(coneToDelete.isFinish):
-            finishConeIndex = GF.findIndexByClassAttr(self.finish_line_cones,'ID', ID) #(safely) try to find the cone in the finish_line_cones
-            if(finishConeIndex < 0): #if the cone thinks it's a finish cone, but it's not in the finish_line_cones, something went very wrong earlier!
-                print("removeCone WARNING: cone isFinish flag set, but not found in finish_line_cones!")
-            else:
-                self.finish_line_cones.pop(finishConeIndex)
         for connectedCone in coneToDelete.connections:
             if(len(connectedCone.coneConData) > 0): #it's always a list, but an empty one if coneConnecter is not used
                 connectedCone.coneConData.pop((0 if (connectedCone.connections[0].ID == coneToDelete.ID) else 1))
