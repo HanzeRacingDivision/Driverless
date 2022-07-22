@@ -29,7 +29,7 @@ class simCar(Map.Car):
         
         # self.simTrueCar = None # a (nested) simCar object used for positionalDrift.  MOVED to Map.simVars.car
     
-    def update(self, dTime, dDist=None, applyUpdate=True):
+    def update(self, dTime, dDist: float=None, applyUpdate=True):
         """ update the position of the car, based on velocity, steering and time-passage """
         if(dDist is None):
             dDist = self.velocity*dTime

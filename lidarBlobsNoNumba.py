@@ -1,3 +1,4 @@
+from typing import Callable
 from Map import Map  #used to get coneDiam
 import GF.generalFunctions as GF
 import numpy as np
@@ -30,7 +31,7 @@ blobType =np.dtype([('timestamp', np.float64),
                     ('pointCount', np.uint8)])
 
 #@njit
-def blobCreate(point, origin, timestamp):
+def blobCreate(point: np.ndarray, origin: np.ndarray, timestamp):
     newBlob = np.zeros(1, dtype=blobType)[0] #create a new blob object (filled with all 0's)
     newBlob['timestamp'] = timestamp
     newBlob['appendTimestamp'] = timestamp
@@ -40,7 +41,7 @@ def blobCreate(point, origin, timestamp):
     return(newBlob)
 
 #@njit
-def blobAppend(blob, point, origin, timestamp):
+def blobAppend(blob, point: np.ndarray, origin: np.ndarray, timestamp):
     """attempt to append a datapoint to the blob, return whether successful"""
     distAngle = GF.distAngleBetwPos(blob['points'][blob['pointCount']-1], point) #get gap size (and angle, while you're at it)
     if((distAngle[0] < maxBlobSingleGap)
@@ -56,7 +57,7 @@ def blobAppend(blob, point, origin, timestamp):
     else:
         return(False)
 
-def checkBlobAge(timestamp, uponExist=None, uponExistArgs=None, uponExistAppendTimeout=-1):
+def checkBlobAge(timestamp, uponExist: Callable=None, uponExistArgs=None, uponExistAppendTimeout=-1):
     """if blobs were last appended to more than 'uponExistAppendTimeout' seconds ago, call the 'uponExist' callback"""
     global blobInProgress
     if(blobInProgress is not None):
@@ -65,7 +66,7 @@ def checkBlobAge(timestamp, uponExist=None, uponExistArgs=None, uponExistAppendT
                 uponExist(blobInProgress, uponExistArgs)
             blobInProgress = None
 
-def blobify(point, origin, timestamp, uponExist=None, uponExistArgs=None, uponExistAppendTimeout=-1):
+def blobify(point: np.ndarray, origin: np.ndarray, timestamp, uponExist: Callable=None, uponExistArgs=None, uponExistAppendTimeout=-1):
     """deletes-, appends to- or creates blobs given a lidar measurement"""
     if(uponExistAppendTimeout > 0):
         checkBlobAge(timestamp, uponExist, uponExistArgs, uponExistAppendTimeout)

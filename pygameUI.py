@@ -57,7 +57,7 @@ deleteCursorSet = False
 
 
 
-def handleMousePress(pygameDrawerInput, buttonDown, button, pos, eventToHandle):
+def handleMousePress(pygameDrawerInput: DD.pygameDrawer, buttonDown: bool, button: int, pos, eventToHandle: pygame.event.Event):
     """(UI element) handle the mouse-press-events"""
     if(buttonDown and ((button == 1) or (button == 3))): #left/rigth mouse button pressed (down)
         pygame.event.set_grab(1)
@@ -183,7 +183,7 @@ def handleMousePress(pygameDrawerInput, buttonDown, button, pos, eventToHandle):
             pygameDrawerInput.updateViewOffset() #update it one last time (or at all, if this hasn't been running in redraw())
             pygameDrawerInput.movingViewOffset = False
 
-def handleKeyPress(pygameDrawerInput, keyDown, key, eventToHandle):
+def handleKeyPress(pygameDrawerInput: DD.pygameDrawer, keyDown: bool, key: int, eventToHandle: pygame.event.Event):
     """(UI element) handle the key-press-events
         see README.MD (github file) for what the keys do (or just scroll down and decypher)"""
     if(key==pygame.K_f): # f
@@ -215,8 +215,8 @@ def handleKeyPress(pygameDrawerInput, keyDown, key, eventToHandle):
             limitCounter = 0
             while(PF.makePath(pygameDrawerInput.mapToDraw) and (limitCounter<25)): #stops when path can no longer be advanced
                 limitCounter += 1
-            import pathPlanningTemp as PP
-            PP.makePathSpline(pygameDrawerInput.mapToDraw)
+            # import pathPlanningTemp as PP
+            # PP.makePathSpline(pygameDrawerInput.mapToDraw) # NOTE: moved to pathPlanningTemp.py to make sure it's only done when the first lap is completed
         elif((key==pygame.K_a) or ((key==pygame.K_PLUS) or (key==pygame.K_EQUALS)) or (key==pygame.K_MINUS)):
             if(key==pygame.K_a): # a
                 if(pygameDrawerInput.mapToDraw.car.pathFolData is not None):
@@ -319,7 +319,7 @@ def handleKeyPress(pygameDrawerInput, keyDown, key, eventToHandle):
 #            printComponentPickleSizes(getComponentPickleSize(pygameDrawerInput.mapToDraw, 2, 2000))
 
 
-# def currentpygameDrawerInput(pygameDrawerInputList, mousePos=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
+# def currentpygameDrawerInput(pygameDrawerInputList: list[DD.pygameDrawer], mousePos: tuple[int,int]=None, demandMouseFocus=True): #if no pos is specified, retrieve it using get_pos()
 #     """(UI element) return the pygameDrawer that the mouse is hovering over, or the one you interacted with last"""
 #     if(len(pygameDrawerInputList) > 1):
 #         if(mousePos is None):
@@ -338,7 +338,7 @@ def handleKeyPress(pygameDrawerInput, keyDown, key, eventToHandle):
 #     else:
 #         return(pygameDrawerInputList[0])
 
-def handleWindowEvent(pygameDrawerInput, eventToHandle):
+def handleWindowEvent(pygameDrawerInput: DD.pygameDrawer, eventToHandle: pygame.event.Event):
     """(UI element) handle general (pygame) window-event"""
     if(eventToHandle.type == pygame.QUIT):
         #global windowKeepRunning
@@ -422,7 +422,7 @@ def handleWindowEvent(pygameDrawerInput, eventToHandle):
             simToScale.viewOffset[1] -= dif[1]
 
 
-def handleAllWindowEvents(pygameDrawerInput):
+def handleAllWindowEvents(pygameDrawerInput: DD.pygameDrawer):
     """(UI element) loop through (pygame) window-events and handle all of them"""
     # pygameDrawerInputList = []
     # if(type(pygameDrawerInput) is list):

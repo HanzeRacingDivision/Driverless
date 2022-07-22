@@ -5,6 +5,8 @@
 
 
 
+from cmath import tan
+from typing import Callable
 import numpy as np
 
 from Map import Map
@@ -23,24 +25,24 @@ STEERING_RAW_TO_RAD_OFFSET = np.deg2rad(0.642)  # calibrated value
 class realCar(Map.Car, kartMCUserialClass, kartMCUserialLogger):
     """a class that handles the connection to the car (IRL, not simulated)
         (replace Map.Car object with this)"""
-    def __init__(self, clockFunc, logfilename=None):
+    def __init__(self, clockFunc: Callable, logfilename=None):
         Map.Car.__init__(self) # init Car object
         kartMCUserialClass.__init__(self, clockFunc) # init Car object
         kartMCUserialLogger.__init__(self, logfilename) # init logger
         
         #self.desired_steering_raw = np.int32(0) # see the @property for this value
-        self.lastEncoderVals = None
+        self.lastEncoderVals: np.ndarray = None
     
     def __del__(self): # the automatically generated __del__ function only calls 1 (custom?) __del__ function, the first parent class's one. This solves that
         kartMCUserialClass.__del__(self) # make sure to close the serial
         kartMCUserialLogger.__del__(self) # make sure to close the logfile
 
-    def setSteeringEnable(self, enabled):
+    def setSteeringEnable(self, enabled: bool):
         """enable/disable the steering motor (so a human can drive)
             (just a macro to requestSetSteeringEnable())"""
         self.requestSetSteeringEnable(self, enabled) # pass 'self' as carToUse
     
-    def setPedalPassthroughEnable(self, enabled):
+    def setPedalPassthroughEnable(self, enabled: bool):
         """enable/disable the throttle-pedal passthrough/override (so a human can drive)
             (just a macro to requestSetPedalPassthroughEnable())"""
         self.requestSetPedalPassthroughEnable(self, enabled) # pass 'self' as carToUse
@@ -57,15 +59,28 @@ class realCar(Map.Car, kartMCUserialClass, kartMCUserialLogger):
 
     def _encodersDiff(self, encoderValues: np.ndarray):
         if(self.lastEncoderVals is None):
+            # remember to set lastEncoderVals after each update()
             return(encoderValues)
         else:
             return(encoderValues - self.lastEncoderVals) # numpy array subtraction
 
     def _encodersToForwardMovement(self, encoderValues: np.ndarray): # note: use encoderValues in meters, NOT RAW!
-        ## TODO: calculate an appropriate forward distance-travelled based on the distance-travelled of each wheel
-        ## i'm thinking just the average of all wheels might work, or maybe just of the 2 rear wheels or something, i have to think about this some more...
+        ## TODO: filtering/smoothing
         encoDiff = self._encodersDiff(encoderValues)
-        return((encoDiff[0] + encoDiff[1]) / 2) # the average of the 2 rear wheels
+        centralTurnRadius, turningRadii = self.calcTurningRadii(self.steering)
+        averageCounter = 0
+        averageSum = 0.0
+        for i in range(4):
+            if(encoDiff[i] > 0.0):
+                averageCounter += 1
+                if(centralTurnRadius > 0.0): # alternatively, you could check abs(self.steering)
+                    averageSum += centralTurnRadius / turningRadii[i] * encoDiff[i] # when turning, the travel of each wheel is calculated thusly
+                else:
+                    averageSum += encoDiff[i] # if going in a straight line, no math has to be done
+        if(averageCounter > 0):
+            averageSum /= averageCounter # average over the number of wheels with new data only.
+        return(averageSum)
+        # return((encoDiff[0] + encoDiff[1]) / 2) # the average of the 2 rear wheels
     
     def _encodersToForwardSpeed(self, encoderValues: np.ndarray, dTime: float): # note: use encoderValues in meters, NOT RAW!
         ## TODO: calculate an appropriate forward velocity based on the distance-travelled of each wheel
@@ -73,7 +88,7 @@ class realCar(Map.Car, kartMCUserialClass, kartMCUserialLogger):
         #return((encoderValues[0] - self.lastEncoderVals[0]) / dTime)
         return(self._encodersToForwardMovement(encoderValues) / dTime)
 
-    def _update_pos(self, dTime, dDist=None, applyUpdate=True):
+    def _update_pos(self, dTime, dDist: float=None, applyUpdate=True):
         """ update the position of the car, based on velocity, steering and time-passage """
         if(dDist is None):
             dDist = self.velocity*dTime

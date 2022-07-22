@@ -11,7 +11,7 @@ import time #for debugging
 
 ########################### some (static!!!) functions ####################################
 
-def mapObjectToFile(mapToSave):
+def mapObjectToFile(mapToSave: Map):
     """convert Map object to pandas dataframe"""
     combinedConeList = mapToSave.cone_lists[False] + mapToSave.cone_lists[True]
     map_file = pd.DataFrame({'ConeID' : [cone.ID for cone in combinedConeList],
@@ -23,7 +23,7 @@ def mapObjectToFile(mapToSave):
                              'Conn_B' : [(cone.connections[1].ID if (len(cone.connections)>1) else None) for cone in combinedConeList]})
     return(map_file)
 
-def mapFileToObject(map_file):
+def mapFileToObject(map_file: pd.DataFrame):
     """convert pandas dataframe (map_file) to Map object"""
     mapObj = Map()
     if("ConeID" in map_file.columns): #storing the ConeID in the mapfile makes manual mapfile editing a lot easier and maploading in general less error-prone
@@ -70,7 +70,7 @@ def generateFilename():
     """generate a unique filename using mapLoader.defaultFilename and datetime"""
     return(mapLoader.defaultFilename + datetime.datetime.now().strftime("%Y-%m-%d_%H;%M;%S") + mapLoader.fileExt)
 
-def save_map(mapToSave: Map, filename=None, saveSimVarsMap=True):
+def save_map(mapToSave: Map, filename: str=None, saveSimVarsMap=True):
     """save map to excel file
         if no filename is provided, one with be automatically generated using generateFilename()
         simVars maps are also saved (if saveSimVarsMap==True) to a seperate file"""
@@ -96,7 +96,7 @@ def save_map(mapToSave: Map, filename=None, saveSimVarsMap=True):
         print("save_map simVar .to_excel time:", round(time.time()-saveStartTime,2))
     return(filename, map_file) #, map_file_simVar)   # i think returning the mapFile came from an old version where it was sent to a remote client, i'm just gonna leave it...
 
-def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
+def load_map_file(map_file: pd.DataFrame, whereToLoad=None):
     """loads a map file object (pandas dataframe)
         (optional) can load data into an existing map
         returns a new Map object"""
@@ -144,30 +144,30 @@ class mapLoader:
     fileExt = ".xlsx"
     defaultFilename = "map_"
     
-    #this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
-    @staticmethod
-    def mapObjectToFile(mapToSave):
-        return(mapObjectToFile(mapToSave))
+    # #this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
+    # @staticmethod
+    # def mapObjectToFile(mapToSave):
+    #     return(mapObjectToFile(mapToSave))
     
-    @staticmethod
-    def mapFileToObject(map_file):
-        return(mapFileToObject(map_file))
+    # @staticmethod
+    # def mapFileToObject(map_file):
+    #     return(mapFileToObject(map_file))
     
-    @staticmethod
-    def generateFilename():
-        return(generateFilename)
+    # @staticmethod
+    # def generateFilename():
+    #     return(generateFilename)
     
-    @staticmethod
-    def save_map(mapToSave: Map, filename=None):
-        return(save_map(mapToSave, filename))
+    # @staticmethod
+    # def save_map(mapToSave: Map, filename=None):
+    #     return(save_map(mapToSave, filename))
     
-    @staticmethod
-    def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
-        return(load_map_file(map_file, whereToLoad))
+    # @staticmethod
+    # def load_map_file(map_file: pd.core.frame.DataFrame, whereToLoad=None):
+    #     return(load_map_file(map_file, whereToLoad))
     
-    @staticmethod
-    def load_map(filename: str, whereToLoad=None):
-        return(load_map(filename, whereToLoad))
+    # @staticmethod
+    # def load_map(filename: str, whereToLoad=None):
+    #     return(load_map(filename, whereToLoad))
 
 # if __name__ == '__main__':
 #     loader = mapLoader()

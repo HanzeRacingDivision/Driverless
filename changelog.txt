@@ -42,16 +42,21 @@ massively increased defaultOverlapTolerance
 removed Map.finish_line_cones in favor of a function that just searches the cone_lists. More CPU intensive, easier to program tho
 realLidar lidarClass now stores self.carToUse to make the functions a little easier to read/use
 made mainLog.py, which logs some general values (car positions and stuff)
+added type hints (to get proper syntax coloring) to many functions (across all files) and to Map.py specifically
+renamed/restructured some variables in pathPlanningTemp, including: left_ and right_spline, path_midpoints_spline are now boundrySplines and targetSpline respectively (also, their contents changed!)
+changed pathfollowing to use cubic spline points instead of target points
 
 in-progress:
+temporatily set lidar count to 0 (in NON-simulation!)
+tune pathFollowingTemp (and splines in general)
 temporarly set simulatedLidar and vision error to 0
 SLAM_DIY change the way trust works to over- or undervalue newer/older cone positions AND how much SLAM can alter the car position
 
 next up:
-tune pathFollowingTemp
 allow camera tilt (oh god, rendering math...)
 another round of function labels """""" couldn't hurt
-update target positions if cone positions change
+type hints for the what the functions RETURN (i mean, if i can type-hint the inputs, why not also the outputs...)
+further improve target spline driving (bezier curves??? minimize length- and rotation while maintaining safe dist from boundaries?)
 extra support for bigger (finish?) and orange cones ? (at least drawing, i dont know about other stuff...)
 delaunay triangulation testing (make a basic implementation and draw it, then we'll figure out what to do with it later)
 make a fun new carSprite
@@ -63,7 +68,7 @@ automation (automatic first lap track construction)
 pickle file map loading?
 making 'simulation' a boolean in the map class??? (instead of having to check the contents of .simVar and whatnot)
 
-note: lidar arduino blobs are still in MM, while blobs here are in meters (same unit as the rest of the code, makes things easier)
+note: lidar arduino blobs may still be in MM, while blobs here are in meters (same unit as the rest of the code, makes things easier)
 
 improved hardcoded auto-driving?
 improved UI for making maps?

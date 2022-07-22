@@ -4,9 +4,10 @@
 
 
 
-import numpy as np  #general math library
+import numpy as np
+from pyparsing import dict_of  #general math library
 
-#from Map import Map
+from Map import Map # (currently) only used to help with syntax coloring
 import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
@@ -22,8 +23,19 @@ class coneConnection: #a class to go in Map.Cone.coneConData. This carries some 
 
 ########################### some (static!!!) functions ####################################
 
+def _applyConeConnection(coneToConnect: Map.Cone, winningCone: Map.Cone, strengthVal, distAngle: list[float,float]=None):
+    if(distAngle is None):
+        distAngle = GF.distAngleBetwPos(coneToConnect.position, winningCone.position)
+    ## input cone
+    coneToConnect.connections.append(winningCone) #save cone pointer in the .connections list
+    coneToConnect.coneConData.append(coneConnection(distAngle[1], distAngle[0], strengthVal))
+    ## and the other cone
+    winningCone.connections.append(coneToConnect)
+    winningCone.coneConData.append(coneConnection(GF.radInv(distAngle[1]), distAngle[0], strengthVal))
 
-def connectCone(mapToUse, coneToConnect, applyResult=True, printDebug=True): #attempt to connect a given cone
+
+
+def connectCone(mapToUse: Map, coneToConnect: Map.Cone, applyResult=True, printDebug=True): #attempt to connect a given cone
     """attempt to connect a cone to a suitable cone. selection is based on distance, angle and several other parameters"""
     #the correct cone should be selected based on a number of parameters:
     #distance to last cone, angle difference from last and second-to-last cones's, angle that 'track' is (presumably) going based on cones on other side (left/right) (if right cones make corner, left cones must also), etc
@@ -102,15 +114,10 @@ def connectCone(mapToUse, coneToConnect, applyResult=True, printDebug=True): #at
         ## make the connection:
         winningCone = nearbyConeList[bestCandidateIndex][0] #pointer to a Cone class object
         if(applyResult): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
-            ## input cone
-            coneToConnect.connections.append(winningCone) #save cone pointer in the .connections list
-            coneToConnect.coneConData.append(coneConnection(nearbyConeList[bestCandidateIndex][1][1], nearbyConeList[bestCandidateIndex][1][0], highestStrength))
-            ## and the other cone
-            winningCone.connections.append(coneToConnect)
-            winningCone.coneConData.append(coneConnection(GF.radInv(nearbyConeList[bestCandidateIndex][1][1]), nearbyConeList[bestCandidateIndex][1][0], highestStrength))
+            _applyConeConnection(coneToConnect, winningCone, highestStrength, nearbyConeList[bestCandidateIndex][1])
         return(True, winningCone) #return the cone you connected with (or are capable of connecting with, if applyResult=False)
 
-def connectConeSuperSimple(mapToUse, coneToConnect, applyResult=True, printDebug=True):
+def connectConeSuperSimple(mapToUse: Map, coneToConnect: Map.Cone, applyResult=True, printDebug=True):
     """attempt to (quickly) connect a cone to a suitable cone. selection is based on (squared) distance and a few other parameters"""
     currentConnectionCount = len(coneToConnect.connections)
     if(currentConnectionCount >= 2):#if cone is already doubly connected
@@ -142,19 +149,51 @@ def connectConeSuperSimple(mapToUse, coneToConnect, applyResult=True, printDebug
         ## make the connection:
         winningCone = nearbyConeList[bestCandidateIndex][0] #pointer to a Cone class object
         if(applyResult): #True in 99% of situations, but if you want to CHECK a connection without committing to it, then this should be False
-            dist, angle = GF.distAngleBetwPos(coneToConnect.position, winningCone.position)
-            ## input cone
-            coneToConnect.connections.append(winningCone) #save cone pointer in the .connections list
-            coneToConnect.coneConData.append(coneConnection(angle, dist, highestStrength))
-            ## and the other cone
-            winningCone.connections.append(coneToConnect)
-            winningCone.coneConData.append(coneConnection(GF.radInv(angle), dist, highestStrength))
+            _applyConeConnection(coneToConnect, winningCone, highestStrength, None)
         return(True, winningCone) #return the cone you connected with (or are capable of connecting with, if applyResult=False)
 
-def findFirstCones(mapToUse):
+def findFirstCones(mapToUse: Map, onlyOneSide=None):
     """find the first left/right cones"""
-    returnList = [None, None] # return a left and a right cone
+    firstCones = {False : None, True :None} # return a left and a right cone
+    import pathFinding      as PF # used to retieve pathFirstLinePosDist
+    for LorR in mapToUse.cone_lists: # iterates over keys!
+        if((LorR != onlyOneSide) if (onlyOneSide is not None) else False):
+            continue # skip this loop if the user specified onlyOneSide (and it wasn't this side)
+        nearbyConeList = mapToUse.distanceToCone(mapToUse.car.position, mapToUse.cone_lists[LorR], 'SORTBY_DIST', simpleThreshold=PF.pathFinder.pathFirstLinePosDist)
+        for cone, distAngle in nearbyConeList:
+            # if cone == good ?
+            firstCones[LorR] = cone
+            break
+    return(firstCones)
 
+def connectFirstCones(mapToUse: Map, firstCones: dict[bool,Map.Cone], onlyOneSide=None, makeFinish=False):
+    # if((firstCones[False] is None) or (firstCones[True] is None)):
+    #     print("cant connectFirstCones(), firstCones are None")
+    import pathFinding      as PF # used to retrieve pathFirstLineCarAngleDeltaMax
+    connectedCones = {False : None, True : None}
+    for LorR in firstCones: # iterates over keys!
+        if((LorR != onlyOneSide) if (onlyOneSide is not None) else False):
+            continue # skip this loop if the user specified onlyOneSide (and it wasn't this side)
+        if(firstCones[LorR] is None):
+            continue
+        connectSucces, connectedCones[LorR] = connectCone(mapToUse, firstCones[LorR], True, True)
+        if(not connectSucces):
+            continue
+        if(makeFinish): # if the code makes it here, the fistCone was probably good, in which case you might want to use it as a finish line (also makes pathFinding easier...)
+            firstCones[LorR].isFinish = True # (note: this pointer cone should also affect the cone in the cone_lists)
+        # the boundry needs to be built in the same direction as the car is facing, so make sure that this first connection actually does allows for that
+        angleLikeCar = abs(GF.radDiff(mapToUse.car.angle, GF.distAngleBetwPos(firstCones[LorR].position, connectedCones[LorR].position)[1]))
+        if(angleLikeCar > PF.pathFinder.pathFirstLineCarAngleDeltaMax):
+            # the connection was with a cone on the wrong side, let's just try to connect another cone
+            connectSucces, connectedCones[LorR] = connectCone(mapToUse, firstCones[LorR], True, True) # attempt to doubly-connect the fistCone, in hopes of 
+            angleLikeCarSecond = abs(GF.radDiff(mapToUse.car.angle, GF.distAngleBetwPos(firstCones[LorR].position, connectedCones[LorR].position)[1]))
+            if(not connectSucces):
+                print("connectFirstCones() first connection was the wrong direction and there is no second connection.")
+            elif(angleLikeCarSecond > PF.pathFinder.pathFirstLineCarAngleDeltaMax):
+                print("connectFirstCones() somehow both connections are at bad angles with respect to the car!", angleLikeCar, angleLikeCarSecond)
+                if(angleLikeCarSecond > angleLikeCar): # if the second one sucks even more than the first one
+                    connectedCones[LorR] = firstCones[LorR].connections[0] # go back to the first one
+    return(connectedCones)
 
 class coneConnecter():
     """a static class with constants and (pointers to) functions to connect cones (to form a track boundry).
@@ -164,16 +203,20 @@ class coneConnecter():
     # coneConnectionLowChainLen = 3 #if the connection length of coneToConnect is higher than this, devalue the length of the pospect cone's connections #NOT IMPLEMENTED (YET?)
     coneConnectionHighChainLen = 5 #the longer the sequence, the better, but any longer than this is just as good as this (strength saturation). (not hard threshold)
     coneConnectionHighAngleDelta = np.deg2rad(60) #IMPORTANT: not actual hard threshold, just distance at which lowest strength-score is given
-    coneConnectionMaxAngleDelta = np.deg2rad(120) #if the angle difference is larger than this, it just doesnt make sense to connect them. (this IS a hard threshold)
-    coneConnectionRestrictiveAngleChangeThreshold = np.deg2rad(20) # the most-restrictive-angle code only switches if angle is this much more restrictive
+    coneConnectionMaxAngleDelta = np.deg2rad(80) #if the angle difference is larger than this, it just doesnt make sense to connect them. (this IS a hard threshold)
+    coneConnectionRestrictiveAngleChangeThreshold = np.deg2rad(30) # the most-restrictive-angle code only switches if angle is this much more restrictive
     coneConnectionRestrictiveAngleStrengthThreshold = 0.5 # the strength of the more restrictive cone needs to be at least this proportion of the old (less restrictive angle) strength
+
+    findFirstConesDelay = 3.0 # how long to wait before even looking for the first cones (give the sensor data some time to come in)
+    findFirstConesInterval = 1.0 # how long inbetween findFirstCones() attempts
+    defaultConeConnectInterval = 0.5 # how long between default boundry-building calls. Note: it will only build 1 cone at-a-time, so don't make this too long, but also not too long (sensor data needs time)
     
-    #this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
-    @staticmethod
-    def connectCone(mapToUse, coneToConnect, applyResult=True):
-        return(connectCone(mapToUse, coneToConnect, applyResult))
+    # #this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
+    # @staticmethod
+    # def connectCone(mapToUse, coneToConnect, applyResult=True, printDebug=True):
+    #     return(connectCone(mapToUse, coneToConnect, applyResult, printDebug))
     
-    @staticmethod
-    def connectConeSuperSimple(mapToUse, coneToConnect, applyResult=True):
-        return(connectConeSuperSimple(mapToUse, coneToConnect, applyResult))
+    # @staticmethod
+    # def connectConeSuperSimple(mapToUse, coneToConnect, applyResult=True, printDebug=True):
+    #     return(connectConeSuperSimple(mapToUse, coneToConnect, applyResult, printDebug))
     

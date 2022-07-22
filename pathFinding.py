@@ -9,27 +9,30 @@ import GF.generalFunctions as GF #(homemade) some useful functions for everyday 
 
 
 
-class pathFinderData: #a class to go in Map.Target.coneConData or Map.Target.pathFolData, if Alex approves
-    """some data to go in .coneConData of Map.Target objects (TBD: put in .pathFolData?)"""
-    def __init__(self, heading=0, track_width=0, cones=[None, None], strength=0):
+class pathFinderData: #a class to go in Map.Target.coneConData (could be moved to pathFolData)
+    """some data to go in .coneConData of Map.Target objects (TBD?: put in .pathFolData?)"""
+    def __init__(self, heading=0, track_width=0, cones: list[Map.Cone]=[None, None], strength=0):
         #self.position = np.array([pos[0], pos[1]])
         self.heading = heading #angle the car should (roughly) face when crossing this target
         self.track_width = track_width #width of the track at that point (target is a point between 2 cones, so width is NOT very accurate if the cones are not on exactly opposite sides (shifted forw/backw))
+        self.cones: list[Map.Cone] # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
         self.cones = [cones[0], cones[1]]
         self.strength = strength #path-finding strength (highest strength option was used)
 
 
-def makePath(mapToUse):
+def makePath(mapToUse: Map, printDebug=True):
     """find Target points between connected cones (track boundry),
         the first Target is placed on the finish lines (if available) or near the car"""
     # target_list content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
     # left/right-ConeList content: [cone ID, [x,y], [[cone ID, index, angle, distance, cone-connection-strength], [(same as last entry)]], cone data]
     if(mapToUse.targets_full_circle):
-        print("not gonna make path, already full circle")
+        if(printDebug):
+            print("not gonna make path, already full circle")
         return(False)
     if(len(mapToUse.target_list) == 0): #if there is no existing path to go on
         if((len(mapToUse.cone_lists[True]) < 2) or (len(mapToUse.cone_lists[False]) < 2)): #first pathLine can only be made between 2 connected cones
-            print("not enough cones in one or more coneLists, cant place first pathLine")
+            if(printDebug):
+                print("not enough cones in one or more coneLists, cant place first pathLine")
             return(False)
         
         #search cones here
@@ -37,7 +40,8 @@ def makePath(mapToUse):
         strengths = [0.0, 0.0]
         finishCones = mapToUse.find_finish_cones()
         if((finishCones[False] is not None) or (finishCones[True] is not None)):
-            print("using finish cone(s) to make first pathLine")
+            if(printDebug):
+                print("using finish cone(s) to make first pathLine")
             if(finishCones[False] is not None):
                 firstCones[0] = finishCones[False]
             if(finishCones[True] is not None):
@@ -61,14 +65,16 @@ def makePath(mapToUse):
                         candidatesDiscarded += 1
                     elif(not (connectionAnglesAllowed[0] or connectionAnglesAllowed[1])):
                         ## neither of the connections on this candidate 
-                        print("neither connections have acceptable angles")
+                        if(printDebug):
+                            print("neither connections have acceptable angles")
                         candidatesDiscarded += 1
                     elif(connectionAnglesAllowed[0] and connectionAnglesAllowed[1]):
                         ## somehow, both connections are alligned with the car, and since coneConnectionMaxAngleDelta exists, that should be impossible
                         print("impossible angle sitch 1")
                         candidatesDiscarded += 1
                     elif(coneOverlapsCar):
-                        print("cone overlaps car")
+                        if(printDebug):
+                            print("cone overlaps car")
                         candidatesDiscarded += 1
                     else:
                         coneCandidateStrength = 1 #init var
@@ -99,7 +105,8 @@ def makePath(mapToUse):
                             highestStrength = coneCandidateStrength
                             bestCandidateIndex = i
                 if((bestCandidateIndex < 0) or (highestStrength <= 0) or (len(firstConeCandidates) == candidatesDiscarded)):
-                    print("it seems no suitible candidates for first "+("right" if (LorR==1) else "left")+" cone were found at all... bummer.", len(firstConeCandidates), candidatesDiscarded, bestCandidateIndex, highestStrength)
+                    if(printDebug):
+                        print("it seems no suitible candidates for first "+("right" if (LorR==1) else "left")+" cone were found at all... bummer.", len(firstConeCandidates), candidatesDiscarded, bestCandidateIndex, highestStrength)
                     return(False)
                 ## if the code makes it here, a suitable first cone has been selected.
                 #print("first "+("right" if (LorR==1) else "left")+" cone found!", highestStrength, bestCandidateIndex, len(firstConeCandidates), candidatesDiscarded)
@@ -121,7 +128,8 @@ def makePath(mapToUse):
             lastCones.append(lastPathLine.coneConData.cones[LorR])
             lastConnectionCount = len(lastCones[LorR].connections)
             if(lastConnectionCount < 1):
-                print("no connections on lastCones["+("right" if (LorR==1) else "left")+"] (impossible):", lastCones[LorR])
+                if(printDebug):
+                    print("no connections on lastCones["+("right" if (LorR==1) else "left")+"] (impossible):", lastCones[LorR])
                 return(False)
             connectedConesProspectable = [];  prospectConnectionIndex = 0
             for i in range(lastConnectionCount):
@@ -133,7 +141,8 @@ def makePath(mapToUse):
                     if(lastCones[LorR].connections[i].ID == target.coneConData.cones[LorR].ID): #if the only connected cone is ALSO (already) in the target_list, then you cant make any more path
                         connectedConesProspectable[i] = False;
             if((lastConnectionCount == 1) and (not connectedConesProspectable[0])):
-                print("single lastCones["+("right" if (LorR==1) else "left")+"] connection already in target_list (path at end of cone line, make more connections)")
+                if(printDebug):
+                    print("single lastCones["+("right" if (LorR==1) else "left")+"] connection already in target_list (path at end of cone line, make more connections)")
                 return(False)
             elif(lastConnectionCount >= 2):
                 if(connectedConesProspectable[0] and connectedConesProspectable[1]):
@@ -165,9 +174,11 @@ def makePath(mapToUse):
                         #about to go full-circle, use connections[1] as prospectCone
                         prospectConnectionIndex = 1
                     elif(lastCones[LorR].ID == mapToUse.target_list[0].coneConData.cones[LorR].ID): #the prospectcone on this side doesnt matter, it all about this lastCone
-                        print("nearing a full circle")
+                        if(printDebug):
+                            print("nearing a full circle")
                     else: #something is just very wrong
-                        print("both lastCones["+("right" if (LorR==1) else "left")+"].connections already in target_list, something is very wrong")
+                        if(printDebug):
+                            print("both lastCones["+("right" if (LorR==1) else "left")+"].connections already in target_list, something is very wrong")
                         return(False)
             lastConeAvgConnAngle.append((GF.radMidd(GF.radInv(lastCones[LorR].coneConData[0].angle), lastCones[LorR].coneConData[1].angle)) if (lastConnectionCount >= 2) else (lastCones[LorR].coneConData[0].angle))
             #and now the prospect cones
@@ -177,7 +188,8 @@ def makePath(mapToUse):
         if(((prospectCones[0].ID == mapToUse.target_list[0].coneConData.cones[0].ID) and (prospectCones[1].ID == mapToUse.target_list[0].coneConData.cones[1].ID)) \
             or ((lastCones[0].ID == mapToUse.target_list[0].coneConData.cones[0].ID) and (prospectCones[1].ID == mapToUse.target_list[0].coneConData.cones[1].ID)) \
             or ((prospectCones[0].ID == mapToUse.target_list[0].coneConData.cones[0].ID) and (lastCones[1].ID == mapToUse.target_list[0].coneConData.cones[1].ID))):
-            print("path full circle (by default)")
+            if(printDebug):
+                print("path full circle (by default)")
             mapToUse.targets_full_circle = True
             return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
         
@@ -212,10 +224,12 @@ def makePath(mapToUse):
                 maxStrengthIndex = i
                 winningCones[0] = allCones[(0 if (i==0) else 2)];  winningCones[1] = allCones[(1 if (i==1) else 3)]
         
-        print("path found:", maxStrengthIndex, "at strength:", round(maxStrengthVal, 2))
+        if(printDebug):
+            print("path found:", maxStrengthIndex, "at strength:", round(maxStrengthVal, 2))
         #check if you've gone full circle
         if((winningCones[0].ID == mapToUse.target_list[0].coneConData.cones[0].ID) and (winningCones[1].ID == mapToUse.target_list[0].coneConData.cones[1].ID)):
-            print("path full circle (from winning cones)")
+            if(printDebug):
+                print("path full circle (from winning cones)")
             mapToUse.targets_full_circle = True
             return(False) #technically, no new pathLine was added, but it does feel a little wrong to output the same value as errors at such a triumphant moment in the loop. 
         else:
@@ -238,10 +252,10 @@ class pathFinder():
     pathFirstLinePosDist = minBoundarySpacing * 0.9 # simple center to center distance, hard threshold, used to filter out very far cones
     pathFirstLineCarDist = minBoundarySpacing * 0.5 # (shortest dist to chassis) not hard threshold, just distance at which lowest strength-score is given
         
-    #this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
-    @staticmethod
-    def makePath(mapToUse):
-        return(makePath(mapToUse))
+    # #this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
+    # @staticmethod
+    # def makePath(mapToUse):
+    #     return(makePath(mapToUse))
     
 
 

@@ -12,7 +12,7 @@ import GF.generalFunctions as GF #(homemade) some useful functions for everyday 
 
 class pygameDrawerCommon():
     """a class to render Map objects overtop of a camera stream"""
-    def __init__(self, mapToDraw, window, drawSize=(1280,720), drawOffset=(0,0)):
+    def __init__(self, mapToDraw: Map, window: pygame.Surface, drawSize=(1280,720), drawOffset=(0,0)):
         self.window = window #pass on the window object (pygame)
         self.drawSize = (int(drawSize[0]),int(drawSize[1])) #width and height of the display area (does not have to be 100% of the window)
         self.drawOffset = (int(drawOffset[0]), int(drawOffset[1])) #draw position offset, (0,0) is topleft
@@ -55,7 +55,7 @@ class pygameDrawerCommon():
         self.drawCarHist = False #just for UI purposes, to toggle between showing the position history (thin white line) or not
         self.extraViewMode = False #triggered with CTRL+V, can be used to switch between normal and 3D view, or whatever else you want
     
-    def isInsideWindowPixels(self, pixelPos):
+    def isInsideWindowPixels(self, pixelPos: np.ndarray):
         """whether or not a pixel-position is inside the window"""
         return((pixelPos[0] < (self.drawSize[0] + self.drawOffset[0])) and (pixelPos[0] > self.drawOffset[0]) and (pixelPos[1] < (self.drawSize[1] + self.drawOffset[1])) and (pixelPos[1] > self.drawOffset[1]))
     
@@ -123,7 +123,7 @@ class pygameDrawerCommon():
 
 class pygameDrawer(pygameDrawerCommon):
     """a class to draw Map objects (also includes drawing of UI some elements for manually making tracks)"""
-    def __init__(self, mapToDraw, window, drawSize=(1200,600), drawOffset=(0,0), carCamOrient=0, sizeScale=100, startWithCarCam=False, invertYaxis=True):
+    def __init__(self, mapToDraw: Map, window: pygame.Surface, drawSize=(1200,600), drawOffset=(0,0), carCamOrient=0, sizeScale=100, startWithCarCam=False, invertYaxis=True):
         pygameDrawerCommon.__init__(self, mapToDraw, window, drawSize, drawOffset)
         
         self.viewOffset = [0.0, 0.0] #'camera' view offsets, changing this affects the real part of realToPixelPos()
@@ -190,7 +190,7 @@ class pygameDrawer(pygameDrawerCommon):
             print("couldn't set viewOffset to car pos:", theExcept)
     
     #pixel conversion functions (the most important functions in here)
-    def pixelsToRealPos(self, pixelPos):
+    def pixelsToRealPos(self, pixelPos: np.ndarray):
         """return a (real) position for a given pixel position (usually mouse position)
             (mostly used for UI)"""
         if(self.carCam):
@@ -231,7 +231,7 @@ class pygameDrawer(pygameDrawerCommon):
         """draw the background"""
         self.window.fill(self.bgColor, (self.drawOffset[0], self.drawOffset[1], self.drawSize[0], self.drawSize[1])) #dont fill entire screen, just this pygamesim's area (allowing for multiple sims in one window)
     
-    def _dashedLine(self, lineColor, startPixelPos, endPixelPos, lineWidth, dashPixelPeriod=20, dashDutyCycle=0.5):
+    def _dashedLine(self, lineColor: pygame.Color, startPixelPos: np.ndarray, endPixelPos: np.ndarray, lineWidth: int, dashPixelPeriod=20, dashDutyCycle=0.5):
         """(sub function) draw a dashed line"""
         pixelDist, angle = GF.distAngleBetwPos(startPixelPos, endPixelPos)
         for i in range(int(pixelDist/dashPixelPeriod)):
@@ -239,18 +239,18 @@ class pygameDrawer(pygameDrawerCommon):
             dashEndPos = GF.distAnglePosToPos(i*dashPixelPeriod + dashPixelPeriod*dashDutyCycle, angle, startPixelPos)
             pygame.draw.line(self.window, lineColor, dashStartPos, dashEndPos, int(lineWidth))
 
-    def _drawCubicSplinesList(self, splineListToDraw, splineColor, drawDots=True):
+    def _drawCubicSplinesList(self, splineListToDraw: list[tuple[float,float]], splineColor: pygame.Color, drawDots=True):
         """(sub function) draw cubic splines"""
         splinePointPixelDiam = self.splinePointDiam * self.sizeScale
-        for i in range(len(splineListToDraw[0])):
-            splinePointPos = self.realToPixelPos([splineListToDraw[0][i], splineListToDraw[1][i]])
+        for i in range(len(splineListToDraw)):
+            splinePointPos = self.realToPixelPos([splineListToDraw[i][0], splineListToDraw[i][1]])
             if(drawDots):
                 pygame.draw.ellipse(self.window, splineColor, [GF.ASA(-(splinePointPixelDiam/2), splinePointPos), [splinePointPixelDiam, splinePointPixelDiam]]) #draw cone
             if(i > 0):#if more than one spline point exists (and the forloop is past the first one)
-                lastSplinePointPos = self.realToPixelPos([splineListToDraw[0][i-1], splineListToDraw[1][i-1]])
+                lastSplinePointPos = self.realToPixelPos([splineListToDraw[i-1][0], splineListToDraw[i-1][1]])
                 pygame.draw.line(self.window, splineColor, lastSplinePointPos, splinePointPos, self.coneConnectionLineWidth) #line from center pos to center pos
 
-    def _drawConeList(self, coneListToDraw, coneColor, drawLines=True, drawSlamData=0):
+    def _drawConeList(self, coneListToDraw: list[Map.Cone], coneColor: pygame.Color, drawLines=True, drawSlamData=0):
         """(sub function) draw a one arbitrary cone list"""
         conePixelDiam = Map.Cone.coneDiam * self.sizeScale
         drawnLineList = [] #[ [ID, ID], ] just a list of drawn lines by ID
@@ -306,17 +306,17 @@ class pygameDrawer(pygameDrawerCommon):
         """draw the cones and their connections
             (if enabled, draw qubic splines instead of direct connections)"""
         if(self.mapToDraw.simVars is not None):
-            for LorR in range(2):
+            for LorR in self.mapToDraw.cone_lists: # iterates over keys!
                 coneColor = self.rightUndetectedConeColor if LorR else self.leftUndetectedConeColor
                 coneListToDraw = self.mapToDraw.simVars.cone_lists[LorR]
                 self._drawConeList(coneListToDraw, coneColor, drawLines, 0)
-        for LorR in range(2):
+        for LorR in self.mapToDraw.cone_lists: # iterates over keys!
             coneColor = self.rightConeColor if LorR else self.leftConeColor
             coneListToDraw = self.mapToDraw.cone_lists[LorR]
             self._drawConeList(coneListToDraw, coneColor, drawLines and (not self.drawCubicSplines), drawSlamData)
             if(self.drawCubicSplines):
                 # TBD: simVars splines?
-                self._drawCubicSplinesList((self.mapToDraw.pathFolData.right_spline if LorR else self.mapToDraw.pathFolData.left_spline), coneColor)
+                self._drawCubicSplinesList(self.mapToDraw.pathFolData.boundrySplines[LorR], coneColor)
     
     # def drawCubicSplinesFunc() # currently included in drawCones(), but could be seperated
     
@@ -325,18 +325,18 @@ class pygameDrawer(pygameDrawerCommon):
             (if enabled, draw qubic splines instead of direct connections)"""
         # target_list content:  [center point ([x,y]), [line angle, path (car) angle], track width, [ID, cone pos ([x,y]), index (left)], [(same as last entry but for right-side cone)], path-connection-strength]
         pathCenterPixelDiam = self.pathPointDiam * self.sizeScale
-        if(self.drawCubicSplines):
+        if(self.drawCubicSplines and (len(self.mapToDraw.pathFolData.targetSpline) > 0)):
             splinePointPixelDiam = self.splinePointDiam * self.sizeScale
-            for i in range(len(self.mapToDraw.pathFolData.path_midpoints_spline[0])):
-                targetPos = self.realToPixelPos([self.mapToDraw.pathFolData.path_midpoints_spline[0][i], self.mapToDraw.pathFolData.path_midpoints_spline[1][i]])
+            for i in range(len(self.mapToDraw.pathFolData.targetSpline)):
+                targetPos = self.realToPixelPos([self.mapToDraw.pathFolData.targetSpline[i].position[0], self.mapToDraw.pathFolData.targetSpline[i].position[1]])
                 if(drawPoints):
                     pygame.draw.ellipse(self.window, self.pathColor, [GF.ASA(-(splinePointPixelDiam/2), targetPos), [splinePointPixelDiam, splinePointPixelDiam]]) #draw spline point
                 if(i > 0):#if more than one path point exists (and the forloop is past the first one)
-                    lastTargetPos = self.realToPixelPos([self.mapToDraw.pathFolData.path_midpoints_spline[0][i-1], self.mapToDraw.pathFolData.path_midpoints_spline[1][i-1]])
+                    lastTargetPos = self.realToPixelPos([self.mapToDraw.pathFolData.targetSpline[i-1].position[0], self.mapToDraw.pathFolData.targetSpline[i-1].position[1]])
                     pygame.draw.line(self.window, self.pathColor, lastTargetPos, targetPos, self.pathLineWidth) #line from center pos to center pos
-            # if(self.mapToDraw.targets_full_circle and (len(self.mapToDraw.pathFolData.path_midpoints_spline[0]) > 1)): #note: this depends on mapToDraw, which path_midpoints_spline might not, be careful
-            #     startingPos = self.realToPixelPos([self.mapToDraw.pathFolData.path_midpoints_spline[0][0], self.mapToDraw.pathFolData.path_midpoints_spline[1][0]])
-            #     endingPos = self.realToPixelPos([self.mapToDraw.pathFolData.path_midpoints_spline[0][-1], self.mapToDraw.pathFolData.path_midpoints_spline[1][-1]])
+            # if(self.mapToDraw.targets_full_circle and (len(self.mapToDraw.pathFolData.targetSpline) > 1)): #note: this depends on mapToDraw, which targetSpline might not, be careful
+            #     startingPos = self.realToPixelPos([self.mapToDraw.pathFolData.targetSpline[0].position[0], self.mapToDraw.pathFolData.targetSpline[0].position[1]])
+            #     endingPos = self.realToPixelPos([self.mapToDraw.pathFolData.targetSpline[-1].position[0], self.mapToDraw.pathFolData.targetSpline[-1].position[1]])
             #     pygame.draw.line(self.window, self.pathColor, endingPos, startingPos, self.pathLineWidth) #line that loops around to start
         else:
             for i in range(len(self.mapToDraw.target_list)):
@@ -363,7 +363,7 @@ class pygameDrawer(pygameDrawerCommon):
         if((finishCones[False] is not None) and (finishCones[True] is not None)):
             pygame.draw.line(self.window, self.finishLineColor, self.realToPixelPos(finishCones[False].position), self.realToPixelPos(finishCones[True].position), self.finishLineWidth)
     
-    def _drawCar(self, carToDraw, polygonMode, headlights, isSimVars=False):
+    def _drawCar(self, carToDraw: Map.Car, polygonMode: bool, headlights: bool, isSimVars=False):
         """(sub function) draws an arbitrary Car object"""
         chassisCenter = carToDraw.getChassisCenterPos()
         # isInsideWindowPixels
@@ -391,15 +391,16 @@ class pygameDrawer(pygameDrawerCommon):
             pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
         else:
             if(headlights):# draw headlights (first, to not overlap car sprite)
-                headlightsImageSize = int(2.0*2*self.sizeScale) #2.0 is arbitrary for now, to be replaced with apprixate camera/sensor range
+                headlightsImageSize = int(4.0*2*self.sizeScale) #2.0 is arbitrary for now, to be replaced with apprixate camera/sensor range
                 headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
                 headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
                 #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
                 headlightsCenterAngle = -1 * np.rad2deg((self.carCamOrient) if self.carCam else (carToDraw.angle))
-                headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), headlightsCenterAngle-60, headlightsCenterAngle+60, fill= (55, 55, 35))
+                headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), headlightsCenterAngle-(carToDraw.cameraFOV[0]/2), headlightsCenterAngle+(carToDraw.cameraFOV[0]/2), fill= (55, 55, 35))
                 headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
                 headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(chassisCenter))
                 self.window.blit(headlightsImage, headlightsImage_rect)
+                print("now", headlightsImageSize, (0, 0))
             # carSizeScale = min(self.sizeScale, 400) # a quick 'n dirty FPS fix! (pygame really struggles to render large images, so this is just a quick hack to make sure it's)
             scaledCarSprite = pygame.transform.scale(self.car_image, (int(carToDraw.chassis_length*self.sizeScale), int(carToDraw.chassis_width*self.sizeScale))) #note: height (length) and width are switched because an angle of 0 is at 3 o'clock, (and the car sprite is loaded like that)
             rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg((self.carCamOrient) if self.carCam else (carToDraw.angle)))
@@ -409,6 +410,21 @@ class pygameDrawer(pygameDrawerCommon):
             #pygame.draw.rect(self.window, (200,200,200), (carPos, (rotatedCarRect.chassis_width, rotatedCarRect.height))) #draws a little box around the car sprite (just for debug)
             self.window.blit(rotatedCarSprite, carPos) #draw car
             pygame.draw.circle(window, [255, 255, 255], self.realToPixelPos(carToDraw.position), 0.05 * self.sizeScale) #draw car position indicator
+    
+    def _drawTurningRadii(self, carToDraw: Map.Car):
+        """a little debug function for showcasing the turning radii of the car and each wheel"""
+        if(abs(carToDraw.steering) > 0.05): # set this threshold higher if you dont like big circles
+            rotationCenterColor = [255,0,255]
+            centralTurnRadius, turningRadii = carToDraw.calcTurningRadii(carToDraw.steering)
+            print(round(centralTurnRadius, 3))
+            turningCenterPos = GF.distAnglePosToPos(centralTurnRadius, carToDraw.angle + ((np.pi/2)*(1.0 if (carToDraw.steering > 0.0) else -1.0)), carToDraw.position)
+            turningCenterPixelPos = self.realToPixelPos(turningCenterPos)
+            pygame.draw.circle(self.window, rotationCenterColor, [int(turningCenterPixelPos[0]), int(turningCenterPixelPos[1])], 3, 0) # a little dot at the turning center
+            ## now to draw the individual wheel radii (to see if the math is correct)
+            for i in range(4):
+                individualColor = [63+(64*i), 0, 63+(64*i)] # a little color gradient. darkest purple == back left, brightest purple == front right
+                pygame.draw.circle(self.window, individualColor, [int(turningCenterPixelPos[0]), int(turningCenterPixelPos[1])], turningRadii[i] * self.sizeScale, 1) # a 1pixel thick circle which should intersect the corrosponding wheel
+                
 
     def drawCar(self, drawSimCar=True):
         """draw car sprite
@@ -417,19 +433,22 @@ class pygameDrawer(pygameDrawerCommon):
         if(drawSimCar and ((self.mapToDraw.simVars.car is not None) if (self.mapToDraw.simVars is not None) else False)): #if this is a simulation (elif to make sure we dont do this recursively endlessly)      ARC_TODO improve this?
             self._drawCar(self.mapToDraw.simVars.car, True, False, True) # draw virtual car (without positionalDrift and SLAM and stuff) into 
         self._drawCar(self.mapToDraw.car, self.carPolygonMode, self.headlights, False)
+        self._drawTurningRadii(self.mapToDraw.car)
         
+        ## draw a line to the next target point
         if((carToDraw.pathFolData.nextTarget is not None) if (carToDraw.pathFolData is not None) else False):
             targetPos = self.realToPixelPos(carToDraw.pathFolData.nextTarget.position)
             carPos = self.realToPixelPos(carToDraw.position)
             pygame.draw.line(self.window, [255, 255, 255], carPos, targetPos, 1)
         
+        ## record position history
         if((self.mapToDraw.clock() - self.carHistTimer) > self.carHistTimeStep):
             self.carHistTimer = self.mapToDraw.clock()
             if((GF.distSqrdBetwPos(np.array(self.carHistPoints[-1][0]), carToDraw.position) > self.carHistMinSquaredDistThresh) if (len(self.carHistPoints) > 1) else True):
                 self.carHistPoints.append([carToDraw.position]) #you can add any number of points to store, as long as the first one is carToDraw.position
                 if(len(self.carHistPoints) > self.carHistMaxLen):
                     self.carHistPoints.pop(0)
-        
+        ## draw position history (if enabled)
         if((len(self.carHistPoints) > 1) and self.drawCarHist):
             for i in range(1, len(self.carHistPoints)):
                 for j in range(len(self.carHistPoints[i])):
@@ -493,7 +512,7 @@ class pygameDrawer(pygameDrawerCommon):
     #                 debugLine[0] = -1
     #             pygame.draw.line(self.window, self.debugLineColors[(debugLine[3] if (len(debugLine)==4) else 0)], debugLine[1], debugLine[2], self.debugLineWidth)
     
-    def updateViewOffset(self, mousePos=None): #screen dragging
+    def updateViewOffset(self, mousePos: tuple[int,int]=None): #screen dragging
         """(UI element) if active (button press), 'drag' the screen around by using the mouse"""
         if(self.movingViewOffset):
             if(mousePos is None):
@@ -556,7 +575,7 @@ class pygameDrawer(pygameDrawerCommon):
 
 class pygameDrawer3D(pygameDrawerCommon):
     """a class to render Map objects overtop of a camera stream"""
-    def __init__(self, mapToDraw, window, drawSize=(1280,720), drawOffset=(0,0)):
+    def __init__(self, mapToDraw: Map, window: pygame.Surface, drawSize=(1280,720), drawOffset=(0,0)):
         pygameDrawerCommon.__init__(self, mapToDraw, window, drawSize, drawOffset)
         
         self.coneOutlineWidth = 5        #pixels wide
@@ -631,11 +650,11 @@ class pygameDrawer3D(pygameDrawerCommon):
             i don't yet know what happens if the pos is wildy out of the FOV"""
         return(self.perspectiveProjection(self.realToRespectivePos(realPos), z, camHeightIsZeroZ))
     
-    def distAngleToPixelPos(self, distAngle, z, camHeightIsZeroZ=False):
+    def distAngleToPixelPos(self, distAngle: np.ndarray, z, camHeightIsZeroZ=False):
         """just a macro (the solution to long function names)"""
         return(self.perspectiveProjection(GF.distAnglePosToPos(distAngle[0], distAngle[1], np.zeros(2)), z, camHeightIsZeroZ))
     
-    def updateCameraFrame(self, buffer, size, encoding):
+    def updateCameraFrame(self, buffer, size, encoding): # type hints TBD
         """TBD: figure out how to get frames from our camera / the overal code"""
         self.cameraSurface = pygame.image.frombuffer(buffer, size, encoding) #https://www.pygame.org/docs/ref/image.html#pygame.image.frombuffer
     
@@ -787,7 +806,7 @@ global oldWindowSize
 oldWindowSize = []
 
 
-def pygameInit(resolution): #you must specify a resolution
+def pygameInit(resolution: tuple[int,int]): #you must specify a resolution
     """initialize pygame window
         (one pygame window can host multiple pygameDrawer objects by using the drawOffset variable)"""
     pygame.init()

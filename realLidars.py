@@ -5,6 +5,7 @@
 # - inaccuracy threshold
 # - expected pointcount (at dist) threshold (we know how many points should be measured, if there are too many, it's probably not a cone)
 
+from typing import Callable
 import numpy as np
 from requests import delete
 
@@ -31,7 +32,7 @@ LIDAR_SAMPLES_AT_DIST = lambda dist, coneDiam : int((2 * np.arcsin(LIDAR_REFLECT
 class lidarClass(lidarESPserialClass, LIDARserialLogger):
     """a class that handles the connection to a LIDAR (IRL, not simulated)
         (make one of these for every lidar on the car)"""
-    def __init__(self, clockFunc, carToUse, identifierIndex=0, logfilename=None):
+    def __init__(self, clockFunc: Callable, carToUse: Map.Car, identifierIndex=0, logfilename=None):
         Map.Car.__init__(self) # init Car object
         lidarESPserialClass.__init__(self, clockFunc, identifierIndex) # init Car object
         LIDARserialLogger.__init__(self, logfilename) # init logger
@@ -42,7 +43,7 @@ class lidarClass(lidarESPserialClass, LIDARserialLogger):
         lidarESPserialClass.__del__(self) # make sure to close the serial
         LIDARserialLogger.__del__(self) # make sure to close the logfile
     
-    def setMaxRange(self, newMaxRange):
+    def setMaxRange(self, newMaxRange: int):
         """set max range
             (just a macro to requestSetMaxRange())"""
         self.requestSetMaxRange(self.carToUse, newMaxRange) # pass 'self' as carToUse

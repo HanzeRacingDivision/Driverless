@@ -1,5 +1,6 @@
 import numpy as np
 
+from Map import Map # just for syntax coloring (right now)
 import GF.generalFunctions as GF
 import multilateration as multLat
 
@@ -10,11 +11,13 @@ MAX_BLOB_HISTORY = 10
 ## TBD: improve error magnitudes:
 ##                  - based on time since last SLAM (plus a certain minimum value?)
 ##                  - based on the measured distance (to equalize error, instead of closer cones being more important (pythangorean is not linear))
-
+TERRIBLE_CAMERALESS_MODE = False # don't use the camera at all, just assume left/right-edness based on a cone's position relative to the car at time of detection
+MEDIOCRE_CAMERA_MODE = False # the camera's hor-FOV is pretty small, so this lets the lidar assume a color (when the conepos is outside of camera FOV and within max dist)
+MEDIOCRE_CAMERA_DIST_MAX = 2.5 # max dist for (lack of camera data) color assumption
 
 class coneSlamData: #a class to go in Map.Cone.coneConData. This carries some extra data which is only used by the coneConnecter functions
     """some data to go in .slamData of Map.Cone objects"""
-    def __init__(self, firstPosition, firstTimestamp, firstBLob=None):
+    def __init__(self, firstPosition: np.ndarray, firstTimestamp, firstBLob=None):
         self.positions = [firstPosition, ] # several (but not all!, see MAX_BLOB_HISTORY) measured positions
         self.timestamps = [firstTimestamp, ] # timestamps for when this cone was spotted
         self.blobs = [firstBLob, ]   # lidar blobs
@@ -48,7 +51,7 @@ def distBetw(posOne: np.ndarray, posTwo: np.ndarray):
     return(GF.distAngleBetwPos(posOne, posTwo)[0])
     #return(math.hypot(*(posTwo-posOne)))
 
-def rotationShift(centerPos, posToShift, shiftAngle):
+def rotationShift(centerPos: np.ndarray, posToShift: np.ndarray, shiftAngle):
     """rotate a point around another point (not very efficient (yet?))"""
     dist, angle = GF.distAngleBetwPos(np.array(centerPos), np.array(posToShift))
     return(GF.distAnglePosToPos(dist, angle+shiftAngle, np.array(centerPos)))
@@ -93,7 +96,7 @@ def calculateOffsets(carPos: np.ndarray, knownCones: np.ndarray, measuredCones: 
     
     return(calculatedLinearOffset, calculatedRotationalOffset, unshiftedConesOnlyLinear, unshiftedCones)
 
-def updateExistingCone(cone, newPos, timestamp, blob=None):
+def updateExistingCone(cone: Map.Cone, newPos: np.ndarray, timestamp, blob=None):
     """updates the .slamData on an existing cone"""
     if(cone.slamData is not None):
         cone.slamData.append(newPos, timestamp, blob)
@@ -103,7 +106,7 @@ def updateExistingCone(cone, newPos, timestamp, blob=None):
         print("SLAM_DIY warning: adding 'slamData' to an existing cone")
         cone.slamData = coneSlamData(newPos, timestamp, blob)
 
-def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True):
+def updatePosition(mapToUse: Map, landmarkLists: list[list], trust=(1.0, 1.0), makeNewCones=True):
     """runs the whole DIY_SLAM!
         you give it measured landmarks (LiDAR & CompVis data) 
          and it works out which cones those corrospond with.
@@ -212,9 +215,9 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
     
     
     for measuredCone, coneTimestamp, blob in newCones:
-        magnitude = 1.0
-        #magnitude = abs(coneTimestamp - lastSLAMtime) / passedTime
-        unshiftedPos = rotationShift(mapToUse.car.position, measuredCone-(calculatedLinearOffset*magnitude), -calculatedRotationalOffset*magnitude)
+        # magnitude = 1.0
+        # #magnitude = abs(coneTimestamp - lastSLAMtime) / passedTime
+        unshiftedPos = rotationShift(mapToUse.car.position, measuredCone-(calculatedLinearOffset*trust[0]), -calculatedRotationalOffset*trust[1])
         overlapsCone, overlappingCone = mapToUse.overlapConeCheck(unshiftedPos) #it should not matter if you use unshiftedPos or measuredCone for this, 
         if(overlapsCone):
             ## if this happens, it means a newCone was spotted multiple times (because it had no overlapping cone in the earlier check).
@@ -222,19 +225,32 @@ def updatePosition(mapToUse, landmarkLists, trust=(1.0, 1.0), makeNewCones=True)
             ## in either case, simply update the overlapping cone's position
             updateExistingCone(overlappingCone, unshiftedPos, rightNow, blob)
         elif(makeNewCones): # extra check to make sure SLAM is actually allowed to make new cones
-            leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, unshiftedPos, mapToUse.car.angle) < 0.0) # (bad) lidar-only test fix: leftOrRight is taken very literally
-            # cameraMatchSuccess = False;   leftOrRight = None # init vars
-            # for cameraConePos, LorR in cameraLandmarks:
-            #     if(mapToUse._overlapConeCheck(cameraConePos, unshiftedPos)):
-            #         cameraMatchSuccess = True
-            #         leftOrRight = LorR
-            # if(cameraMatchSuccess):
-            conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
-            print("SLAM debug: adding new cone:", coneInList)
-            coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
-            # else:
-            #     print("SLAM debug: can't add new lidar cone because there is no matching camera cone (to indicate the color)")
-            #     ## coneLimbo.append(unshiftedPos) # add the lidar cone to some kind of temporary waiting list, untill the camera has found it and determined its color
+            if(TERRIBLE_CAMERALESS_MODE):
+                leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, unshiftedPos, mapToUse.car.angle) < 0.0) # (bad) lidar-only test fix: leftOrRight is taken very literally
+                conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
+                print("SLAM debug: adding new cone:", coneInList)
+                coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
+            else: # the right thing to do
+                cameraMatchSuccess = False;   leftOrRight = None # init vars
+                for cameraConePos, LorR in cameraLandmarks:
+                    unshiftedCameraConePos = rotationShift(mapToUse.car.position, cameraConePos-(calculatedLinearOffset*trust[0]), -calculatedRotationalOffset*trust[1])
+                    if(mapToUse._overlapConeCheck(unshiftedCameraConePos, unshiftedPos)):
+                        cameraMatchSuccess = True
+                        leftOrRight = LorR
+                if(cameraMatchSuccess):
+                    conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
+                    print("SLAM debug: adding new cone:", coneInList)
+                    coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
+                elif(MEDIOCRE_CAMERA_MODE):
+                    distToCone, angleToCone = GF.distAngleBetwPos(mapToUse.car.position, unshiftedPos)
+                    angleToCone = GF.radDiff(mapToUse.car.angle, angleToCone) # get angle relative to car
+                    if((abs(angleToCone) > (mapToUse.car.cameraFOV[0]/2)) and (distToCone < MEDIOCRE_CAMERA_DIST_MAX)):
+                        leftOrRight = (angleToCone < 0.0)
+
+                # else:
+                #     print("SLAM debug: can't add new lidar cone because there is no matching camera cone (to indicate the color)")
+                #     ## coneLimbo.append(unshiftedPos) # add the lidar cone to some kind of temporary waiting list, untill the camera has found it and determined its color
+
     
     mapToUse.car.slamData = rightNow # save when SLAM was last run
     return() # i'm not sure what would be useful to return yet

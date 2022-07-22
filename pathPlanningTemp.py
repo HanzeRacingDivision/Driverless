@@ -8,97 +8,136 @@ from Map import Map
 import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 IDEAL_VELOCITY = 1.0 # (m/s) the ideal velocity (at which the pathfollowing works best)
+MINIMUM_VELOCITY = 0.5 # (m/s) the minimum velocity at which the motor can run
+
+## DEV NOTES:
+# i added spline target driving (bit of a hack), but i only added it for post-first-lap use.
+# to use splines before the track is complete would require a lot of tricky hacking in the current system,
+#  so if you really want to do that, it might be best to just redesign this whole thing.
+
+## TODO: 
+# drive along cubic spline instead of direct target points (almost done)
+# tune spline generator(s)
+# resolve spline overlap/chain-loop
+# start driving along spline targets as soon as the target_list goes full-circle
+# partial spline targets (needs lots of tuning and some significant hacks) (may not result in improved performance in first lap at all)
+# make target positions update based on the constantly shifting cone positions ??? (doesn't really seem necessary)
 
 
 class pathPlannerCarData: #a class to go in Map.Car.coneConData or Map.Car.pathFolData, if Alex approves
     """some data to go in .pathFolData of the car"""
     def __init__(self):
         self.auto = False
+        self.nextTarget: Map.Target # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
         self.nextTarget = None
+        self._useSplineTargets = False # set to true when the first lap is completed
+        # self.pathSplineProgressIndex = -1 # indicates how many Map.target_list entries have already been included in the path spline 
         
         self.laps = 0
         
-        self.targetVelocity = IDEAL_VELOCITY
+        self.targetVelocity = IDEAL_VELOCITY # this is a variable (instead of a contant) so it can be altered by other parties (like pygameUI)
 
 class pathPlannerMapData: #a class to go in Map.pathFolData (with these variables seperate (instead of inside pathPlanner class), pathPlanner is now fully static)
     """some data to go in .pathFolData of the Map"""
     def __init__(self):
-        self.left_spline = [[], []]
-        self.right_spline = [[], []]
-        self.path_midpoints_spline = [[], []]
+        self.boundrySplines = {False : [], True : []}
+        self.targetSpline: list[splineTarget] # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
+        self.targetSpline = []
 
+class splineTarget(Map.Target):
+    """to drive along splines instead of regular targets"""
+    # idk exactly how i want to do this, as it's a bit of a dirty hack op top of the original system.
+    # i can't think of anything that a spline target would need that a regular target wouldn't,
+    #  and since coneConData exists (initialized to None) in the Target class by default, this should make things relatively interchangable...
+    pass
 
 ########################### some (static!!!) functions ####################################
 
-def getNextTarget(mapToUse, currentTarget, panic=True):
+def getNextTarget(mapToUse: Map, targetListToUse: list[Map.Target], currentTarget: Map.Target, panic=True):
     """returns the next target in the target_list"""
-    for i in range(len(mapToUse.target_list)):
-        if(currentTarget == mapToUse.target_list[i]): #slightly risky pointer comparison
-            if(i<(len(mapToUse.target_list)-1)):
-                return(mapToUse.target_list[i+1])
+    for i in range(len(targetListToUse)):
+        if(currentTarget == targetListToUse[i]): #slightly risky pointer comparison
+            if(i<(len(targetListToUse)-1)):
+                return(targetListToUse[i+1])
             elif(mapToUse.targets_full_circle):
                 #print("target rollover")
-                return(mapToUse.target_list[0])
+                return(targetListToUse[0])
             else:
                 if(panic):
                     print("PANIC, ran out of targets")
                 return(currentTarget)
 
-def getPrevTarget(mapToUse, currentTarget, panic=True): #deleteme (only needed for predictive steering)
-    """returns the previous target in the target_list"""
-    for i in range(len(mapToUse.target_list)):
-        if(currentTarget == mapToUse.target_list[i]): #slightly risky pointer comparison
-            if(i>0):
-                return(mapToUse.target_list[i-1])
-            elif(mapToUse.targets_full_circle):
-                #print("target rollover")
-                return(mapToUse.target_list[len(mapToUse.target_list)-1])
-            else:
-                if(panic):
-                    print("PANIC, ran out of targets")
-                return(currentTarget)
+# def getPrevTarget(mapToUse: Map, targetListToUse: list[Map.Target], currentTarget: Map.Target, panic=True): #deleteme (only needed for predictive steering)
+#     """returns the previous target in the target_list"""
+#     for i in range(len(targetListToUse)):
+#         if(currentTarget == targetListToUse[i]): #slightly risky pointer comparison
+#             if(i>0):
+#                 return(targetListToUse[i-1])
+#             elif(mapToUse.targets_full_circle):
+#                 return(targetListToUse[len(targetListToUse)-1])
+#             else:
+#                 if(panic):
+#                     print("PANIC, ran out of targets")
+#                 return(currentTarget)
 
-def targetUpdate(mapToUse, currentTarget, distToTarget, angleToTarget, velocity):
+def targetUpdate(mapToUse: Map, targetListToUse: list[Map.Target], currentTarget: Map.Target, distToTarget, angleToTarget, velocity, printDebug=True):
     """returns the next target if the current one is reached/passed/missed, returns the current target if the car is still on track to reach it"""
     if(currentTarget is None): #if the first target hasn't been selected yet
-        print("selecting totally new target (TBD!)")
-        if(len(mapToUse.target_list) > 0):
-            return(mapToUse.target_list[0])
+        if(printDebug):
+            print("selecting totally new target (TBD!)")
+        if(len(targetListToUse) > 0):
+            return(targetListToUse[0])
         else:
-            print("there are no targets, how am i supposed to update it >:(")
+            if(printDebug):
+                print("there are no targets, how am i supposed to update it >:(")
             return(currentTarget)
     else:
         if(distToTarget < (pathPlanner.targetReachedThreshold + pathPlanner.targetDistSpeedMargin(velocity))):
             #print("target reached normally", distToTarget, np.rad2deg(angleToTarget))
             #currentTarget.passed += 1
-            return(getNextTarget(mapToUse,currentTarget))
+            return(getNextTarget(mapToUse, targetListToUse, currentTarget))
         elif((distToTarget < (pathPlanner.targetPassedDistThreshold + pathPlanner.targetDistSpeedMargin(velocity))) and (abs(angleToTarget) > pathPlanner.targetPassedAngleThreshold)):
-            print("target passed kinda wonky", distToTarget, np.rad2deg(angleToTarget))
+            if(printDebug):
+                print("target passed kinda wonky", distToTarget, np.rad2deg(angleToTarget))
             #currentTarget.passed += 1
-            return(getNextTarget(mapToUse,currentTarget))
+            return(getNextTarget(mapToUse, targetListToUse, currentTarget))
         elif(abs(angleToTarget) > pathPlanner.targetMissedAngleThreshold):
             print("TARGET MISSED!(?)", distToTarget, np.rad2deg(angleToTarget))
-            return(getNextTarget(mapToUse,currentTarget))
+            return(getNextTarget(mapToUse, targetListToUse, currentTarget))
         else: #just keep heading towards current target
             return(currentTarget)
     
 
-def calcAutoDriving(mapToUse, saveOutput=True):
+def calcAutoDriving(mapToUse: Map, saveOutput=True, printDebug=True):
     """calculate the steering angle (and speed) required to reach the current target
         (default) if input parameter True the output will be saved to the Car"""
     if(mapToUse.car.pathFolData is None):
         mapToUse.car.pathFolData = pathPlannerCarData()
-    if(len(mapToUse.target_list) == 0):
-        print("can't autodrive, there are no targets")
+    if((not mapToUse.car.pathFolData._useSplineTargets) and (mapToUse.targets_full_circle)):
+        mapToUse.pathFolData.targetSpline = makePathSpline(mapToUse, saveOutput)
+        mapToUse.car.pathFolData._useSplineTargets = (len(mapToUse.pathFolData.targetSpline)>0) # TODO: add more requirements
+        ## note: spline list is often longer than target_list. This could be good debug info(?)
+        print("debug _useSplineTargets:", mapToUse.car.pathFolData._useSplineTargets, len(mapToUse.pathFolData.targetSpline), mapToUse.pathFolData.targetSpline[0:1])
+        if(mapToUse.car.pathFolData._useSplineTargets): # note: spline list is often longer than target_list. This could be good debug info(?)
+            nextTarget = mapToUse.pathFolData.targetSpline[0]
+            ## TODO: find nearest valid spline target point and set THAT as the nextTarget
+    targetListToUse = mapToUse.target_list # init var
+    if(mapToUse.car.pathFolData._useSplineTargets):
+        targetListToUse: list[splineTarget]=mapToUse.pathFolData.targetSpline # switch to spline targets (also give type hint)
+    if(len(targetListToUse) == 0):
+        if(printDebug):
+            print("can't autodrive, there are no targets")
         mapToUse.car.pathFolData.auto = False
         return(0.0, 0.0, None)
     if((mapToUse.car.pathFolData.nextTarget is None) and saveOutput):
-        mapToUse.car.pathFolData.nextTarget = targetUpdate(mapToUse, None, 0, 0, 0)
+        mapToUse.car.pathFolData.nextTarget = targetUpdate(mapToUse, targetListToUse, None, 0, 0, 0, printDebug)
     if(mapToUse.car.pathFolData.nextTarget is not None): #if saveOutput hasn't prevented the first target from being set
         prevTarget = mapToUse.car.pathFolData.nextTarget
         dist, angle = GF.distAngleBetwPos(mapToUse.car.position, prevTarget.position)
         angle = GF.radRoll(angle-mapToUse.car.angle)
-        nextTarget = targetUpdate(mapToUse, prevTarget, dist, angle, mapToUse.car.velocity) #check whether the target should be updated (if prevTarget reached/passed/missed), and return next/current target
+        nextTarget = targetUpdate(mapToUse, targetListToUse, prevTarget, dist, angle, mapToUse.car.velocity, printDebug) #check whether the target should be updated (if prevTarget reached/passed/missed), and return next/current target
+        if(nextTarget is None):
+            print("target went from valid to None:", prevTarget, nextTarget, type(prevTarget), mapToUse.car.pathFolData._useSplineTargets)
         if(prevTarget != nextTarget): #if it didnt change there's no need to spend time recalculating dist & angle
             dist, angle = GF.distAngleBetwPos(mapToUse.car.position, nextTarget.position)
             angle = GF.radRoll(angle-mapToUse.car.angle)
@@ -110,7 +149,7 @@ def calcAutoDriving(mapToUse, saveOutput=True):
         desired_steering = min(max(angle,-mapToUse.car.maxSteeringAngle),mapToUse.car.maxSteeringAngle) #simply the constrained angle
         lastPredictTarget = mapToUse.car.pathFolData.nextTarget
         for i in range(pathPlanner.steeringPredictDepth):
-            predictTarget = getNextTarget(mapToUse, lastPredictTarget, False)
+            predictTarget = getNextTarget(mapToUse, targetListToUse, lastPredictTarget, False)
             if(predictTarget != lastPredictTarget):
                 lastPredictDist, lastPredictAngle = GF.distAngleBetwPos(mapToUse.car.position, lastPredictTarget.position)
                 predictDist, predictAngle = GF.distAngleBetwPos(mapToUse.car.position, predictTarget.position)
@@ -125,7 +164,7 @@ def calcAutoDriving(mapToUse, saveOutput=True):
                 ## this is for setting up for sharp corners (going towards the outside corner, so you have the distance you need to actually make the turn)
                 ## note: this code is pretty fiddly (and should be replaced by AI as soon as possible), but it does help sometimes
                 ##TBD!
-                # prevPredictTarget = getPrevTarget(mapToUse, lastPredictTarget, False)
+                # prevPredictTarget = getPrevTarget(mapToUse, targetListToUse, lastPredictTarget, False)
                 # if(prevPredictTarget != lastPredictTarget):
                 #     prevAngle = GF.distAngleBetwPos(prevPredictTarget.position, lastPredictTarget.position)[1]
                 #     nextAngle = GF.distAngleBetwPos(lastPredictTarget.position, predictTarget.position)[1]
@@ -139,7 +178,9 @@ def calcAutoDriving(mapToUse, saveOutput=True):
 
                 lastPredictTarget = predictTarget
             else:
-                print("cant predict target???", i, nextTarget, lastPredictTarget, predictTarget)
+                if(printDebug):
+                    print("cant predict target???", i, nextTarget, lastPredictTarget, predictTarget)
+                desired_velocity = MINIMUM_VELOCITY
                 break;
         desired_steering = min(max(desired_steering,-mapToUse.car.maxSteeringAngle),mapToUse.car.maxSteeringAngle) #constrain one more time
 
@@ -149,17 +190,18 @@ def calcAutoDriving(mapToUse, saveOutput=True):
             mapToUse.car.desired_velocity = desired_velocity
             if(prevTarget != nextTarget):
                 prevTarget.passed += 1
-                if(nextTarget == mapToUse.target_list[0]):
+                if(nextTarget == targetListToUse[0]):
                     mapToUse.car.pathFolData.laps += 1
-                    print("target rollover, laps done:", mapToUse.car.pathFolData.laps)
+                    if(printDebug):
+                        print("target rollover, laps done:", mapToUse.car.pathFolData.laps)
         return(desired_velocity, desired_steering, nextTarget)
     else: #if no first target was selected (saveOutput=False)
-        return(0.0, 0.0, targetUpdate(mapToUse, None, 0, 0, 0))
+        return(0.0, 0.0, targetUpdate(mapToUse, targetListToUse, None, 0, 0, 0, printDebug))
 
 ## cubic spline 
-def makeBoundrySpline(mapToUse, inputConeList):
+def makeBoundrySpline(mapToUse: Map, inputConeList: list[Map.Cone]):
     """calculate and return a qubic spline for a cone_list (left or right)"""
-    returnList = [[], []]
+    returnList = []
     if(len(inputConeList) > 1):
         startingCone = inputConeList[0] #start at any random cone
         finishCone = mapToUse.find_finish_cones(inputConeList[0].LorR)[inputConeList[0].LorR]
@@ -171,12 +213,12 @@ def makeBoundrySpline(mapToUse, inputConeList):
             itt += 1
         if(len(startingCone.connections) < 1): #check if it found a cone with connections (if not, itt == len(inputConeList))
            #print("couldn't make boundry spline, no connected cones in list")
-           return([[], []])
+           return([])
         chainLen, startingCone = mapToUse.getConeChainLen(startingCone, ((startingCone.connections[0]) if (len(startingCone.connections)>1) else None)) #go to the end of the cone connection chain
         fullCircleLoop = False
         if(chainLen < 1): #should NEVER happen
             print("no splines here, chainlen:", chainLen)
-            return([[], []])
+            return([])
         elif((len(startingCone.connections) >= 2) and (chainLen >= len(inputConeList))): #if the chain is full-circle (looping)
             fullCircleLoop = True
         else: #if it's NOT a full-circle (looping) cone chain
@@ -198,23 +240,28 @@ def makeBoundrySpline(mapToUse, inputConeList):
                 startingCone = startingCone.connections[0]
         if(len(xValues) < 2): #should never happen
             print("len(xValues) < 2: ", chainLen)
-            return([[], []])
+            return([])
         if(fullCircleLoop): #if cone chain is a full circle
             xValues.append(startingCone.position[0]);  yValues.append(startingCone.position[1]) #save position
         #print("making spline with length", len(xValues), chainLen)
         tck, u = splprep([xValues, yValues], s=0, k = (1 if (len(xValues)<3) else 2)) #(thijs) I DONT KNOW IF 's' SHOULD BE 0 OR 1, i dont know what it does
         unew = np.arange(0, 1.01, pathPlanner.boundrySplineSamplingDividend/(len(xValues)**pathPlanner.boundrySplineSamplingPower)) #more cones  = less final var
         returnList = splev(unew, tck)
+        returnList = list(zip(*returnList)) # turn list from [[x,], [y,]] into [[x,y],]
     return(returnList)
 
-def makeBoundrySplines(mapToUse):
-    """make and store qubic splines for both left_ and right_cone_list"""
-    mapToUse.pathFolData.left_spline = makeBoundrySpline(mapToUse, mapToUse.cone_lists[False])
-    mapToUse.pathFolData.right_spline = makeBoundrySpline(mapToUse, mapToUse.cone_lists[True])
+def makeBoundrySplines(mapToUse: Map, saveOutput=True):
+    """make and store qubic splines from both cone_lists"""
+    returnLists = {False : [], True : []}
+    for LorR in returnLists: # iterates over keys!
+        returnLists[LorR] = makeBoundrySpline(mapToUse, mapToUse.cone_lists[LorR])
+    if(saveOutput):
+        mapToUse.pathFolData.boundrySplines = returnLists
+    return(returnLists)
 
-def makePathSpline(mapToUse):
-    """calculate and return a qubic spline for the target_list"""
-    mapToUse.pathFolData.path_midpoints_spline = [[], []]
+def _makePathSpline(mapToUse: Map):
+    """calculate and return a qubic spline from the target_list"""
+    returnList = []
     if(len(mapToUse.target_list) > 1):
         targetPositions = [[target.position[i] for target in mapToUse.target_list] for i in range(2)]
         if(mapToUse.targets_full_circle): #close the gap if the list goes full circle (STARTING AND ENDING SPLINE LINES DO NOT MATCH/FLOW-OVER)
@@ -222,7 +269,19 @@ def makePathSpline(mapToUse):
             targetPositions[1].append(mapToUse.target_list[0].position[1])
         tck, u = splprep(targetPositions, s=pathPlanner.pathSplineSmoothing, k = (1 if (len(mapToUse.target_list)<3) else 2)) #(thijs) I DONT KNOW IF 's' SHOULD BE 0 OR 1, i dont know what it does
         unew = np.arange(0, 1.01, pathPlanner.pathSplineSamplingDividend/(len(mapToUse.target_list)**pathPlanner.pathSplineSamplingPower)) #more cones  = less final var
-        mapToUse.pathFolData.path_midpoints_spline = splev(unew, tck)
+        returnList = splev(unew, tck)
+        returnList = list(zip(*returnList))
+    return(returnList)
+
+def makePathSpline(mapToUse: Map, saveOutput=True):
+    """calculate and return a list of cubic-spline-based targets to drive along"""
+    splinePositions = _makePathSpline(mapToUse)
+    splineTargets = [splineTarget(pos) for pos in splinePositions]
+    if(saveOutput):
+        mapToUse.pathFolData.targetSpline = splineTargets
+    return(splineTargets)
+
+# def appendPathSpline(mapToUse): # TBD???: splines for incomplete tracks (by building onto existing partial splines)
 
 class pathPlanner():
     """a static class with constants and (pointers to) functions for (rudimentary) auto-driving and cubic-spline creation.
@@ -255,27 +314,32 @@ class pathPlanner():
     #steeringPredictCounterCurve = lambda turnAngle : TBD  (also note, maybe this should use the same distance function, as this countersteer needs to happen a little further away maybe)
     ##TBD: consider the distance to the predicted target as well (if it's far away, there's less need to cut corners, there will be time to react normally)
     
-    ##this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
-    @staticmethod
-    def getNextTarget(mapToUse, currentTarget, panic=True):
-        return(getNextTarget(mapToUse, currentTarget, panic))
+    # ##this is mostly to keep compatibility with my older versions (where the pathPlanner class is inherited into the map object). I can't recommend that, as the map object is often transmitted to other processes/PCs
+    # @staticmethod
+    # def getNextTarget(mapToUse, targetListToUse, currentTarget, panic=True):
+    #     return(getNextTarget(mapToUse, targetListToUse, currentTarget, panic))
     
-    @staticmethod
-    def targetUpdate(mapToUse, currentTarget, distToTarget, angleToTarget, velocity):
-        return(targetUpdate(mapToUse, currentTarget, distToTarget, angleToTarget, velocity))
+    # @staticmethod
+    # def targetUpdate(mapToUse, targetListToUse, currentTarget, distToTarget, angleToTarget, velocity):
+    #     return(targetUpdate(mapToUse, targetListToUse, currentTarget, distToTarget, angleToTarget, velocity))
     
-    @staticmethod
-    def calcAutoDriving(mapToUse, saveOutput=True):
-        return(calcAutoDriving(mapToUse, saveOutput))
+    # @staticmethod
+    # def calcAutoDriving(mapToUse, saveOutput=True):
+    #     return(calcAutoDriving(mapToUse, saveOutput))
     
-    @staticmethod
-    def makeBoundrySpline(mapToUse, inputConeList):
-        return(makeBoundrySpline(mapToUse, inputConeList))
+    # @staticmethod
+    # def makeBoundrySpline(mapToUse, inputConeList):
+    #     return(makeBoundrySpline(mapToUse, inputConeList))
     
-    @staticmethod
-    def makeBoundrySplines(mapToUse):
-        return(makeBoundrySplines(mapToUse))
+    # @staticmethod
+    # def makeBoundrySplines(mapToUse):
+    #     return(makeBoundrySplines(mapToUse))
     
-    @staticmethod
-    def makePathSpline(mapToUse):
-        return(makePathSpline(mapToUse))
+    # @staticmethod
+    # def makePathSpline(mapToUse):
+    #     return(makePathSpline(mapToUse))
+    
+
+# if __name__ == '__main__':
+#     ass = [[], []]
+#     print(list(zip(*ass)))

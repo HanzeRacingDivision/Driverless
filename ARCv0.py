@@ -10,9 +10,12 @@ makeConesAfterMapload = False #whether to completely rely on the loaded map, or 
 makeConesOnlyFirstLap = True
 delaySLAMuntillDriving = False
 
+autoTrackDiscovery = False
+
 useDrawer = True # whether to draw stuff on the screen (pretty useful for debugging and user-interfacing, but it does consume a bunch of processing power)
 printConnectionDebug = True # whether to explicitely print out the details of the kartMCU and LiDAR connections (serial port stuff)
 
+from cgi import FieldStorage
 from doctest import master
 from socket import TCP_NODELAY
 from Map import Map
@@ -60,6 +63,7 @@ class masterMapClass(Map):
         if(simulation):
             self.car = SC.simCar() #simCar has Map.Car as a parent class, so all regular Car stuff will still work
             self.simVars = mapSimVarClass()
+            self.simVars.clockStart = self.clockStart # not needed, but just to be extra safe
         else:
             self.car = RC.realCar(self.clock)
         
@@ -107,7 +111,7 @@ if __name__ == "__main__":
                 print("realCar handshake failed or something, i don't feel like dealing with this")
                 raise(Exception("nah, bro"))
             ## initialize the lidar(s)
-            lidars = [RL.lidarClass(masterMap.clock, masterMap.car, lidarIndex) for lidarIndex in range(   1   )]
+            lidars = [RL.lidarClass(masterMap.clock, masterMap.car, lidarIndex) for lidarIndex in range(   0   )]
             for lidarIndex in range(len(lidars)):
                 while(not lidars[lidarIndex].connect(comPort=None, autoFind=True, tryAny=True, exclusionList=(defaultExclusionList + [masterMap.car.comPort,] + [lidars[j].comPort for j in range(lidarIndex)]), printDebug=printConnectionDebug)):
                     time.sleep(0.5) # wait a little bit, to avoid spamming the terminal
@@ -145,21 +149,39 @@ if __name__ == "__main__":
 
         mapLogger = mapLoggerClass()
 
-        lastCones = []
+        lastCones = {False : None, True : None} # the cones at the end of each boundry. Attempt to connect these
+        autoPathFindTimer = masterMap.clock()
+        autoPathFindInterval = CC.coneConnecter.findFirstConesDelay # initialized to how long the car should wait before building attempting the first connections
         
         ######################################################################################## main loop ###############################################################################
         while (DD.windowKeepRunning if useDrawer else True):
             loopStart = masterMap.clock()
             loopSpeedTimers = [('start', time.time()),]
 
-            # if((len(masterMap.conelists[False])>0) and (len(masterMap.conelists[True])>0)):
-            #     try to connec last cones
-            # else:
-            #     if()
-            #     find first cones
+            if(autoTrackDiscovery and ((masterMap.clock() - autoPathFindTimer) > autoPathFindInterval) and (not masterMap.targets_full_circle)):
+                autoPathFindTimer = masterMap.clock()
+                if((lastCones[False] is not None) and (lastCones[True] is not None)):
+                    for LorR in lastCones: # iterates over keys!
+                        connectSuccess, winningCone = CC.connectCone(masterMap, lastCones[LorR], applyResult=True, printDebug=False)
+                        if(connectSuccess):
+                            lastCones[LorR] = winningCone
+                    #if(cone list actually changed):
+                    limitCounter = 0; limit = 3
+                    while(PF.makePath(masterMap, printDebug=False) and (limitCounter<limit)): #stops when path can no longer be advanced
+                        limitCounter += 1
+                    # PP.makePathSpline(masterMap) # NOTE: moved to pathPlanningTemp.py to make sure it's only done when the first lap is completed
+                else:
+                    autoPathFindInterval = CC.coneConnecter.findFirstConesInterval # from now on, try this more often (untill it succeeds, at which point we can go even faster)
+                    onlyOneSide = (False if (lastCones[False] is not None) else (True if (lastCones[True] is not None) else None))
+                    firstCones = CC.findFirstCones(masterMap, onlyOneSide)
+                    if(((firstCones[False] is not None) or (lastCones[False] is not None)) and ((firstCones[True] is not None) or (lastCones[True] is not None))): # not strictly needed, but waiting a little longer means more sensor data can come in
+                        lastCones = CC.connectFirstCones(masterMap, firstCones, onlyOneSide, makeFinish=True)
+                        if((lastCones[False] is not None) and (lastCones[True] is not None)):
+                            autoPathFindInterval = CC.coneConnecter.defaultConeConnectInterval
+
             
             if(masterMap.car.pathFolData.auto):
-                PP.calcAutoDriving(masterMap)
+                PP.calcAutoDriving(masterMap, printDebug=False)
                 loopSpeedTimers.append(('calcAutoDriving', time.time()))
 
             if(simulation):
@@ -246,6 +268,11 @@ if __name__ == "__main__":
                 print("main process running slow", 1/(loopEnd-loopStart))
     finally:
         print("main ending")
+        try:
+            mapfilename, _ = ML.save_map(masterMap)
+            # print("saved map on exit:", mapfilename)
+        except Exception as excep:
+            print("failed to save mapfile on exit:", excep)
         if(useDrawer):
             try:
                 DD.pygameEnd() #correctly shut down pygame window

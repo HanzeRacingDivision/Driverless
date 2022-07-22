@@ -3,6 +3,7 @@
 # easier/better support for  'saveMeasurementOrigin' (arduino lidar define)
 # a little automatic loop autoFinding comports (which adds already-opened ports to the exclusionList)
 
+from typing import Callable, Iterable
 import serial
 import serial.tools.list_ports
 import time
@@ -90,7 +91,7 @@ kartMCUconnRequest = np.dtype([('requestCMD', np.uint8),
                                ('targetSpeed', np.float32), # always a float32 (even when using raw data for everything else)
                                ('checksum', np.uint8)])
 
-def _calcChecksum_connStruct(obj):
+def _calcChecksum_connStruct(obj: np.void):
     checksumVal = np.uint8(0)
     for _data in obj.tobytes()[:-1]: # the last byte is the checksum byte. If you include it, you should end up with 0
         checksumVal ^= _data
@@ -151,7 +152,7 @@ class handshakeESPserial:
         except:
             print("couldn't close serial port from __del__")
     
-    def _autoFindComPort(self, tryAny=True, exclusionList=[], printDebug=True):
+    def _autoFindComPort(self, tryAny=True, exclusionList: list[str]=[], printDebug=True):
         """attempt to find a new/singular COM-port (unplugging and replugging the serial device will make this function return that device)"""
         comPortList = [entry.name for entry in serial.tools.list_ports.comports()]
         if(printDebug):
@@ -225,7 +226,7 @@ class handshakeESPserial:
                     print("no newly added comPorts found")
                 return(None, False)
     
-    def _comportCheck(self, comPort, autoFind, tryAny=False, exclusionList=[], printDebug=True):
+    def _comportCheck(self, comPort: str, autoFind: bool, tryAny=False, exclusionList: list[str]=[], printDebug=True):
         """check whether or not a given COM-port name exists in the list of COM-ports (may cause issues in linux)"""
         comPortList = [entry.name for entry in serial.tools.list_ports.comports()]
         if(comPort is None):
@@ -253,7 +254,7 @@ class handshakeESPserial:
                     return(None, False)
                 
     
-    def connect(self, comPort=None, autoFind=True, replaceIfConnected=False, tryAny=False, exclusionList=[], printDebug=True):
+    def connect(self, comPort: str=None, autoFind=True, replaceIfConnected=False, tryAny=False, exclusionList: list[str]=[], printDebug=True):
         """connect to a given (or an automatically found) COM-port, or replace an active connection with a new one"""
         # if(printDebug):
         #     print("connecting to:", comPort, "current connection:", self._serial.port)
@@ -309,7 +310,7 @@ class handshakeESPserial:
         self._serial.write(HANDSHAKE_SYNC_BYTES) # send sync bytes
         self._serial.write(handshakeToSend.tobytes()) # send handshake bytes
     
-    def waitForSyncBytes(self, syncBytes, timeout, printDebug=True):
+    def waitForSyncBytes(self, syncBytes: bytes, timeout, printDebug=True):
         if(not self._serial.is_open):
             print("can't waitForSyncBytes(), serial port is not open!")
         startTime = time.time()
@@ -370,7 +371,7 @@ class handshakeESPserial:
         self.handshakeLocalTimestamp = PCtimestamp
         self.handshakeReceivedTimestamp = ESPtimestamp
 
-    def _doHandshake(self, meFirst=True, clockFunc=time.time, timeout=1.0, resetESP=False, printDebug=True):
+    def _doHandshake(self, meFirst=True, clockFunc: Callable=time.time, timeout=1.0, resetESP=False, printDebug=True):
         self.handshake_done = False
         if(not self._serial.is_open):
             print("can't _doHandshake(), serial port is not open!")
@@ -397,7 +398,7 @@ class handshakeESPserial:
                 self.sendHandshake(ownHandshake)
         return(handshakeToReturn) # may return None, if waitForHandshake() returned None
     
-    def _doHandshakeIndef(self, meFirst=True, clockFunc=time.time, printEvery=1.0, resetESP=False):
+    def _doHandshakeIndef(self, meFirst=True, clockFunc: Callable=time.time, printEvery=1.0, resetESP=False):
         self.handshake_done = False
         if(not self._serial.is_open):
             print("can't _doHandshakeIndef(), serial port is not open!")
@@ -417,7 +418,7 @@ class handshakeESPserial:
         otherObj._serial, otherObj.handshakeLocalTimestamp, otherObj.handshakeReceivedTimestamp, otherObj.handshakeReceivedIdentifier, otherObj.handshake_done = temp
 
 class lidarESPserialClass(handshakeESPserial): # handles serial communication with the ESP32 (which communicates with the actual lidar). This is NOT a library for reading the lidar data directly
-    def __init__(self, clockFunc=time.time, identifierIndex=0):
+    def __init__(self, clockFunc: Callable=time.time, identifierIndex=0):
         handshakeESPserial.__init__(self)
         self.clockFunc = clockFunc
         self.correctHandshakeIdentifier = LIDAR_HANDSHAKE_IDENTIFIERS[identifierIndex] # there are several lidarESPs, so this helps identify which one you want to connect to
@@ -474,7 +475,7 @@ class lidarESPserialClass(handshakeESPserial): # handles serial communication wi
             return(None)
         return(packetDescriptor)
     
-    def _requestPacket(self, requestToSend, carToUse, requestCMD): # set request payload before using this function
+    def _requestPacket(self, requestToSend: LIDARconnRequest, carToUse, requestCMD: int): # set request payload before using this function
         if(not self.is_open):
             print("can't _requestPacket(), serial port is not open!")
             return(None)
@@ -568,7 +569,7 @@ class lidarESPserialClass(handshakeESPserial): # handles serial communication wi
 
 class kartMCUserialClass(handshakeESPserial): # handles communication between the kartMCU and the main PC. the PC sends desired speed & steering and the kartMCU responds with sensor data
     correctHandshakeIdentifier = KART_MCU_HANDSHAKE_IDENTIFIER # static property (overwrite handshakeESPserial's static property, as intended)
-    def __init__(self, clockFunc=time.time):
+    def __init__(self, clockFunc: Callable=time.time):
         handshakeESPserial.__init__(self)
         self.clockFunc = clockFunc
     
@@ -625,7 +626,7 @@ class kartMCUserialClass(handshakeESPserial): # handles communication between th
             return(None)
         return(packet)
     
-    def _requestPacket(self, requestToSend: LIDARconnRequest, carToUse, requestCMD: int): # set request payload before using this function
+    def _requestPacket(self, requestToSend: kartMCUconnRequest, carToUse, requestCMD: int): # set request payload before using this function
         if(not self.is_open):
             print("can't _requestPacket(), serial port is not open!")
             return()
@@ -679,7 +680,7 @@ class kartMCUserialClass(handshakeESPserial): # handles communication between th
         readynessByte = packet['throttle']
         return(readynessByte > 0)
 
-def shuffleSerials(*serialHandlers): # input any number of handshakeESPserial
+def shuffleSerials(*serialHandlers: handshakeESPserial): # input any number of handshakeESPserial objects/derivatives
     ## TODO: think of a more efficient way to shuffle arbetrary handshakeESPserial-derived objects.
     for i in range(len(serialHandlers)):
         if(not serialHandlers[i]._handshakeIdentifierCheck): # if the serialHandler in question found the wrong 

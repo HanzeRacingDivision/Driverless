@@ -1,9 +1,7 @@
-from turtle import left
 import numpy as np
 import time
 import GF.generalFunctions as GF
-
-## IMPORTANT: clock requires major overhaul, as this just isnt working. Whenever a new map object is created (anywhere), it resets the clock, (i know why)
+## todo?: import stuff like pathPlanningTemp and coneConnecting to be able to use their class definitions for type hints
 
 
 class Map:
@@ -13,16 +11,18 @@ class Map:
         self.clock = self.internalClock # defaults to internalClock, but can be anything you want
         
         self.car = self.Car()
+        self.cone_lists: dict[bool, list[Map.Cone]] # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
         self.cone_lists = {False: [], True: []}
         #self.coneLimbo = [] # TBD: all (recent?) cone detections which lack sufficient data to (confidently) put them into cone_lists. (e.g. lidar cones with no color)
         
+        self.target_list: list[Map.Target] # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
         self.target_list = [] #list of Target objects, the order of the list is the order in which they need to be driven
         self.targets_full_circle = False #if the target list loops around
         
-        #self.maxConeID = 0
-        
+        #self.pathFolData: PP.pathPlannerMapData # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
         self.pathFolData = None #holds variables for pathPlanning (e.g. spline data), as pathPlannerMapData object
         
+        self.simVars: mapSimVarClass # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
         self.simVars = None # holds simulatedLidar variables (and/or other: ...)
     
     def __repr__(self): #print map objects in a legible fashion
@@ -33,7 +33,7 @@ class Map:
         ## some static constants:
         maxSteeringAngle = np.deg2rad(23.115) #the car can't steer harder than this, (and will not accept HW commands outside this range)
         wheelbase = 1.03 # (meters) distance between front and rear axle
-        # axleWidth = 0.71 # (meters) distance between the centers of the wheels (a.k.a. 'track')
+        axleWidth = 0.71 # (meters) distance between the centers of the wheels (a.k.a. 'track')
         chassis_length = 1.56 # (meters) distance bumper to bumper (for drawing/colision-detection)
         chassis_width = 1.06 # (meters) car chassis width ('skirt to skirt', one might say). NOT distance between wheel centers
         chassis_center_offset = (wheelbase/2) + 0.0 # (meters) car pos (rear axle center) + this = chassis center (mostly used for drawing)
@@ -62,9 +62,10 @@ class Map:
             #self.acceleration = 0.0 #acceleration in meters/second^2
             #self.fov_range = 60  #(thijs) this is the actual (camera) field of view variable, but it's only useful for the simulation, so delete this?
             
-            self.coneConData = None #extra data specifically for cone-connection
+            # self.coneConData = None #extra data specifically for cone-connection
+            #self.pathFolData: PP.pathPlannerCarData # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
             self.pathFolData = None #extra data specifically for path-planning
-            self.slamData = None    #extra data specifically for SLAM
+            self.slamData: float=None    #extra data specifically for SLAM (currently just holds a timestamp)
         
         def __repr__(self): #print car objects in a legible fashion
             return("Car(typ="+(self.__class__.__name__)+",pos=["+str(round(self.position[0],2))+','+str(round(self.position[1],2))+"],angle="+str(round(np.rad2deg(self.angle),1))+")")
@@ -88,6 +89,31 @@ class Map:
             ## debug:
             # print(np.round(offset[0:2], 2), np.round(GF.vectorProjectDist(carPos, offsetPos, carAngle), 2)) # validity check: should print out the same thing twice
             return(offsetPos)
+        
+        # def _caclTuringRadius(self, steerAngle, offset: np.ndarray): # untested, probably works, not really needed (yet)
+        #     """ a function for calculating the turning radius at a given point on the car.
+        #         can be used to calculate expected wheel travel OR to do some funky boundry-collision-prediction.
+        #         input arguments: steering angle in radians, offset from car center (forw,forw) in meters"""
+        #     if(abs(steerAngle) > 0.01):
+        #         centralTurnRadius = self.wheelbase/np.tan(steerAngle) # the turn radius if there were a wheel at the center of the front axle, rotated at exactly the steerAngle
+        #         return(abs(offset[0]/np.sin(np.arctan2(offset[0], centralTurnRadius + offset[1]))))
+        #     else:
+        #         ## invalid use of this function!
+        #         return(0.0) # it should technically return infinity
+
+        def calcTurningRadii(self, steerAngle): # (note: not typo, just latin) calculate turning radii for each wheel (in meters)
+            radiusArray = np.zeros(4, dtype=np.float32)
+            centralTurnRadius = 0.0
+            if(abs(steerAngle) > 0.01): # avoid division by 0
+                tanSteer = np.tan(steerAngle)
+                centralTurnRadius = self.wheelbase/tanSteer # the turn radius if there were a wheel at the center of the front axle, rotated at exactly the steerAngle
+                radiusArray[0] = abs(centralTurnRadius - (self.axleWidth/2)) # back left
+                radiusArray[1] = abs(centralTurnRadius + (self.axleWidth/2)) # back right
+                radiusArray[2] = abs(self.wheelbase/np.sin(np.arctan2(self.wheelbase, centralTurnRadius - (self.axleWidth/2)))) # front left
+                radiusArray[3] = abs(self.wheelbase/np.sin(np.arctan2(self.wheelbase, centralTurnRadius + (self.axleWidth/2)))) # front right
+                ## front wheel radii == (wheelbase**2)+((centrRadius +- (width/2))**2) == dist_betw rot_centr and wheel
+                #radiusArray[3] = self._caclTuringRadius(steerAngle, np.array([self.wheelbase, self.axleWidth/2])) # same thing (but less efficient)
+            return(abs(centralTurnRadius), radiusArray)
         
         def getChassisCenterPos(self):
             """calculates the position of the center of chassis (instead of the car's position, which is at the center of rotation)
@@ -145,11 +171,14 @@ class Map:
             self.LorR = leftOrRight #boolean to indicate which side of the track (which color) the code is. True=right, False=left
             self.isFinish = isFinish
             
+            self.connections: list[Map.Cone, Map.Cone] # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
             self.connections = [] #appendable list, max 2 entries. will contain pointers to cones if succesfully connected
             
+            #self.coneConData: list[CC.coneConnection, CC.coneConnection] # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
             self.coneConData = [] #extra data specifically for cone-connection
-            self.pathFolData = None #extra data specifically for path-planning
-            self.slamData = None    #extra data specifically for SLAM
+            # self.pathFolData = None #extra data specifically for path-planning
+            #self.slamData: SLAM.coneSlamData # type hints to help the IDE syntax coloring and stuff. Not required, and should not complain about discrepencies, really just a type HINT.
+            self.slamData = None    #extra data specifically for SLAM (see SLAM_DIY.py for the class that goes here)
         
         def __repr__(self): #print cone objects in a legible fashion
             return("Cone(ID="+str(self.ID)+","+("RIGHT" if self.LorR else "LEFT")+",pos=["+str(round(self.position[0],2))+','+str(round(self.position[1],2))+"],{"+(",".join([str(conn.ID) for conn in self.connections]))+("},FINISH)" if self.isFinish else "})"))
@@ -169,9 +198,9 @@ class Map:
             
             self.passed = 0 #counts the number of times it's been passed (from path-planning)
             
-            self.coneConData = None #extra data specifically for cone-connection
-            self.pathFolData = None #extra data specifically for path-planning
-            self.slamData = None    #extra data specifically for SLAM
+            self.coneConData = None #extra data specifically for cone-connection (see pathFinding.py for the class that goes here)
+            # self.pathFolData = None #extra data specifically for path-planning
+            # self.slamData = None    #extra data specifically for SLAM
         
         def __repr__(self): #print target objects in a legible fashion
             return("Target(pos=["+str(round(self.position[0],2))+','+str(round(self.position[1],2))+"],passed="+str(self.passed)+")")
@@ -218,9 +247,10 @@ class Map:
                     returnList[LorR] = cone
         return(returnList)
     
-    def distanceToConeSquared(self, pos, conelist=None, sortByDistance=False, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, coneConnectionExclusions='NO_CONN_EXCL', ignoreLinkedConeIDs=[]):
+    def distanceToConeSquared(self, pos: np.ndarray, conelist=None, sortByDistance=False, ignoreConeIDs=[], simpleSquaredThreshold=-1.0, coneConnectionExclusions='NO_CONN_EXCL', ignoreLinkedConeIDs=[]):
         """ returns a list with squared distances to cones from a given position, 
-            allows (optional) filtering based on cone.ID, max-distance, cone-connected-ness 
+            allows (optional) filtering based on cone.ID, max-distance, cone-connected-ness:
+            NO_CONN_EXCL   EXCL_UNCONN   EXCL_SING_CONN   EXCL_DUBL_CONN   EXCL_ANY_CONN
             and (optional) sorting by distance """   
         if(conelist is None): #if no conelist was entered (probably should do this)
             conelist = self.cone_lists[False] + self.cone_lists[True] #then search both lists
@@ -257,10 +287,13 @@ class Map:
                         returnList.append([cone, squaredDistance])
         return(returnList)
     
-    def distanceToCone(self, pos, conelist=None, sortBySomething='DONT_SORT', ignoreConeIDs=[], simpleThreshold=-1.0, coneConnectionExclusions='NO_CONN_EXCL', ignoreLinkedConeIDs=[], angleDeltaTarget=0.0, angleThreshRange=[]): #note: angleThreshRange is [lowBound, upBound]
+    def distanceToCone(self, pos: np.ndarray, conelist=None, sortBySomething='DONT_SORT', ignoreConeIDs=[], simpleThreshold=-1.0, coneConnectionExclusions='NO_CONN_EXCL', ignoreLinkedConeIDs=[], angleDeltaTarget=0.0, angleThreshRange=[]): #note: angleThreshRange is [lowBound, upBound]
         """ returns a list with distances and angles to cones from a given position, 
-            allows (optional) filtering based on cone.ID, max-distance, cone-connected-ness and angle thresholds
-            and (optional) sorting by distance, angle or angle-delta """
+            allows (optional) filtering based on cone.ID, max-distance, cone-connected-ness using coneConnectionExclusions:
+            NO_CONN_EXCL   EXCL_UNCONN   EXCL_SING_CONN   EXCL_DUBL_CONN   EXCL_ANY_CONN
+            and (optional) filtering based on angle thresholds using angleThreshRange: formatted as [lowBound, upBound] (not relative angles)
+            and (optional) sorting by distance, angle or angle-delta using sortBySomething:
+            DONT_SORT   SORTBY_DIST   SORTBY_ANGL   SORTBY_ANGL_DELT   SORTBY_ANGL_DELT_ABS """
         if(conelist is None): #if no conelist was entered (probably should do this)
             conelist = self.cone_lists[False] + self.cone_lists[True] #then search both lists
         returnList = []  #[[conePointer, [dist, angle]], ]
@@ -320,13 +353,13 @@ class Map:
                         returnList.append([cone, [distance, angle]])
         return(returnList)
     
-    def _overlapConeCheck(self, posToCheck, conePosToUse, coneDistToler=None):
+    def _overlapConeCheck(self, posToCheck: np.ndarray, conePosToUse: np.ndarray, coneDistToler=None):
         """ return whether or not posToCheck overlaps a cone at conePosToUse"""
         if(coneDistToler is None):
             coneDistToler = self.Cone.defaultOverlapTolerance  #overlap tolerance  NOTE: area is square, not round
         return(GF.distSqrdBetwPos(posToCheck, conePosToUse) < (coneDistToler**2))
 
-    def overlapConeCheck(self, posToCheck):
+    def overlapConeCheck(self, posToCheck: np.ndarray):
         """ return whether or not a given position overlaps an existing cone and the cone which it overlaps (if any) """
         boolAnswer = False;   coneListPointer=None #boolAnswer MUST default to False, the other variables dont matter as much
         combinedConeList = self.cone_lists[True] + self.cone_lists[False]
@@ -345,14 +378,14 @@ class Map:
             returns 0 if the list was empty"""
         return(int(GF.findMaxAttrIndex((self.cone_lists[True] + self.cone_lists[False]), 'ID')[1]))
     
-    def addCone(self, pos, leftOrRight: bool, isFinish=False):
+    def addCone(self, pos: np.ndarray, leftOrRight: bool, isFinish=False):
         """add a new cone to the map"""
         overlaps, overlappingCone = self.overlapConeCheck(pos)
         if(overlaps):
             print("cant addConeObj(), there's already a cone there with ID:", overlappingCone.ID)
             return(False, overlappingCone)
-        if((len(self.find_finish_cones()) >= 2) and isFinish):
-            print("addCone warning: there's already 2 finish cones. adding as non-finish cone...")
+        if((self.find_finish_cones()[leftOrRight] is not None) if isFinish else False):
+            print("addCone warning: there's already a",("right" if leftOrRight else "left"),"finish cone. adding as non-finish cone...")
             isFinish = False
         aNewCone = self.Cone(self.maxConeID()+1, pos, leftOrRight, bool(isFinish)) #bool is just to make sure it's not a 0/1 int
         self.cone_lists[leftOrRight].append(aNewCone)
@@ -419,3 +452,10 @@ class mapSimVarClass(Map):
         self.car = None # put a simCar in this Map-like object only if positionalDrift is enabled
         self.lidarSimVars = [] # store simulatedLidarVariables here
         self.undiscoveredCones = True # whether newly added cones should be 'discovered' by (simulated) sensors (True), or instantly added (False)
+
+# if __name__ == '__main__':
+#     # ass: dict[bool, list[Map.Cone]]
+#     # ass = {False : [], True : []}
+#     test = Map()
+#     test.cone_lists[False].append(Map.Cone())
+#     print(test.cone_lists[False])
