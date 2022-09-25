@@ -4,13 +4,6 @@ from Map import Map
 import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
-#this shouldn't be here (because this is intended only for CAR simulation code), but there's no better place for it (YET)
-import time
-def simClockExample(clockStart): #usage: 'mapObject.setClock(simClockExample)'  now, when mapObject.clock() is called, simClockExample(mapObject) will be called
-    return((time.time()-clockStart)*2)
-
-
-
 class simCar(Map.Car):
     """a class that simulates the car
         (replace Map.Car object with this)"""

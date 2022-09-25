@@ -45,6 +45,13 @@ made mainLog.py, which logs some general values (car positions and stuff)
 added type hints (to get proper syntax coloring) to many functions (across all files) and to Map.py specifically
 renamed/restructured some variables in pathPlanningTemp, including: left_ and right_spline, path_midpoints_spline are now boundrySplines and targetSpline respectively (also, their contents changed!)
 changed pathfollowing to use cubic spline points instead of target points
+fixed delaySLAMuntillDriving (now affects SLAM trust values, so cones can still be placed)
+fixed commandline map loading (mapLoader class no longer contains static functions)
+removed makeConesAfterMapload (i forgot it existed when i added simVars map stuff, it needs significant code work, but i don't really need it anyway)
+the pathPlannerCarData now stores 'nextTargetIndex' as well as a Map.Target object, which is an index in the list. It's still not very clean, but it's as good it gets (in python) (for now)
+added simple grid to help visualize distances (i can't tell how big a meter is anymore)
+fixed and improved the (unnecessary) headlights code (camera range is still not true, instead it's taken from simulatedVision.py)
+added (and commented out) a little debug visual (drawDriverless) for the MEDIOCRE_CAMERA_MODE area. See just after the headlights code
 
 in-progress:
 temporatily set lidar count to 0 (in NON-simulation!)
@@ -53,11 +60,24 @@ temporarly set simulatedLidar and vision error to 0
 SLAM_DIY change the way trust works to over- or undervalue newer/older cone positions AND how much SLAM can alter the car position
 
 next up:
+blindly follow curvature of boundaries when you've run out of targets (first lap only)
+PAUSING FUNCTION! (drawDriverless class var and pygameUI)
+logging for SLAM, pathfinding/planning and anything else that i deem worthwhile!
+improve/fix MEDIOCRE_CAMERA_MODE in SLAM_DIY
+polar-coord. peak finding in multilateration???
+seperate driving paramerters for first lap (or make speed-dependent and drive slow). Cutting corners is only possible if you KNOW THE TRACK AHEAD...
+a log reader
+more ackerman wheel speed turn math?
+cone limbo (lidar only cones)
 allow camera tilt (oh god, rendering math...)
 another round of function labels """""" couldn't hurt
 type hints for the what the functions RETURN (i mean, if i can type-hint the inputs, why not also the outputs...)
 further improve target spline driving (bezier curves??? minimize length- and rotation while maintaining safe dist from boundaries?)
 extra support for bigger (finish?) and orange cones ? (at least drawing, i dont know about other stuff...)
+key binding explenation screen
+draw turning radii in 3D
+predict expected path line (simulate ahead (quickly, or just infrequently))
+draw expected path line (in 3D as well)
 delaunay triangulation testing (make a basic implementation and draw it, then we'll figure out what to do with it later)
 make a fun new carSprite
 basic DSP (filtering) on the steering?? idk man, it seems like there is a lot of predictable oscillation, maybe DSP will help (or not, if freq is too low)

@@ -12,8 +12,9 @@ MAX_BLOB_HISTORY = 10
 ##                  - based on time since last SLAM (plus a certain minimum value?)
 ##                  - based on the measured distance (to equalize error, instead of closer cones being more important (pythangorean is not linear))
 TERRIBLE_CAMERALESS_MODE = False # don't use the camera at all, just assume left/right-edness based on a cone's position relative to the car at time of detection
-MEDIOCRE_CAMERA_MODE = False # the camera's hor-FOV is pretty small, so this lets the lidar assume a color (when the conepos is outside of camera FOV and within max dist)
+MEDIOCRE_CAMERA_MODE = True # the camera's hor-FOV is pretty small, so this lets the lidar assume a color (when the conepos is outside of camera FOV and within max dist)
 MEDIOCRE_CAMERA_DIST_MAX = 2.5 # max dist for (lack of camera data) color assumption
+MEDIOCRE_CAMERA_ANGLE_MAX = np.deg2rad(170) # max dist for (lack of camera data) color assumption
 
 class coneSlamData: #a class to go in Map.Cone.coneConData. This carries some extra data which is only used by the coneConnecter functions
     """some data to go in .slamData of Map.Cone objects"""
@@ -201,7 +202,7 @@ def updatePosition(mapToUse: Map, landmarkLists: list[list], trust=(1.0, 1.0), m
         else:
             print("SLAM overcorrected?:", calculatedLinearOffset, np.rad2deg(calculatedRotationalOffset))
         
-        linearTrust = abs(1.0) # TODO!
+        #linearTrust = abs(1.0) # TODO!
         mapToUse.car.position -= (calculatedLinearOffset * trust[0])
         mapToUse.car.angle -= (calculatedRotationalOffset * trust[1])
         mapToUse.car.lastUpdateTimestamp = rightNow # save when the car position was last updated
@@ -228,7 +229,7 @@ def updatePosition(mapToUse: Map, landmarkLists: list[list], trust=(1.0, 1.0), m
             if(TERRIBLE_CAMERALESS_MODE):
                 leftOrRight = (GF.get_norm_angle_between(mapToUse.car.position, unshiftedPos, mapToUse.car.angle) < 0.0) # (bad) lidar-only test fix: leftOrRight is taken very literally
                 conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
-                print("SLAM debug: adding new cone:", coneInList)
+                print("SLAM debug TERRIBLE_CAMERALESS_MODE: adding new cone:", coneInList)
                 coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
             else: # the right thing to do
                 cameraMatchSuccess = False;   leftOrRight = None # init vars
@@ -244,9 +245,11 @@ def updatePosition(mapToUse: Map, landmarkLists: list[list], trust=(1.0, 1.0), m
                 elif(MEDIOCRE_CAMERA_MODE):
                     distToCone, angleToCone = GF.distAngleBetwPos(mapToUse.car.position, unshiftedPos)
                     angleToCone = GF.radDiff(mapToUse.car.angle, angleToCone) # get angle relative to car
-                    if((abs(angleToCone) > (mapToUse.car.cameraFOV[0]/2)) and (distToCone < MEDIOCRE_CAMERA_DIST_MAX)):
+                    if((abs(angleToCone) > (mapToUse.car.cameraFOV[0]/2)) and (abs(angleToCone) < MEDIOCRE_CAMERA_ANGLE_MAX) and (distToCone < MEDIOCRE_CAMERA_DIST_MAX)):
                         leftOrRight = (angleToCone < 0.0)
-
+                        conePlaceSuccess, coneInList = mapToUse.addCone(unshiftedPos, leftOrRight, False)
+                        print("SLAM debug MEDIOCRE_CAMERA_MODE: adding new cone:", coneInList)
+                        coneInList.slamData = coneSlamData(unshiftedPos, rightNow, blob)
                 # else:
                 #     print("SLAM debug: can't add new lidar cone because there is no matching camera cone (to indicate the color)")
                 #     ## coneLimbo.append(unshiftedPos) # add the lidar cone to some kind of temporary waiting list, untill the camera has found it and determined its color

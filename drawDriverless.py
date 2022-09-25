@@ -35,7 +35,7 @@ class pygameDrawerCommon():
         
         self.fontSize = 25
         self.fontColor = [200, 200, 200]
-        self.pygameFont = pygame.font.Font(None, self.fontSize)
+        self.pygameFont = pygame.font.SysFont('Calibri', self.fontSize, bold=True, italic=False)
         
         self.FPStimer = time.time()
         self.FPSdata = []
@@ -49,11 +49,13 @@ class pygameDrawerCommon():
 
         self.lastMapFilename = "" # the name of the loaded mapfile
         #self.lastMapFilenameRenderedFont = None # todo: avoid having to render this every loop, maybe?
-        
+
+        self.paused = False #just for UI purposes, should stop the main loop (only in simulations(?)). NOTE: code for pausing is implemented in ARCv0.py (or whatever the main file is)
         self.drawTargetConeLines = False #just for UI purposes, to toggle between showing and not showing how the targets are made
         self.drawConeSlamData = 0 #just for UI purposes, to toggle between showing lidar cone spot-count (and the actual datapoints) or not (neither)
         self.drawCarHist = False #just for UI purposes, to toggle between showing the position history (thin white line) or not
         self.extraViewMode = False #triggered with CTRL+V, can be used to switch between normal and 3D view, or whatever else you want
+        self.drawGrid = True #a simple grid to help make clear how big units of measurement are. (TBD in 3D rendering mode!)
     
     def isInsideWindowPixels(self, pixelPos: np.ndarray):
         """whether or not a pixel-position is inside the window"""
@@ -131,13 +133,18 @@ class pygameDrawer(pygameDrawerCommon):
         self.sizeScale = sizeScale #pixels per meter
         self.carCam = startWithCarCam #it's either carCam (car-centered cam, with rotating but no viewOffset), or regular cam (with viewOffset, but no rotating)
         self.invertYaxis = invertYaxis #pygame has pixel(0,0) in the topleft, so this just flips the y-axis when drawing things
+
+        self.sizeScaleDebug = int(0)
         
-        self.minSizeScale = 1.0 # note: the unit for sizeScale is pixels per meter, so there's no need to make this too small
+        self.minSizeScale = 15.0 # note: the unit for sizeScale is pixels per meter, so there's no need to make this too small
         self.maxSizeScale = 2000.0 # a reasonable limit to how much you can zoom in
         # self.maxSizeScaleWithCar = 500.0 # zooming in too much makes drawing (the car) really slow (because it has to render the car image at such a high resolution)
         self.centerZooming = False # whether zooming (using the scroll wheel) uses the center of the screen (or the mouse position)
 
-        self.bgColor = [50,50,50] #gray
+        self.bgColor = [50,50,50] #dark gray
+        
+        self.gridColor = [100,100,100] #light gray
+        self.gridFont = pygame.font.SysFont('Calibri', max(int(self.fontSize*0.75), 10), bold=False, italic=True)
         
         #self.pathCenterPixelDiam = 
         self.pathPointDiam = Map.Cone.coneDiam / 2
@@ -227,9 +234,72 @@ class pygameDrawer(pygameDrawerCommon):
         return(self.isInsideWindowPixels(self.realToPixelPos(realPos))) #not very efficient, but simple
     
     #drawing functions
+    def _drawGrid(self):
+        gridSpacing = 1.0 # line spacing (in meters). Should be calculated based on sizeScale, but that's TBD!
+        ## attempt to calculate an appropriate scale for the grid (to minimize the number of lines drawn)
+        gridSpacings = (5.0, 2.0, 1.0, 0.5, 0.25, 0.1) # = (0.5, 1.0, 5.0, 10.0, 25.0)
+        gridSpacingIndex = (np.log(self.sizeScale) - np.log(self.minSizeScale)) / (np.log(self.maxSizeScale) - np.log(self.minSizeScale)) # produces a number between 0 and 1 (linearized)
+        gridSpacingIndex = min(int(gridSpacingIndex*len(gridSpacings)), len(gridSpacings)-1)
+        gridSpacing = gridSpacings[gridSpacingIndex]
+        lineWidth = int(1)
+        ## first, figure out what the window sees. (keeping rotated views in mind)
+        screenCenterRealPos = self.pixelsToRealPos(np.array(self.drawSize) / 2.0)
+        roundedCenterPos = np.array([screenCenterRealPos[0]-(screenCenterRealPos[0]%gridSpacing), screenCenterRealPos[1]-(screenCenterRealPos[1]%gridSpacing)]) # rounded (down) to the nearest multiple of gridSpacing
+        screenMaxRadiusSquared = GF.distSqrdBetwPos(screenCenterRealPos, self.pixelsToRealPos(np.zeros(2))) # terribly inefficient, but whatever.
+        gridIttToVal = lambda axis, value : (roundedCenterPos[axis]+(value*gridSpacing)) # obviously excessive use of lambda, but it makes it more abstract when rendering the text in the loop
+        gridIttToPos = lambda x, y : np.array([gridIttToVal(0,x),gridIttToVal(1,y)],float) # to go from abstract grid forloop iterator (int) to actual coordinates (real, not pixel)
+        withinScreenRadius = lambda x, y : (GF.distSqrdBetwPos(screenCenterRealPos, gridIttToPos(x,y)) < screenMaxRadiusSquared) # the fastest check to see if a position is (probably/bluntly) visible
+        ## the following code needs to be refactored to be a little shorter, but at least this is sort of legible and stuff
+        def xloop(x): # vertical lines
+            yMax = 0
+            for y in range(0, 100):
+                if(not withinScreenRadius(x,y)):
+                    yMax = y;  break # yMax is found, stop this loop
+            if(yMax == 0):
+                return(False) # if the first entry was already outside the screenRadius, stop looping in this direction
+            for y in range(-1, -100, -1):
+                if(not withinScreenRadius(x,y)):
+                    pygame.draw.line(self.window, self.gridColor, self.realToPixelPos(gridIttToPos(x,y)), self.realToPixelPos(gridIttToPos(x,yMax)), lineWidth) # draw the vertical line
+                    if(not self.carCam): # doesn't work in carCam mode (i'm too lazy to write this slightly tricky code (you'd just need to find where the line intersects the edge of the screen and draw the text there))
+                        textToRender = str(round(gridIttToVal(0,x),   len(str(gridSpacing)[max(str(gridSpacing).rfind('.')+1, 0):]))) # a needlessly difficult way of rounding to the same number of decimals as the number in the gridSpacings array
+                        renderedFont = self.gridFont.render(textToRender, False, self.gridColor)
+                        self.window.blit(renderedFont, [self.realToPixelPos(gridIttToPos(x,y))[0] + 5, self.drawOffset[1]+self.drawSize[1]-renderedFont.get_height() - 5]) # display the text at the bottom of the screen and to the right of the line
+                    break # line is drawn, stop this loop
+            return(True)
+        for x in range(0, 100): # note: loop should break before reaching end!
+            if(not xloop(x)):
+                break
+        for x in range(-1, -100, -1): # note: loop should break before reaching end!
+            if(not xloop(x)):
+                break
+        def yloop(y): # horizontal lines
+            xMax = 0
+            for x in range(0, 100):
+                if(not withinScreenRadius(x,y)):
+                    xMax = x;  break # xMax is found, stop this loop
+            if(xMax == 0):
+                return(False) # if the first entry was already outside the screenRadius, stop looping in this direction
+            for x in range(-1, -100, -1):
+                if(not withinScreenRadius(x,y)):
+                    pygame.draw.line(self.window, self.gridColor, self.realToPixelPos(gridIttToPos(x,y)), self.realToPixelPos(gridIttToPos(xMax,y)), lineWidth) # draw the horizontal line
+                    if(not self.carCam): # doesn't work in carCam mode (i'm too lazy to write this slightly tricky code (you'd just need to find where the line intersects the edge of the screen and draw the text there))
+                        textToRender = str(round(gridIttToVal(1,y),   len(str(gridSpacing)[max(str(gridSpacing).rfind('.')+1, 0):]))) # a needlessly difficult way of rounding to the same number of decimals as the number in the gridSpacings array
+                        renderedFont = self.gridFont.render(textToRender, False, self.gridColor)
+                        self.window.blit(renderedFont, [self.drawOffset[0]+self.drawSize[0]-renderedFont.get_width() - 5, self.realToPixelPos(gridIttToPos(x,y))[1] + 5]) # display the text at the bottom of the screen and to the right of the line
+                    break # line is drawn, stop this loop
+            return(True)
+        for y in range(0, 100): # note: loop should break before reaching end!
+            if(not yloop(y)):
+                break
+        for y in range(-1, -100, -1): # note: loop should break before reaching end!
+            if(not yloop(y)):
+                break
+
     def background(self):
-        """draw the background"""
+        """draw the background and a grid (if enabled)"""
         self.window.fill(self.bgColor, (self.drawOffset[0], self.drawOffset[1], self.drawSize[0], self.drawSize[1])) #dont fill entire screen, just this pygamesim's area (allowing for multiple sims in one window)
+        if(self.drawGrid):
+            self._drawGrid()
     
     def _dashedLine(self, lineColor: pygame.Color, startPixelPos: np.ndarray, endPixelPos: np.ndarray, lineWidth: int, dashPixelPeriod=20, dashDutyCycle=0.5):
         """(sub function) draw a dashed line"""
@@ -363,6 +433,19 @@ class pygameDrawer(pygameDrawerCommon):
         if((finishCones[False] is not None) and (finishCones[True] is not None)):
             pygame.draw.line(self.window, self.finishLineColor, self.realToPixelPos(finishCones[False].position), self.realToPixelPos(finishCones[True].position), self.finishLineWidth)
     
+    def _drawMediocreCameraDebug(self, carToDraw: Map.Car): # deleteme
+        import SLAM_DIY as SLAM
+        if(SLAM.MEDIOCRE_CAMERA_MODE):
+            for pol in range(-1, 2, 2): # pol will be -1 then 1 (just a simple polarity flip)
+                pygame.draw.line(self.window, [255,255,255], self.realToPixelPos(carToDraw.position), self.realToPixelPos(GF.distAnglePosToPos(SLAM.MEDIOCRE_CAMERA_DIST_MAX, (carToDraw.cameraFOV[0]/2)*pol + carToDraw.angle, carToDraw.position)), 1)
+                pygame.draw.line(self.window, [255,255,255], self.realToPixelPos(carToDraw.position), self.realToPixelPos(GF.distAnglePosToPos(SLAM.MEDIOCRE_CAMERA_DIST_MAX, SLAM.MEDIOCRE_CAMERA_ANGLE_MAX*pol + carToDraw.angle, carToDraw.position)), 1)
+                arcEllipseRect = [GF.ASA(-SLAM.MEDIOCRE_CAMERA_DIST_MAX*self.sizeScale, self.realToPixelPos(carToDraw.position)),[int(SLAM.MEDIOCRE_CAMERA_DIST_MAX*2*self.sizeScale),int(SLAM.MEDIOCRE_CAMERA_DIST_MAX*2*self.sizeScale)]]
+                arcDrawAddAngle = ((self.carCamOrient) if self.carCam else (carToDraw.angle))
+                if(pol < 0): # has to do with the way pygame draws arcs. Not my best code ever, but whatever, just gonna ignore it
+                    pygame.draw.arc(self.window, [255,255,255], arcEllipseRect, SLAM.MEDIOCRE_CAMERA_ANGLE_MAX*pol + arcDrawAddAngle, (carToDraw.cameraFOV[0]/2)*pol + arcDrawAddAngle, 1)
+                else:
+                    pygame.draw.arc(self.window, [255,255,255], arcEllipseRect, (carToDraw.cameraFOV[0]/2)*pol + arcDrawAddAngle, SLAM.MEDIOCRE_CAMERA_ANGLE_MAX*pol + arcDrawAddAngle, 1)
+
     def _drawCar(self, carToDraw: Map.Car, polygonMode: bool, headlights: bool, isSimVars=False):
         """(sub function) draws an arbitrary Car object"""
         chassisCenter = carToDraw.getChassisCenterPos()
@@ -391,16 +474,26 @@ class pygameDrawer(pygameDrawerCommon):
             pygame.draw.polygon(self.window, oppositeColor, arrowPoints) #draw arrow
         else:
             if(headlights):# draw headlights (first, to not overlap car sprite)
-                headlightsImageSize = int(4.0*2*self.sizeScale) #2.0 is arbitrary for now, to be replaced with apprixate camera/sensor range
-                headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
-                headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
-                #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
-                headlightsCenterAngle = -1 * np.rad2deg((self.carCamOrient) if self.carCam else (carToDraw.angle))
-                headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), headlightsCenterAngle-(carToDraw.cameraFOV[0]/2), headlightsCenterAngle+(carToDraw.cameraFOV[0]/2), fill= (55, 55, 35))
-                headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
-                headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(chassisCenter))
-                self.window.blit(headlightsImage, headlightsImage_rect)
-                print("now", headlightsImageSize, (0, 0))
+                import simulatedVision as SV # just to fetch one constant
+                headlightRange = SV.RANGE_LIMIT # TODO: use actual camera range instead of only simulated value
+                headlightsImageSize = int(headlightRange*2*self.sizeScale) #2.0 is arbitrary for now, to be replaced with apprixate camera/sensor range
+                #### PIL drawing method:
+                # headlightsImage = Image.new("RGBA", (headlightsImageSize, headlightsImageSize))
+                # headlightsImageDrawObj = ImageDraw.Draw(headlightsImage)
+                # #pil_draw.arc((0, 0, pil_size-1, pil_size-1), 0, 270, fill=RED)
+                # headlightsCenterAngle = -1 * np.rad2deg((self.carCamOrient) if self.carCam else (carToDraw.angle))
+                # headlightsImageDrawObj.pieslice((0, 0, headlightsImageSize-1, headlightsImageSize-1), headlightsCenterAngle-np.rad2deg(carToDraw.cameraFOV[0]/2), headlightsCenterAngle+np.rad2deg(carToDraw.cameraFOV[0]/2), fill= (55, 55, 35)) # note: angles in degrees for some reason
+                # headlightsImage = pygame.image.fromstring(headlightsImage.tobytes(), headlightsImage.size, headlightsImage.mode)
+                # headlightsImage_rect = headlightsImage.get_rect(center=self.realToPixelPos(carToDraw.position))
+                # self.window.blit(headlightsImage, headlightsImage_rect)
+                #### simpler (additional?) drawing method:
+                pygame.draw.line(self.window, [255,255,255], self.realToPixelPos(carToDraw.position), self.realToPixelPos(GF.distAnglePosToPos(headlightRange, carToDraw.angle + (carToDraw.cameraFOV[0]/2), carToDraw.position)), 1)
+                pygame.draw.line(self.window, [255,255,255], self.realToPixelPos(carToDraw.position), self.realToPixelPos(GF.distAnglePosToPos(headlightRange, carToDraw.angle - (carToDraw.cameraFOV[0]/2), carToDraw.position)), 1)
+                headlightsCenterAngle = ((self.carCamOrient) if self.carCam else (carToDraw.angle))
+                arcEllipseRect = [GF.ASA(-headlightRange*self.sizeScale, self.realToPixelPos(carToDraw.position)),[headlightsImageSize, headlightsImageSize]]
+                pygame.draw.arc(self.window, [255,255,255], arcEllipseRect, headlightsCenterAngle - (carToDraw.cameraFOV[0]/2), headlightsCenterAngle + (carToDraw.cameraFOV[0]/2), 1)
+            # else:
+            #     self._drawMediocreCameraDebug(carToDraw)
             # carSizeScale = min(self.sizeScale, 400) # a quick 'n dirty FPS fix! (pygame really struggles to render large images, so this is just a quick hack to make sure it's)
             scaledCarSprite = pygame.transform.scale(self.car_image, (int(carToDraw.chassis_length*self.sizeScale), int(carToDraw.chassis_width*self.sizeScale))) #note: height (length) and width are switched because an angle of 0 is at 3 o'clock, (and the car sprite is loaded like that)
             rotatedCarSprite = pygame.transform.rotate(scaledCarSprite, np.rad2deg((self.carCamOrient) if self.carCam else (carToDraw.angle)))
@@ -411,19 +504,24 @@ class pygameDrawer(pygameDrawerCommon):
             self.window.blit(rotatedCarSprite, carPos) #draw car
             pygame.draw.circle(window, [255, 255, 255], self.realToPixelPos(carToDraw.position), 0.05 * self.sizeScale) #draw car position indicator
     
-    def _drawTurningRadii(self, carToDraw: Map.Car):
+    def _drawTurningRadii(self, carToDraw: Map.Car, drawWheelRadii=False):
         """a little debug function for showcasing the turning radii of the car and each wheel"""
         if(abs(carToDraw.steering) > 0.05): # set this threshold higher if you dont like big circles
             rotationCenterColor = [255,0,255]
             centralTurnRadius, turningRadii = carToDraw.calcTurningRadii(carToDraw.steering)
-            print(round(centralTurnRadius, 3))
+            # print(round(carToDraw.steering, 3), round(centralTurnRadius, 3))
             turningCenterPos = GF.distAnglePosToPos(centralTurnRadius, carToDraw.angle + ((np.pi/2)*(1.0 if (carToDraw.steering > 0.0) else -1.0)), carToDraw.position)
             turningCenterPixelPos = self.realToPixelPos(turningCenterPos)
-            pygame.draw.circle(self.window, rotationCenterColor, [int(turningCenterPixelPos[0]), int(turningCenterPixelPos[1])], 3, 0) # a little dot at the turning center
+            turningCenterPixelPos = [int(turningCenterPixelPos[0]), int(turningCenterPixelPos[1])] # convert to a more pygame-friendly format
+            pygame.draw.circle(self.window, rotationCenterColor, turningCenterPixelPos, 3, 0) # a little dot at the turning center
             ## now to draw the individual wheel radii (to see if the math is correct)
-            for i in range(4):
-                individualColor = [63+(64*i), 0, 63+(64*i)] # a little color gradient. darkest purple == back left, brightest purple == front right
-                pygame.draw.circle(self.window, individualColor, [int(turningCenterPixelPos[0]), int(turningCenterPixelPos[1])], turningRadii[i] * self.sizeScale, 1) # a 1pixel thick circle which should intersect the corrosponding wheel
+            if(drawWheelRadii):
+                for i in range(4):
+                    individualColor = [63+(64*i), 0, 63+(64*i)] # a little color gradient. darkest purple == back left, brightest purple == front right
+                    pygame.draw.circle(self.window, individualColor, turningCenterPixelPos, turningRadii[i] * self.sizeScale, 1) # a 1pixel thick circle which should intersect the corrosponding wheel
+            else: # draw the car's general (single) turning radius
+                pygame.draw.circle(self.window, rotationCenterColor, turningCenterPixelPos, centralTurnRadius * self.sizeScale, 1)
+
                 
 
     def drawCar(self, drawSimCar=True):
@@ -433,7 +531,7 @@ class pygameDrawer(pygameDrawerCommon):
         if(drawSimCar and ((self.mapToDraw.simVars.car is not None) if (self.mapToDraw.simVars is not None) else False)): #if this is a simulation (elif to make sure we dont do this recursively endlessly)      ARC_TODO improve this?
             self._drawCar(self.mapToDraw.simVars.car, True, False, True) # draw virtual car (without positionalDrift and SLAM and stuff) into 
         self._drawCar(self.mapToDraw.car, self.carPolygonMode, self.headlights, False)
-        self._drawTurningRadii(self.mapToDraw.car)
+        #self._drawTurningRadii(self.mapToDraw.car)
         
         ## draw a line to the next target point
         if((carToDraw.pathFolData.nextTarget is not None) if (carToDraw.pathFolData is not None) else False):

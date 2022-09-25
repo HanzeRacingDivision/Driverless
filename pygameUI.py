@@ -209,7 +209,9 @@ def handleKeyPress(pygameDrawerInput: DD.pygameDrawer, keyDown: bool, key: int, 
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             deleteCursorSet = False
     elif(keyDown): #most things only happen on keyDown, this just saves a few lines
-        if(key==pygame.K_p): # p
+        if(key==pygame.K_SPACE): # spacebar
+            pygameDrawerInput.paused = not pygameDrawerInput.paused #code to actually enact the pause is in ARCv0.py (or whatever the main file is)
+        elif(key==pygame.K_p): # p
             import pathFinding    as PF
             #PF.makePath(pygameDrawerInput.mapToDraw) #find a single path point
             limitCounter = 0
@@ -286,11 +288,13 @@ def handleKeyPress(pygameDrawerInput: DD.pygameDrawer, keyDown: bool, key: int, 
                 print("save_map took", round(time.time()-saveStartTime, 2), "seconds")
             except Exception as excep:
                 print("failed to save file, exception:", excep)
-        elif(key==pygame.K_m): # m
+        elif(key==pygame.K_m): # m for map-loading type toggle
             if(pygameDrawerInput.mapToDraw.simVars is not None):
                 pygameDrawerInput.mapToDraw.simVars.undiscoveredCones = not pygameDrawerInput.mapToDraw.simVars.undiscoveredCones # toggle
-        elif(key==pygame.K_z): # z
+        elif(key==pygame.K_z): # z for zooming type toggle
             pygameDrawerInput.centerZooming = not pygameDrawerInput.centerZooming # toggle
+        elif(key==pygame.K_g): # g for grid on/off toggle
+            pygameDrawerInput.drawGrid = not pygameDrawerInput.drawGrid # toggle
 #        elif(key==pygame.K_d): # d   (for debug)
 #            ## (debug) printing the pickle size of individual components in the map object
 #            import pickle
@@ -381,7 +385,7 @@ def handleWindowEvent(pygameDrawerInput: DD.pygameDrawer, eventToHandle: pygame.
                 ML.load_map(eventToHandle.file, pygameDrawerInput.mapToDraw)
             import os
             _, pygameDrawerInput.lastMapFilename = os.path.split(eventToHandle.file) # save the name of the loaded mapfile
-            print("loaded file successfully")
+            print("loaded file successfully:", pygameDrawerInput.lastMapFilename)
         except Exception as excep:
             print("failed to load drag-dropped file, exception:", excep)
     
@@ -410,6 +414,7 @@ def handleWindowEvent(pygameDrawerInput: DD.pygameDrawer, eventToHandle: pygame.
                 print("can't zoom out any further")
                 simToScale.sizeScale = simToScale.minSizeScale
             elif(simToScale.sizeScale > simToScale.maxSizeScale):
+                print("can't zoom in any further")
                 simToScale.sizeScale = simToScale.maxSizeScale
             #if(not simToScale.carCam): #viewOffset is not used in carCam mode, but it won't hurt to change it anyway
             dif = None # init var

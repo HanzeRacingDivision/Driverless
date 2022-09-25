@@ -1,0 +1,7 @@
+
+rotated offsets: [-0.14324504  0.16780014]
+calculated Linear Offset: [-4.38878529 -1.16788606] [-0.14324504  0.16780014] true error: [4.24554026 1.33568619] [ 4.45069317 -2.83678736]
+calculated Rot.Offset: 65.13717909650974 true error: -50.91540207041033
+
+
+NOTE: only happens at very specific rotations!. Most angles appear to be fine, but 

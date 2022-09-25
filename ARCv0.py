@@ -1,23 +1,20 @@
 # see changelog and README for explenation
 
-simulation = False
+simulation = True
 
 bufferLandmarks = True
-simulatePositionalDrift = False # (only for simulations) the sensor data for steering&velocity have some error IRL, this simulates that (used to test SLAM)
+simulatePositionalDrift = True # (only for simulations) the sensor data for steering&velocity have some error IRL, this simulates that (used to test SLAM)
 
-makeConesAfterMapload = False #whether to completely rely on the loaded map, or to allow for new cone detection
-## TBD: stop cone creation after a drag-drop mapload (currently only cmdline argumented mapfiles stop cone creation)
 makeConesOnlyFirstLap = True
-delaySLAMuntillDriving = False
+## TODO?: makeConesAfterMapload = False #whether to completely rely on the loaded map, or to allow for new cone detection
+delaySLAMuntillDriving = True # NOTE: only affects SLAM's pos updates, not it's cone placement (SLAM needs to place new cones in order to start driving, it's a fun paradox)
 
-autoTrackDiscovery = False
+autoTrackDiscovery = True
 
 useDrawer = True # whether to draw stuff on the screen (pretty useful for debugging and user-interfacing, but it does consume a bunch of processing power)
 printConnectionDebug = True # whether to explicitely print out the details of the kartMCU and LiDAR connections (serial port stuff)
+saveMapOnClose = False # please enable when doing any sort of relevant testing (but having this set to False will prevent your folders overflowing with map files)
 
-from cgi import FieldStorage
-from doctest import master
-from socket import TCP_NODELAY
 from Map import Map
 import GF.generalFunctions as GF
 
@@ -75,7 +72,6 @@ if __name__ == "__main__":
     try:
         masterMap = masterMapClass()
 
-        makeNewCones = True #whether to allow the creation of cones at all (determined by things like makeConesAfterMapload)
         if(simulation):
             masterMap.simVars.undiscoveredCones = True # (only for simulations) load mapfiles into .simVars instead of directly into the masterMap, to simulate 'discovering' them
         
@@ -89,14 +85,13 @@ if __name__ == "__main__":
         if(sys.argv[1].endswith(ML.mapLoader.fileExt) if ((type(sys.argv[1]) is str) if (len(sys.argv) > 1) else False) else False): #a long and convoluted way of checking if a file was (correctly) specified
             print("found sys.argv[1], attempting to import:", sys.argv[1])
             if(simulation and masterMap.simVars.undiscoveredCones):
-                ML.mapLoader.load_map(sys.argv[1], masterMap.simVars)
+                ML.load_map(sys.argv[1], masterMap.simVars)
             else:
-                ML.mapLoader.load_map(sys.argv[1], masterMap)
+                ML.load_map(sys.argv[1], masterMap)
             if(useDrawer):
                 import os
                 _, drawer.lastMapFilename = os.path.split(sys.argv[1]) # save the name of the loaded mapfile
-            if(not makeConesAfterMapload):
-                makeNewCones = False
+            print("loaded cmdline map:", drawer.lastMapFilename)
         
         if(simulation):
             masterMap.simVars.lidarSimVars = [SL.simulatedLidarVariables() for _ in masterMap.car.lidarOffsets]
@@ -194,9 +189,9 @@ if __name__ == "__main__":
                     ## now mess with the velocity/steering a little
                     if(masterMap.simVars.car.velocity > 0.01):
                         masterMap.car.velocity = abs(np.random.normal(masterMap.simVars.car.velocity, simDriftVelocityError)) #abs() is just to make sure it doesnt go negative
+                        masterMap.car.steering = np.random.normal(masterMap.simVars.car.steering, simDriftSteeringError) # note: doesn't require velocity, but steering usually doesn't drift when standing still
                     else:
                         masterMap.car.velocity = 0.0
-                    masterMap.car.steering = np.random.normal(masterMap.simVars.car.steering, simDriftSteeringError)
                     masterMap.car.update(loopStart - masterMap.car.lastUpdateTimestamp) #update true (hidden) position
                 else:
                     masterMap.car.simulateFeedback(loopStart - masterMap.car.lastUpdateTimestamp)
@@ -232,12 +227,12 @@ if __name__ == "__main__":
                 #if(((masterMap.clock() - landmarkBufferTimer) < landmarkBufferTimeInterval) if bufferLandmarks else False):
                 #    print("landmarkBufferLengthThreshold crossed prematurely:", len(lidarConeBuff), ">", landmarkBufferLengthThreshold, " after only", round(masterMap.clock() - landmarkBufferTimer, 3), "seconds (/clock units)")
                 
-                if(masterMap.car.pathFolData.auto if delaySLAMuntillDriving else True):
-                    makeNewConesTemp = makeNewCones
-                    if(makeConesOnlyFirstLap and makeNewCones):
-                        makeNewConesTemp = (masterMap.car.pathFolData.laps < 1) #only on the first lap
-                    SLAM.updatePosition(masterMap, [lidarConeBuff, cameraConeBuff], (1.0, 1.0), makeNewConesTemp)
-                    #masterMap.car.lastUpdateTimestamp = loopStart
+                makeNewConesTemp = True
+                if(makeConesOnlyFirstLap):
+                    makeNewConesTemp = (masterMap.car.pathFolData.laps < 1) #only on the first lap
+                posUpdateTrust = ((0.0, 0.0) if (delaySLAMuntillDriving) else (1.0, 1.0)) # how much to trust SLAM's position corrections
+                SLAM.updatePosition(masterMap, [lidarConeBuff, cameraConeBuff], (1.0, 1.0), makeNewConesTemp)
+                #masterMap.car.lastUpdateTimestamp = loopStart
                 
                 lidarConeBuff = [];   cameraConeBuff = [] # empty the buffers
                 if(bufferLandmarks):
@@ -269,8 +264,11 @@ if __name__ == "__main__":
     finally:
         print("main ending")
         try:
-            mapfilename, _ = ML.save_map(masterMap)
-            # print("saved map on exit:", mapfilename)
+            if(saveMapOnClose):
+                mapfilename, _ = ML.save_map(masterMap)
+                # print("saved map on exit:", mapfilename)
+            else:
+                print("(you chose not to save map file on exit)")
         except Exception as excep:
             print("failed to save mapfile on exit:", excep)
         if(useDrawer):

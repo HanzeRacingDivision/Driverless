@@ -20,13 +20,13 @@ import multilateration as multLat
 
 
 def handlePygameEvents(eventToHandle):
+    global changeAngle
     if(eventToHandle.type == pygame.QUIT):
         global windowKeepRunning
         windowKeepRunning = False #stop program (soon)
         print("stopping pygame window")
     elif(eventToHandle.type == pygame.KEYDOWN):
         global sceneIndex
-        global changeAngle
         if(eventToHandle.key == pygame.K_0):
             sceneIndex += (1 if (sceneIndex < (scenes-1)) else 0)
         elif(eventToHandle.key == pygame.K_9):
@@ -50,11 +50,14 @@ def handlePygameEvents(eventToHandle):
         elif(eventToHandle.key == pygame.K_LEFT):
             changeAngle = np.deg2rad(2)
     elif(eventToHandle.type == pygame.MOUSEWHEEL):
-        global sizeScale
-        sizeScale *= 1.0+(eventToHandle.y/10.0) #10.0 is an arbetrary zoomspeed
-        if(sizeScale < 1.0):
-            print("can't zoom out any further")
-            sizeScale = 1.0
+        if(pygame.key.get_pressed()[pygame.K_LCTRL]):
+            changeAngle = np.deg2rad(eventToHandle.y*2.0)
+        else:
+            global sizeScale
+            sizeScale *= 1.0+(eventToHandle.y/10.0) #10.0 is an arbetrary zoomspeed
+            if(sizeScale < 1.0):
+                print("can't zoom out any further")
+                sizeScale = 1.0
     elif((eventToHandle.type == pygame.MOUSEBUTTONDOWN) or (eventToHandle.type == pygame.MOUSEBUTTONUP)):
         if(eventToHandle.button == 2):
             global viewpointChanging
