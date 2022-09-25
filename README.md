@@ -1,11 +1,8 @@
 
-NOTE: this branch is depricated, as we'll be moving to Alex's sim (because things like the (new EKF) SLAM and RL code are all written for that).
+NOTE: this branch is depricated, as we'll be moving to ROS (or at the very least away from this stuff)
 
-# Status post-deprication
-What I'm currently working is to make Alex's sim capable of running on a real car (in real-time). I'm gonna be honest, i don't love it, becuase i spent a lot of time writing my version, but also (subjectively) mine is written for real-car operation first-and-foremost and as a simulation second. It's sofar proven to be a bitch-and'a-half converting Alex simulation while changing as little as possible (to make sure all the SLAM/RL code has a chance of being compatible).
-
-# Status POST-post-deprication
-i got bored and made another version. No more multicore, no more remote map viewing (for now?). Since the LiDAR will not be handled by the PC anymore (i hope), i changed the LiDAR code to reflect this. You can still simulate lidar blobs for now. Because python cannot really multi-thread, this version works a lot faster than the last one.
+# Status POST-post-post-deprication
+we ran some of this code at FSN2022 (due to lack of integration in Alex's sim). The SLAM had some issues, but honestly, it could have been a lot worse. Since then, I've added/fixed/changed a few things (most of them pretty minor). See changelog.txt for the details
 
 # Overview
 Python code for a selfdriving car. Can be used for both real-life and simulation purposes <br/>
