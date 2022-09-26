@@ -41,16 +41,13 @@ class DetectionMoule:
     filename = "Data_Cones.mp4"
 
     syncNN = True
-    start = time.time()
-    MAXIMUM_DISTANCE = 3200
 
     # Create pipeline
     pipeline = dai.Pipeline()
 
     # Define sources and outputs
     camRgb = pipeline.create(dai.node.ColorCamera)
-    spatialDetectionNetwork = pipeline.create(
-        dai.node.YoloSpatialDetectionNetwork)
+    spatialDetectionNetwork = pipeline.create(dai.node.YoloSpatialDetectionNetwork)
     monoLeft = pipeline.create(dai.node.MonoCamera)
     monoRight = pipeline.create(dai.node.MonoCamera)
     stereo = pipeline.create(dai.node.StereoDepth)
@@ -75,17 +72,15 @@ class DetectionMoule:
 
     monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
     monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
-    monoRight.setResolution(
-        dai.MonoCameraProperties.SensorResolution.THE_400_P)
+    monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
     monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
     # setting node configs
-    stereo.setDefaultProfilePreset(
-        dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
     # Align depth map to the perspective of RGB camera, on which inference is done
     stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
     stereo.setOutputSize(monoLeft.getResolutionWidth(),
-                         monoLeft.getResolutionHeight())
+                        monoLeft.getResolutionHeight())
 
     spatialDetectionNetwork.setBlobPath(nnBlobPath)
     spatialDetectionNetwork.setConfidenceThreshold(0.5)
@@ -95,7 +90,7 @@ class DetectionMoule:
     spatialDetectionNetwork.setDepthUpperThreshold(5000)
 
     # Yolo specific parameters
-    spatialDetectionNetwork.setNumClasses(2)
+    spatialDetectionNetwork.setNumClasses(80)
     spatialDetectionNetwork.setCoordinateSize(4)
     spatialDetectionNetwork.setAnchors(
         [
@@ -154,35 +149,24 @@ class DetectionMoule:
     spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
     spatialDetectionNetwork.outNetwork.link(nnNetworkOut.input)
 
-    def get_video_type(filename):
-        filename, ext = os.path.splitext(filename)
-        if ext in Type:
-            return Type[ext]
-        return Type['avi']
-
     # Connect to device and start pipeline
     with dai.Device(pipeline) as device:
 
         # Output queues will be used to get the rgb frames and nn data from the outputs defined above
-        previewQueue = device.getOutputQueue(
-            name="rgb", maxSize=4, blocking=False)
+        previewQueue = device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
         detectionNNQueue = device.getOutputQueue(
             name="detections", maxSize=4, blocking=False)
         xoutBoundingBoxDepthMappingQueue = device.getOutputQueue(
             name="boundingBoxDepthMapping", maxSize=4, blocking=False)
-        depthQueue = device.getOutputQueue(
-            name="depth", maxSize=4, blocking=False)
+        depthQueue = device.getOutputQueue(name="depth", maxSize=4, blocking=False)
         networkQueue = device.getOutputQueue(
             name="nnNetwork", maxSize=4, blocking=False)
 
         startTime = time.monotonic()
         counter = 0
         fps = 0
-        color = (0, 255, 0)
+        color = (255, 255, 255)
         printOutputLayersOnce = True
-
-        out = cv2.VideoWriter(
-            filename, cv2.VideoWriter_fourcc(*'mp4v'), 25, (416, 416))
 
         while True:
             inPreview = previewQueue.get()
@@ -203,8 +187,7 @@ class DetectionMoule:
             depthFrameColor = cv2.normalize(
                 depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
             depthFrameColor = cv2.equalizeHist(depthFrameColor)
-            depthFrameColor = cv2.applyColorMap(
-                depthFrameColor, cv2.COLORMAP_HOT)
+            depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
 
             counter += 1
             current_time = time.monotonic()
@@ -230,7 +213,7 @@ class DetectionMoule:
                     ymax = int(bottomRight.y)
 
                     cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax,
-                                                                  ymax), color, cv2.FONT_HERSHEY_SIMPLEX)
+                                ymax), color, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
 
             # If the frame is available, draw bounding boxes on it and show the frame
             height = frame.shape[0]
@@ -245,53 +228,24 @@ class DetectionMoule:
                     label = labelMap[detection.label]
                 except:
                     label = detection.label
-                frame_aug = cv2.putText(frame, str(label), (x1 + 10, y1 + 20),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
-                frame_aug = cv2.putText(frame, "{:.2f}".format(
-                    detection.confidence), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
-                print("Label = ", end="")
-                print(str(label))
-                frame_aug = cv2.putText(frame, f"X: {int(detection.spatialCoordinates.x)} mm",
-                                        (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
-                frame_aug = cv2.putText(frame, f"Y: {int(detection.spatialCoordinates.y)} mm",
-                                        (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
-                frame_aug = cv2.putText(frame, f"Z: {int(detection.spatialCoordinates.z)} mm",
-                                        (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255)
-
-                Top_Left_Point = x1, y1
-                Top_Right_Point = x2, y1
-                Bottom_Left_Point = x1, y2
-                Bottom_Right_Point = x2, y2
-                
-                dict = {
-                    "Label" : label,
-                    "Z": int(detection.spatialCoordinates.z),
-                    "X": int(detection.spatialCoordinates.x),
-                    "Time": time.time()
-                }
-
-                if int(detection.spatialCoordinates.z) != 0 and int(detection.spatialCoordinates.z) < MAXIMUM_DISTANCE :
-                    with open("detection.json", "r+") as file:
-                        json.dump(dict, file)
-
-                    print(Top_Left_Point)
-                    print(Top_Right_Point)
-                    print(Bottom_Left_Point)
-                    print(Bottom_Right_Point)
-
-                    print("Time: ", end='')
-                    print(time.time() - start)
-
-                print()
+                cv2.putText(frame, str(label), (x1 + 10, y1 + 20),
+                            cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(frame, "{:.2f}".format(
+                    detection.confidence*100), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(frame, f"X: {int(detection.spatialCoordinates.x)} mm",
+                            (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(frame, f"Y: {int(detection.spatialCoordinates.y)} mm",
+                            (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+                cv2.putText(frame, f"Z: {int(detection.spatialCoordinates.z)} mm",
+                            (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
 
                 cv2.rectangle(frame, (x1, y1), (x2, y2),
-                              color, cv2.FONT_HERSHEY_SIMPLEX)
+                            color, cv2.FONT_HERSHEY_SIMPLEX)
 
-            frame_aug = cv2.putText(frame, "NN fps: {:.2f}".format(
-                fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color)
-            cv2.imshow("Depth frame", depthFrameColor)
-            cv2.imshow("Cone detection", frame)
-            out.write(frame_aug)
+            cv2.putText(frame, "NN fps: {:.2f}".format(
+                fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
+            cv2.imshow("depth", depthFrameColor)
+            cv2.imshow("rgb", frame)
 
             if cv2.waitKey(1) == ord('q'):
                 break
