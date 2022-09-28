@@ -54,6 +54,7 @@ fixed and improved the (unnecessary) headlights code (camera range is still not 
 added (and commented out) a little debug visual (drawDriverless) for the MEDIOCRE_CAMERA_MODE area. See just after the headlights code
 moved all the numba GeneralFunctions stuff to the 'old and tests' folder, and just used generalFunctionsNoNumba.py from now on
 added the option to importCmdlineMapsAsBoth (for demo purposes)
+fixed silly bug in pathPlanningTemp which made spline target driving not work (it wasn't generating the spline because i typed "<0" instead of ">=0")
 
 in-progress:
 temporatily set lidar count to 0 (in NON-simulation!)

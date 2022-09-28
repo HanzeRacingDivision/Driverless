@@ -109,7 +109,7 @@ def calcAutoDriving(mapToUse: Map, saveOutput=True, printDebug=True):
         mapToUse.car.pathFolData = pathPlannerCarData()
     nextTarget, nextTargetIndex = None, -1 # init var
     debugVar = False
-    if((not mapToUse.car.pathFolData._useSplineTargets) and (mapToUse.targets_full_circle) and (len(mapToUse.pathFolData.targetSpline)>0)): # should only run once (unless makePathSpline fails for some reason)
+    if((not mapToUse.car.pathFolData._useSplineTargets) and (mapToUse.targets_full_circle) and (len(mapToUse.pathFolData.targetSpline)<=0)): # should only run once (unless makePathSpline fails for some reason)
         print("generating spline targets", len(mapToUse.target_list), mapToUse.car.pathFolData.nextTargetIndex) # debug
         mapToUse.pathFolData.targetSpline = makePathSpline(mapToUse, saveOutput)
         ## NOTE: the spline target list may be generated, but it starts being used when the finish line is crossed.
@@ -192,12 +192,12 @@ def calcAutoDriving(mapToUse: Map, saveOutput=True, printDebug=True):
                     mapToUse.car.pathFolData.laps += 1
                     if(printDebug):
                         print("target rollover, laps done:", mapToUse.car.pathFolData.laps)
-                    # if(not mapToUse.car.pathFolData._useSplineTargets): # when the first lap is completed, we can switch to driving along the spline instead
-                    #     mapToUse.car.pathFolData._useSplineTargets = True
-                    #     print("about to crash:", print(len(mapToUse.pathFolData.targetSpline)), mapToUse.car.pathFolData.nextTarget, type(mapToUse.car.pathFolData.nextTarget))
-                    #     mapToUse.car.pathFolData.nextTarget = mapToUse.pathFolData.targetSpline[0] # switch target object for one from the splinelist (note: index stays 0)
-                    #     print("switching to spline target list!") # debug
-                    #     ## note: the desired steering and velocity are still pointed towards the regular target list, but they'll be updated to the new target next time around (very soon), so it's fine
+                    if(not mapToUse.car.pathFolData._useSplineTargets): # when the first lap is completed, we can switch to driving along the spline instead
+                        mapToUse.car.pathFolData._useSplineTargets = True
+                        print("about to crash:", len(mapToUse.pathFolData.targetSpline), mapToUse.car.pathFolData.nextTarget, type(mapToUse.car.pathFolData.nextTarget))
+                        mapToUse.car.pathFolData.nextTarget = mapToUse.pathFolData.targetSpline[0] # switch target object for one from the splinelist (note: index stays 0)
+                        print("switching to spline target list!") # debug
+                        ## note: the desired steering and velocity are still pointed towards the regular target list, but they'll be updated to the new target next time around (very soon), so it's fine
         return(desired_velocity, desired_steering, nextTarget, nextTargetIndex)
 
 ## cubic spline 
