@@ -5,7 +5,7 @@ import numpy as np  #general math library
 from scipy.interpolate import splprep, splev
 
 from Map import Map
-import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
+import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 IDEAL_VELOCITY = 1.0 # (m/s) the ideal velocity (at which the pathfollowing works best)
 MINIMUM_VELOCITY = 0.5 # (m/s) the minimum velocity at which the motor can run
@@ -192,11 +192,12 @@ def calcAutoDriving(mapToUse: Map, saveOutput=True, printDebug=True):
                     mapToUse.car.pathFolData.laps += 1
                     if(printDebug):
                         print("target rollover, laps done:", mapToUse.car.pathFolData.laps)
-                    if(not mapToUse.car.pathFolData._useSplineTargets): # when the first lap is completed, we can switch to driving along the spline instead
-                        mapToUse.car.pathFolData._useSplineTargets = True
-                        mapToUse.car.pathFolData.nextTarget = mapToUse.pathFolData.targetSpline[0] # switch target object for one from the splinelist (note: index stays 0)
-                        print("switching to spline target list!") # debug
-                        ## note: the desired steering and velocity are still pointed towards the regular target list, but they'll be updated to the new target next time around (very soon), so it's fine
+                    # if(not mapToUse.car.pathFolData._useSplineTargets): # when the first lap is completed, we can switch to driving along the spline instead
+                    #     mapToUse.car.pathFolData._useSplineTargets = True
+                    #     print("about to crash:", print(len(mapToUse.pathFolData.targetSpline)), mapToUse.car.pathFolData.nextTarget, type(mapToUse.car.pathFolData.nextTarget))
+                    #     mapToUse.car.pathFolData.nextTarget = mapToUse.pathFolData.targetSpline[0] # switch target object for one from the splinelist (note: index stays 0)
+                    #     print("switching to spline target list!") # debug
+                    #     ## note: the desired steering and velocity are still pointed towards the regular target list, but they'll be updated to the new target next time around (very soon), so it's fine
         return(desired_velocity, desired_steering, nextTarget, nextTargetIndex)
 
 ## cubic spline 

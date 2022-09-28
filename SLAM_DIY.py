@@ -1,7 +1,7 @@
 import numpy as np
 
 from Map import Map # just for syntax coloring (right now)
-import GF.generalFunctions as GF
+import generalFunctions as GF
 import multilateration as multLat
 
 MIN_LANDMARK_COUNT = 4

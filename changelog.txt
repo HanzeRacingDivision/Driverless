@@ -52,6 +52,8 @@ the pathPlannerCarData now stores 'nextTargetIndex' as well as a Map.Target obje
 added simple grid to help visualize distances (i can't tell how big a meter is anymore)
 fixed and improved the (unnecessary) headlights code (camera range is still not true, instead it's taken from simulatedVision.py)
 added (and commented out) a little debug visual (drawDriverless) for the MEDIOCRE_CAMERA_MODE area. See just after the headlights code
+moved all the numba GeneralFunctions stuff to the 'old and tests' folder, and just used generalFunctionsNoNumba.py from now on
+added the option to importCmdlineMapsAsBoth (for demo purposes)
 
 in-progress:
 temporatily set lidar count to 0 (in NON-simulation!)
@@ -60,6 +62,8 @@ temporarly set simulatedLidar and vision error to 0
 SLAM_DIY change the way trust works to over- or undervalue newer/older cone positions AND how much SLAM can alter the car position
 
 next up:
+cone connection stength threshold based on the number of cadidates and the prudence (how many path points are still available)
+cone connection & color determination based on counting how many times an imaginary line (from the car or the detection origin) crosses the existing boundry
 blindly follow curvature of boundaries when you've run out of targets (first lap only)
 PAUSING FUNCTION! (drawDriverless class var and pygameUI)
 logging for SLAM, pathfinding/planning and anything else that i deem worthwhile!

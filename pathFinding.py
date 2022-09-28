@@ -4,7 +4,7 @@
 import numpy as np  #general math library
 
 from Map import Map
-import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
+import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
 

@@ -418,7 +418,7 @@ def handleWindowEvent(pygameDrawerInput: DD.pygameDrawer, eventToHandle: pygame.
                 simToScale.sizeScale = simToScale.maxSizeScale
             #if(not simToScale.carCam): #viewOffset is not used in carCam mode, but it won't hurt to change it anyway
             dif = None # init var
-            if(simToScale.centerZooming): ## center zooming:
+            if(simToScale.centerZooming or simToScale.carCam): ## center zooming:
                 dif = [(viewSizeBeforeChange[0]-(simToScale.drawSize[0]/simToScale.sizeScale))/2, (viewSizeBeforeChange[1]-(simToScale.drawSize[1]/simToScale.sizeScale))/2]
             else: ## mouse position based zooming:
                 mousePosAfterChange = simToScale.pixelsToRealPos(pygame.mouse.get_pos())
@@ -451,43 +451,3 @@ def handleAllWindowEvents(pygameDrawerInput: DD.pygameDrawer):
         if(eventToHandle.type != pygame.MOUSEMOTION): #skip mousemotion events early (fast)
             #handleWindowEvent(pygameDrawerInputList, eventToHandle)
             handleWindowEvent(pygameDrawerInput, eventToHandle)
-    
-    # #the manual keyboard driving (tacked on here, because doing it with the event system would require more variables, and this is temporary anyway)
-    # #simToDrive = currentpygameDrawerInput(pygameDrawerInputList, demandMouseFocus=False) #get the active sim within the window
-    # simToDrive = pygameDrawerInput
-    # carToDrive = simToDrive.mapToDraw.car
-    # if((not carToDrive.pathFolData.auto) if simToDrive.mapToDraw.pathPlanningPresent else True):
-    #     pressedKeyList = pygame.key.get_pressed()
-    #     deltaTime = time.time() - simToDrive.carKeyboardControlTimer
-    #     simToDrive.carKeyboardControlTimer = time.time()
-    #     speedAccelVal = 3.0 * deltaTime
-    #     steerAccelVal = 1.5 * deltaTime
-    #     #first for speed
-    #     if(pressedKeyList[pygame.K_UP]): #accelerate button
-    #         carToDrive.velocity += speedAccelVal #accelerate
-    #     elif(pressedKeyList[pygame.K_DOWN]): #brake/reverse button
-    #         if(carToDrive.velocity > (speedAccelVal*3)): #positive speed
-    #             carToDrive.velocity -= speedAccelVal * 2 #fast brake
-    #         else:                               #near-zero or negative speed
-    #             carToDrive.velocity -= speedAccelVal * 0.5 #reverse accelerate
-    #     else:                           #neither buttons
-    #         if(carToDrive.velocity > speedAccelVal): #positive speed
-    #             carToDrive.velocity -= speedAccelVal/2 #slow brake
-    #         elif(carToDrive.velocity < -speedAccelVal): #negative speed
-    #             carToDrive.velocity += speedAccelVal #brake
-    #         else:                           #near-zero speed
-    #             carToDrive.velocity = 0
-    #     carToDrive.velocity = max(-1, min(2, carToDrive.velocity)) #limit speed
-    #     #now for steering
-    #     if(pressedKeyList[pygame.K_LEFT] and (not pressedKeyList[pygame.K_RIGHT])):
-    #         carToDrive.steering += steerAccelVal
-    #     elif(pressedKeyList[pygame.K_RIGHT] and (not pressedKeyList[pygame.K_LEFT])):
-    #         carToDrive.steering -= steerAccelVal
-    #     else:
-    #         if(carToDrive.steering > steerAccelVal):
-    #             carToDrive.steering -= steerAccelVal*2.0
-    #         elif(carToDrive.steering < -steerAccelVal):
-    #             carToDrive.steering += steerAccelVal*2.0
-    #         else:
-    #             carToDrive.steering = 0
-    #     carToDrive.steering = max(np.deg2rad(-25), min(np.deg2rad(25), carToDrive.steering)) #limit speed

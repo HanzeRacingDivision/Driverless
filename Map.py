@@ -1,6 +1,6 @@
 import numpy as np
 import time
-import GF.generalFunctions as GF
+import generalFunctions as GF
 ## todo?: import stuff like pathPlanningTemp and coneConnecting to be able to use their class definitions for type hints
 
 

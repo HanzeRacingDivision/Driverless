@@ -4,7 +4,7 @@
 import numpy as np
 
 from Map import Map
-import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
+import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 RENDER_FRAMES = False # whether to render a fake camera frame
 

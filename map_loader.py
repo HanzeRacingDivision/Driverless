@@ -4,7 +4,7 @@ import os
 import datetime     #used for naming files automatically
 
 from Map import Map
-import GF.generalFunctions as GF
+import generalFunctions as GF
 
 import time #for debugging
 

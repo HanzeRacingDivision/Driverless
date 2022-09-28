@@ -6,7 +6,7 @@ import os #only used for loading the car sprite (os is used to get the filepath)
 from PIL import Image, ImageDraw #python image library, only used for drawing car headlights
 
 from Map import Map
-import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
+import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
 
@@ -53,7 +53,6 @@ class pygameDrawerCommon():
         self.paused = False #just for UI purposes, should stop the main loop (only in simulations(?)). NOTE: code for pausing is implemented in ARCv0.py (or whatever the main file is)
         self.drawTargetConeLines = False #just for UI purposes, to toggle between showing and not showing how the targets are made
         self.drawConeSlamData = 0 #just for UI purposes, to toggle between showing lidar cone spot-count (and the actual datapoints) or not (neither)
-        self.drawCarHist = False #just for UI purposes, to toggle between showing the position history (thin white line) or not
         self.extraViewMode = False #triggered with CTRL+V, can be used to switch between normal and 3D view, or whatever else you want
         self.drawGrid = True #a simple grid to help make clear how big units of measurement are. (TBD in 3D rendering mode!)
     
@@ -133,8 +132,6 @@ class pygameDrawer(pygameDrawerCommon):
         self.sizeScale = sizeScale #pixels per meter
         self.carCam = startWithCarCam #it's either carCam (car-centered cam, with rotating but no viewOffset), or regular cam (with viewOffset, but no rotating)
         self.invertYaxis = invertYaxis #pygame has pixel(0,0) in the topleft, so this just flips the y-axis when drawing things
-
-        self.sizeScaleDebug = int(0)
         
         self.minSizeScale = 15.0 # note: the unit for sizeScale is pixels per meter, so there's no need to make this too small
         self.maxSizeScale = 2000.0 # a reasonable limit to how much you can zoom in
@@ -152,20 +149,15 @@ class pygameDrawer(pygameDrawerCommon):
         
         self.mouseCone = None #either None, True or False, to indicate the color of the (mouse) cone that is about to be placed (replaces floatingCone)
         
-        #the drawing stuff: (only used in carPolygonMode)
-        self.carColor = [50,200,50] 
-        #polygon stuff (to be replaced by sprite?)
-        self.carPointRadius = None #will be calculated once the car is drawn for the first time
-        self.carPointAngle = None #will be calculated once the car is drawn for the first time
-        
         self.movingViewOffset = False
         self.prevViewOffset = (self.viewOffset[0], self.viewOffset[1])
         self.movingViewOffsetMouseStart = [0,0]
         
-        # self.debugLines = [] #[[lineType, pos, pos/angles, color_index (0-2)], ] #third entry is: (lineType==0: straight line from two positions), (lineType==1: straight line from pos and [radius, angle]), (lineType==2: arc from pos and [radius, startAngle, endAngle])
-        # self.debugLineColors = [[255,0,255],[255,255,255],[0,255,0], [255,160,255]] #purple, white, green, pink
-        # self.debugLineWidth = 3
-        
+        #the drawing stuff: (only used in carPolygonMode)
+        self.carColor = [50,200,50]
+        self.carPointRadius = None #will be calculated once the car is drawn for the first time
+        self.carPointAngle = None #will be calculated once the car is drawn for the first time
+
         ## load car sprite here (TBD)
         self.carPolygonMode = False #if no sprite is present, this can be used to draw a simple car
         try: #if the sprite doesnt load (usually because it's missing), thats fine
@@ -177,19 +169,14 @@ class pygameDrawer(pygameDrawerCommon):
             self.carPolygonMode = True
         self.headlights = False #only has an effect if carPolygonMode=False, also doesnt really do anything right now
         
-        self.drawCubicSplines = False
+        self.drawCubicSplines = False # whether to show the cones of the boundry or the cubic spline smoothed boundry
         
-        # self.isRemote = False
-        # self.remoteFPS = 5 #this should be initialised here though
-        
-        #self.drawCarHist = True
-        self.carHistTimer = self.mapToDraw.clock()
-        self.carHistPoints = []
+        self.drawCarHist = False #just for UI purposes, to toggle between showing the position history (thin white line) or not
+        self.carHistTimer = self.mapToDraw.clock() #just a timestamp
+        self.carHistPoints = [] #the array of car history positions
         self.carHistTimeStep = 0.15
         self.carHistMinSquaredDistThresh = 0.1**2 #only save new positions if the car is moving
         self.carHistMaxLen = 200
-        
-        self.carKeyboardControlTimer = time.time() #ONLY USED FOR KEYBOARD DRIVING (commented out)
         
         try:
             self.viewOffset = [(-self.mapToDraw.car.position[0]) + ((self.drawSize[0]/self.sizeScale)/2), (-self.mapToDraw.car.position[1]) + ((self.drawSize[1]/self.sizeScale)/2)]
@@ -591,25 +578,6 @@ class pygameDrawer(pygameDrawerCommon):
                     if(bestConnection is not None):
                         pygame.draw.line(self.window, coneColor, conePixelPos, self.realToPixelPos(bestConnection.position), self.coneConnectionLineWidth) # draw a solid line
     
-    # def drawDebugLines(self):
-    #     """debugging utility, allows certain debugging elements to be visualized (not carCam friendly)"""
-    #     #debugLines structure: [pos,pos, color_index (0-2)]
-    #     for debugLine in self.debugLines:
-    #         if(abs(debugLine[0]) == 2):
-    #             if(debugLine[0] == 2):
-    #                 pixelRactSize = debugLine[2][0] * self.sizeScale
-    #                 debugLine[1] = GF.ASA(-(pixelRactSize), debugLine[1])
-    #                 pixelRactSize *= 2
-    #                 debugLine[2][0] = pixelRactSize
-    #                 debugLine[0] = -2
-    #             pygame.draw.arc(self.window, self.debugLineColors[(debugLine[3] if (len(debugLine)==4) else 0)], [debugLine[1], [debugLine[2][0], debugLine[2][0]]], debugLine[2][1], debugLine[2][2], self.debugLineWidth)
-    #         else:
-    #             if(debugLine[0] == 1):
-    #                 secondPos = self.realToPixelPos(GF.distAnglePosToPos(debugLine[2][0], debugLine[2][1], self.pixelsToRealPos(debugLine[1]))) #convert
-    #                 debugLine[2] = secondPos
-    #                 debugLine[0] = -1
-    #             pygame.draw.line(self.window, self.debugLineColors[(debugLine[3] if (len(debugLine)==4) else 0)], debugLine[1], debugLine[2], self.debugLineWidth)
-    
     def updateViewOffset(self, mousePos: tuple[int,int]=None): #screen dragging
         """(UI element) if active (button press), 'drag' the screen around by using the mouse"""
         if(self.movingViewOffset):
@@ -650,8 +618,6 @@ class pygameDrawer(pygameDrawerCommon):
         drawSpeedTimers.append(('drawStatText', time.time()))
         self.drawLoadedFilename()
         drawSpeedTimers.append(('drawLoadedFilename', time.time()))
-        #self.drawDebugLines()
-        #drawSpeedTimers.append(('drawDebugLines', time.time()))
         drawSpeedTimers = [(drawSpeedTimers[i][0], round((drawSpeedTimers[i][1]-drawSpeedTimers[i-1][1])*1000, 1)) for i in range(1,len(drawSpeedTimers)) if ((drawSpeedTimers[i][1]-drawSpeedTimers[i-1][1]) > 0.0001)]
         # print(self.sizeScale, "draw speed times:", sorted(drawSpeedTimers, key=lambda item : item[1], reverse=True))
     

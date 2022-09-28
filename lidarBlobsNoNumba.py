@@ -1,6 +1,6 @@
 from typing import Callable
 from Map import Map  #used to get coneDiam
-import GF.generalFunctions as GF
+import generalFunctions as GF
 import numpy as np
 
 #from numba import njit

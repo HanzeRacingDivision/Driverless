@@ -9,14 +9,16 @@ makeConesOnlyFirstLap = True
 ## TODO?: makeConesAfterMapload = False #whether to completely rely on the loaded map, or to allow for new cone detection
 delaySLAMuntillDriving = True # NOTE: only affects SLAM's pos updates, not it's cone placement (SLAM needs to place new cones in order to start driving, it's a fun paradox)
 
-autoTrackDiscovery = True
+autoTrackDiscovery = False
 
 useDrawer = True # whether to draw stuff on the screen (pretty useful for debugging and user-interfacing, but it does consume a bunch of processing power)
 printConnectionDebug = True # whether to explicitely print out the details of the kartMCU and LiDAR connections (serial port stuff)
 saveMapOnClose = False # please enable when doing any sort of relevant testing (but having this set to False will prevent your folders overflowing with map files)
 
+importCmdlineMapsAsBoth = True # if enabled, maps imported from the cmdline will be imported as both an undiscovered map AND the discovered cones. This is mostly for demo or test purposes
+
 from Map import Map
-import GF.generalFunctions as GF
+import generalFunctions as GF
 
 import map_loader       as ML
 import coneConnecting   as CC
@@ -86,6 +88,8 @@ if __name__ == "__main__":
             print("found sys.argv[1], attempting to import:", sys.argv[1])
             if(simulation and masterMap.simVars.undiscoveredCones):
                 ML.load_map(sys.argv[1], masterMap.simVars)
+                if(importCmdlineMapsAsBoth):
+                    ML.load_map(sys.argv[1], masterMap) # import directly as well
             else:
                 ML.load_map(sys.argv[1], masterMap)
             if(useDrawer):

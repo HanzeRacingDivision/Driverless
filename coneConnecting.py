@@ -8,7 +8,7 @@ import numpy as np
 from pyparsing import dict_of  #general math library
 
 from Map import Map # (currently) only used to help with syntax coloring
-import GF.generalFunctions as GF #(homemade) some useful functions for everyday ease of use
+import generalFunctions as GF #(homemade) some useful functions for everyday ease of use
 
 
 class coneConnection: #a class to go in Map.Cone.coneConData. This carries some extra data which is only used by the coneConnecter functions
