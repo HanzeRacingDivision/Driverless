@@ -3,14 +3,251 @@ import pygame
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3 import PPO, A2C, DQN
 from constants import *
+import depthai as dai
 
 from CarEnv import CarEnv
 from cone import *
+import json
+
 
 # encoders and lidars
 import GF.generalFunctionsNoNumba as GF #(homemade) some useful functions for everyday ease of use
 from log.HWserialConnLogging import kartMCUserialLogger
 from HWserialConn import *
+from pathlib import Path
+import sys
+from turtle import st
+import cv2
+import depthai as dai
+import numpy as np
+import time
+import os
+
+Type = {
+    'avi': cv2.VideoWriter_fourcc(*'XVID'),
+    'mp4v': cv2.VideoWriter_fourcc(*'H264'),
+    # 'mp4v': cv2.VideoWriter_fourcc(*'XVID'),
+}
+
+
+def start_Camera():
+    # Get argument first
+    nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/416_half_shave.blob"
+    #nnBlobPath = "416_half_shave.blob"
+    #nnBlobPath = "416_half_shave.blob"
+
+    if not Path(nnBlobPath).exists():
+        import sys
+        raise FileNotFoundError(
+            f'Required file/s not found, please run "{sys.executable} install_requirements.py"')
+
+    syncNN = True
+
+     # Create pipeline
+    pipeline = dai.Pipeline()
+
+     # Define sources and outputs
+    camRgb = pipeline.create(dai.node.ColorCamera)
+    spatialDetectionNetwork = pipeline.create(
+        dai.node.YoloSpatialDetectionNetwork)
+    monoLeft = pipeline.create(dai.node.MonoCamera)
+    monoRight = pipeline.create(dai.node.MonoCamera)
+    stereo = pipeline.create(dai.node.StereoDepth)
+    nnNetworkOut = pipeline.create(dai.node.XLinkOut)
+
+    xoutRgb = pipeline.create(dai.node.XLinkOut)
+    xoutNN = pipeline.create(dai.node.XLinkOut)
+    xoutBoundingBoxDepthMapping = pipeline.create(dai.node.XLinkOut)
+    xoutDepth = pipeline.create(dai.node.XLinkOut)
+
+    xoutRgb.setStreamName("rgb")
+    xoutNN.setStreamName("detections")
+    xoutBoundingBoxDepthMapping.setStreamName("boundingBoxDepthMapping")
+    xoutDepth.setStreamName("depth")
+    nnNetworkOut.setStreamName("nnNetwork")
+
+     # Properties
+    camRgb.setPreviewSize(416, 416)
+    camRgb.setResolution(
+        dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+    camRgb.setInterleaved(False)
+    camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
+
+    monoLeft.setResolution(
+        dai.MonoCameraProperties.SensorResolution.THE_400_P)
+    monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
+    monoRight.setResolution(
+        dai.MonoCameraProperties.SensorResolution.THE_400_P)
+    monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
+
+     # setting node configs
+    stereo.setDefaultProfilePreset(
+        dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+     # Align depth map to the perspective of RGB camera, on which inference is done
+    stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
+    stereo.setOutputSize(monoLeft.getResolutionWidth(),
+                          monoLeft.getResolutionHeight())
+
+    spatialDetectionNetwork.setBlobPath(nnBlobPath)
+    spatialDetectionNetwork.setConfidenceThreshold(0.5)
+    spatialDetectionNetwork.input.setBlocking(False)
+    spatialDetectionNetwork.setBoundingBoxScaleFactor(0.5)
+    spatialDetectionNetwork.setDepthLowerThreshold(100)
+    spatialDetectionNetwork.setDepthUpperThreshold(5000)
+
+    # Yolo specific parameters
+    spatialDetectionNetwork.setNumClasses(2)
+    spatialDetectionNetwork.setCoordinateSize(4)
+    spatialDetectionNetwork.setAnchors(
+        [
+            2.6171875,
+            6.7734375,
+            4.28125,
+            9.484375,
+            6.53515625,
+            14.109375,
+            9.5625,
+            19.484375,
+            12.7578125,
+            26.0625,
+            17.640625,
+            35.46875,
+            23.0,
+            43.90625,
+            27.8125,
+            57.5,
+            40.25,
+            78.0
+            ])
+    spatialDetectionNetwork.setAnchorMasks(
+        {"side52": [
+            0,
+            1,
+            2
+            ],
+        "side26": [
+            3,
+            4,
+            5
+            ],
+        "side13": [
+            6,
+            7,
+            8
+            ]})
+    spatialDetectionNetwork.setIouThreshold(0.5)
+
+    # Linking
+    monoLeft.out.link(stereo.left)
+    monoRight.out.link(stereo.right)
+
+    camRgb.preview.link(spatialDetectionNetwork.input)
+    if syncNN:
+        spatialDetectionNetwork.passthrough.link(xoutRgb.input)
+    else:
+        camRgb.preview.link(xoutRgb.input)
+
+    spatialDetectionNetwork.out.link(xoutNN.input)
+    spatialDetectionNetwork.boundingBoxMapping.link(
+        xoutBoundingBoxDepthMapping.input)
+
+    stereo.depth.link(spatialDetectionNetwork.inputDepth)
+    spatialDetectionNetwork.passthroughDepth.link(xoutDepth.input)
+    spatialDetectionNetwork.outNetwork.link(nnNetworkOut.input)
+
+    return pipeline
+
+
+def getCones(previewQueue, detectionNNQueue, depthQueue, networkQueue, xoutBoundingBoxDepthMappingQueue, labelMap, start):
+    startTime = time.monotonic()
+    counter = 0
+    fps = 0
+    color = (255, 255, 255)
+
+    inPreview = previewQueue.get()
+    inDet = detectionNNQueue.get()
+    depth = depthQueue.get()
+    inNN = networkQueue.get()
+
+    frame = inPreview.getCvFrame()
+    depthFrame = depth.getFrame()  # depthFrame values are in millimeters
+
+    depthFrameColor = cv2.normalize(
+        depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
+    depthFrameColor = cv2.equalizeHist(depthFrameColor)
+    depthFrameColor = cv2.applyColorMap(
+        depthFrameColor, cv2.COLORMAP_HOT)
+
+    counter += 1
+    current_time = time.monotonic()
+    if (current_time - startTime) > 1:
+        fps = counter / (current_time - startTime)
+        counter = 0
+        startTime = current_time
+
+    detections = inDet.detections
+    if len(detections) != 0:
+        boundingBoxMapping = xoutBoundingBoxDepthMappingQueue.get()
+        roiDatas = boundingBoxMapping.getConfigData()
+
+        for roiData in roiDatas:
+            roi = roiData.roi
+            roi = roi.denormalize(
+                depthFrameColor.shape[1], depthFrameColor.shape[0])
+            topLeft = roi.topLeft()
+            bottomRight = roi.bottomRight()
+            xmin = int(topLeft.x)
+            ymin = int(topLeft.y)
+            xmax = int(bottomRight.x)
+            ymax = int(bottomRight.y)
+
+            cv2.rectangle(depthFrameColor, (xmin, ymin),
+                            (xmax, ymax), color, cv2.FONT_HERSHEY_SCRIPT_SIMPLEX)
+
+     # If the frame is available, draw bounding boxes on it and show the frame
+    height = frame.shape[0]
+    width = frame.shape[1]
+
+    coords = 0
+
+    for detection in detections:
+        # Denormalize bounding box
+        x1 = int(detection.xmin * width)
+        x2 = int(detection.xmax * width)
+        y1 = int(detection.ymin * height)
+        y2 = int(detection.ymax * height)
+        try:
+            label = labelMap[detection.label]
+        except:
+            label = detection.label
+        frame_aug = cv2.putText(frame, str(label), (x1 + 10, y1 + 20),
+                                cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+        frame_aug = cv2.putText(frame, "{:.2f}".format(
+            detection.confidence), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+        frame_aug = cv2.putText(frame, f"X: {int(detection.spatialCoordinates.x)} mm",
+                                (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+        frame_aug = cv2.putText(frame, f"Y: {int(detection.spatialCoordinates.y)} mm",
+                                (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+        frame_aug = cv2.putText(frame, f"Z: {int(detection.spatialCoordinates.z)} mm",
+                                (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+        coords = [int(detection.spatialCoordinates.x), int(
+            detection.spatialCoordinates.z), str(label)]
+
+        print()
+
+        cv2.rectangle(frame, (x1, y1), (x2, y2),
+                    color, cv2.FONT_HERSHEY_SIMPLEX)
+
+    frame_aug = cv2.putText(frame, "NN fps: {:.2f}".format(
+         fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color)
+    cv2.imshow("Depth frame", depthFrameColor)
+    cv2.imshow("Cone detection", frame)
+
+    if coords != 0:
+        return (coords)
+
+    #if cv2.waitKey(1) == ord('q'):
+    #break
 
 
 def disc_to_cont(action):
@@ -51,7 +288,6 @@ class RealCar(FakeCar, kartMCUserialClass, kartMCUserialLogger):
             self.doHandshakeIndef(resetESP=True, printDebug=True)
             self.requestSetSteeringEnable(self, False)
             self.requestSetPedalPassthroughEnable(self, True)
-            #self.setSteeringEnable(True)
 
         # self.desired_steering_raw = np.int32(0) # see the @property for this value
         self.lastEncoderVals = [0, 0, 0, 0]
@@ -189,13 +425,13 @@ def init_lidar(port):
     return lidar
 
 
-def match_cones(no_label_no_color, previous):
-    initial_size = len(no_label_no_color)
+def match_cones(no_color, previous):
+    initial_size = len(no_color)
     matched = []
     counter = 0
     for category in Side:
         for cone in previous[category]:
-            for to_match in no_label_no_color:
+            for to_match in no_color:
                 if (cone.position.x - to_match.position.x)**2 + (cone.position.y - to_match.position.y)**2 < DISTANCE_TO_MATCH**2:
                     to_match.category = cone.category
                     to_match.id = cone.id
@@ -204,11 +440,11 @@ def match_cones(no_label_no_color, previous):
                     cone.position.y = to_match.position.y
 
                     matched.append(to_match)
-                    no_label_no_color.remove(to_match)
+                    no_color.remove(to_match)
                     counter += 1
 
     print("Perceived:", initial_size , "Matched:", counter)
-    return matched, no_label_no_color
+    return matched, no_color
 
 
 def add_new_ids(left_over_cones, current_highest_id):
@@ -218,6 +454,40 @@ def add_new_ids(left_over_cones, current_highest_id):
         cone.id = current_highest_id
         observation_with_ids.append(cone)
     return observation_with_ids
+
+
+def collect_cones_from_camera(cone_data, car_position):
+    perceived_cones = []
+    #f = open("C:/Users/micha/Documents/GitHub/Car_Simulation/processing/computer_vision/YOLOv5/detection.json")
+    #data = json.load(f)
+
+    #for cone_data in data:
+    #print(cone_data.get("label"))
+    if cone_data is not None:
+        if cone_data[2] == "Yellow":
+            label = Side.LEFT
+        else:
+            label = Side.RIGHT
+        x = cone_data[0]/1000
+        y = cone_data[1]/1000
+
+
+        # rotate
+        phi = car.angle
+        x, y = x * np.cos(phi) - y * np.sin(phi), x * np.cos(phi) - y * np.sin(phi)
+        # add car x and y coordinates
+        x += car_position.x
+        y += car_position.y
+        # add to the array
+        print(x, y, label)
+        cone = Cone(x, y, label, None)
+        perceived_cones.append(cone)
+
+    # f = open("C:/Users/micha/Documents/GitHub/Car_Simulation/processing/computer_vision/YOLOv5/detection.json", "w")
+    # #data = json.load(f)
+    # data = []
+    # json.dump(data, f)
+    return perceived_cones
 
 
 if __name__ == "__main__":
@@ -237,6 +507,34 @@ if __name__ == "__main__":
     episodes = 1
 
     car = RealCar(time.time)
+
+    if COLLECT_CAMERA_DATA:
+        #camera = DetectionModule()
+        #camera = None
+        pipeline = start_Camera()
+
+        # Tiny yolo v3 / 4 label texts
+        labelMap = [
+            "Blue", "Yellow"
+        ]
+
+        start = time.time()
+        
+        # Connect to device and start pipeline
+        device = dai.Device(pipeline)
+        #with dai.Device(pipeline) as device:
+        previewQueue = device.getOutputQueue(
+            name="rgb", maxSize=4, blocking=False)
+        detectionNNQueue = device.getOutputQueue(
+            name="detections", maxSize=4, blocking=False)
+        xoutBoundingBoxDepthMappingQueue = device.getOutputQueue(
+            name="boundingBoxDepthMapping", maxSize=4, blocking=False)
+        depthQueue = device.getOutputQueue(
+            name="depth", maxSize=4, blocking=False)
+        networkQueue = device.getOutputQueue(
+            name="nnNetwork", maxSize=4, blocking=False)
+    else:
+        camera = None
 
     if COLLECT_LIDAR_DATA:
         lidar = init_lidar(car.comPort)
@@ -272,21 +570,33 @@ if __name__ == "__main__":
                 # send the desired steering data
                 # read the encoders
                 # update its position using those encoders
-            car.update()
-            # retrieve the position from Thijs' car and update the environment
-            env.pp.car.position.x = car.position[0]
-            env.pp.car.position.y = -car.position[1]
-            env.pp.car.true_position.x = car.position[0]
-            env.pp.car.true_position.y = -car.position[1]
-            env.pp.car.true_angle = -np.rad2deg(car.angle)
-            env.pp.car.angle = -np.rad2deg(car.angle)
+            if COLLECT_STEERING_DATA:
+                car.update()
+                # retrieve the position from Thijs' car and update the environment
+                env.pp.car.position.x = car.position[0]
+                env.pp.car.position.y = -car.position[1]
+                env.pp.car.true_position.x = car.position[0]
+                env.pp.car.true_position.y = -car.position[1]
+                env.pp.car.true_angle = -np.rad2deg(car.angle)
+                env.pp.car.angle = -np.rad2deg(car.angle)
+
+            if COLLECT_CAMERA_DATA:
+                data = getCones(previewQueue, detectionNNQueue, depthQueue, networkQueue,
+                               xoutBoundingBoxDepthMappingQueue, labelMap, start)
+                collected_cones = collect_cones_from_camera(data, env.pp.car.position)
+                matched_cones, leftover_cones = match_cones(collected_cones, env.pp.cones.visible)
+                current_highest_cone_id = len(env.pp.cones.list[Side.LEFT]) + len(env.pp.cones.list[Side.RIGHT])
+                new_cones = add_new_ids(leftover_cones, current_highest_cone_id)
+
+                for new in new_cones:
+                    env.pp.cones.visible[new.category].append(new)
 
             if COLLECT_LIDAR_DATA:
-                cones_no_label_no_color = collect_cones_from_lidar(lidar, car, env.pp.car.position)
-                matched_cones, leftover_cones = match_cones(cones_no_label_no_color, env.pp.cones.visible)
-                # TODO: Match new cones with camera data to get labels
-                #leftover_cones = give_cones_color(leftover_cones)
+                cones_no_color = collect_cones_from_lidar(lidar, car, env.pp.car.position)
+                matched_cones, leftover_cones = match_cones(cones_no_color, env.pp.cones.visible)
                 current_highest_cone_id = len(env.pp.cones.list[Side.LEFT]) + len(env.pp.cones.list[Side.RIGHT])
+                # TODO: Match new cones with camera data to get labels
+                # new_cones = add_color_and_add_ids_to_cones(leftover_cones, current_highest_cone_id)
                 new_cones = add_new_ids(leftover_cones, current_highest_cone_id)
 
                 # Add new cones to the simulation environment
@@ -297,6 +607,8 @@ if __name__ == "__main__":
                 #     for cone in env.pp.cones.visible[category]:
                 #         print(cone.position)
 
+            # Run SLAM and all the other epic stuff
+            # observation, reward, done, info = env.step(action)
             env.render()
 
             if done:
