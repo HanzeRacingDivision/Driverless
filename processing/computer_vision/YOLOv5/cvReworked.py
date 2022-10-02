@@ -16,9 +16,8 @@ Type = {
 
 def start_Camera():
     # Get argument first
-     nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/416_half_shave.blob"
-     #nnBlobPath = "416_half_shave.blob"
-     #nnBlobPath = "416_half_shave.blob"
+     #nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/custom_model.blob"
+     nnBlobPath = "416_half_shave.blob"
 
      if not Path(nnBlobPath).exists():
           import sys
@@ -231,7 +230,7 @@ def getCones(previewQueue, detectionNNQueue, depthQueue, networkQueue, xoutBound
     #break
 
 
-class DetectionModule:
+class DetectionMoule:
      pipeline = start_Camera()
 
      # Tiny yolo v3 / 4 label texts
@@ -257,8 +256,8 @@ class DetectionModule:
      networkQueue = device.getOutputQueue(
           name="nnNetwork", maxSize=4, blocking=False)
 
-     #while True:
-      #     print(getCones(previewQueue, detectionNNQueue, depthQueue, networkQueue,
-       #        xoutBoundingBoxDepthMappingQueue, labelMap, start))
-        #   if cv2.waitKey(1) == ord('q'):
-         #       break
+     while True:
+          print(getCones(previewQueue, detectionNNQueue, depthQueue, networkQueue,
+               xoutBoundingBoxDepthMappingQueue, labelMap, start))
+          if cv2.waitKey(1) == ord('q'):
+               break
