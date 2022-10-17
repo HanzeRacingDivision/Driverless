@@ -395,7 +395,7 @@ if __name__ == '__main__':
             elif(sceneIndex == 3):
                 drawCar(window, carPos, 0.0, [255, 255, 255]) #draw zero indicator
                 drawCar(window, carPos + targetLinearOffset, targetRotationalOffset, realConeColor) #draw true offset indicator
-                drawCar(window, carPos + calculatedLinearOffset, calculatedRotationalOffset, shiftedConeColor) #draw calculated offset indicato
+                drawCar(window, carPos + calculatedLinearOffset, 0.0, shiftedConeColor) #draw calculated offset indicato
                 
                 drawCones(window, realCones, 10, realConeColor)
                 drawCones(window, unshiftedConesOnlyLinear, 7, shiftedConeColor)

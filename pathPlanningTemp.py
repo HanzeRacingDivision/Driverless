@@ -303,7 +303,7 @@ class pathPlanner():
     targetPassedAngleThreshold = np.deg2rad(75) #if it passes a target (without hitting it perfectly), the angle to target will probably be more than this
     targetMissedAngleThreshold = np.deg2rad(140) #if the angle to target is larger than this, (panic, and) move on to the next target (or something)
 
-    steeringPredictDepth = 1 #how many targets to predictively steer towards
+    steeringPredictDepth = 2 #how many targets to predictively steer towards
     steeringPredictDepthStrength = 1.6 #(higher = stronger)
     steeringPredictDepthCurve = lambda depth : (pathPlanner.steeringPredictDepthStrength / (max(depth, 1)**2)) #inverse exponential, starting at a depth of 1 (0 depth would be the current target)
     ##a distance-based steering power curve may be useful (especially for predictive steering)
