@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import cv2
 import time
 import argparse
@@ -7,14 +8,37 @@ import numpy as np
 import depthai as dai
 from pathlib import Path
 
-labelMap = [
-    "Blue", "Yellow"
-]
+#Link the JSON detail file to the code
+with open("../details/FSN2022.json", "r+") as f:
+     data = json.load(f)
 
-nnPathDefault = "/home/catalinzaharia/Development/HARD/Driverless/processing/computer_vision/YOLOv5/shaves/416_half_shave_summer_FSE2022.blob"
+nnConfig = data["nn_config"]
+nnSpecificMetadata = nnConfig["NN_specific_metadata"]
+
+#Size of the model
+inputSize = nnConfig["input_size"]
+inputSize = inputSize.rsplit("x", 1)
+inputSize = inputSize[0]
+
+#Family of the model, temporarly we use just YOLO bases models 
+familiy = nnConfig["NN_family"]
+
+#Various parameters for the model (Dont't worry about these at all)
+#Trust me it works 
+anchors = nnSpecificMetadata["anchors"]
+numberOfClasses = nnSpecificMetadata["classes"]
+anchorsMarks = nnSpecificMetadata["anchor_masks"]
+iouThreshold = nnSpecificMetadata["iou_threshold"]
+numberOfCoordonates = nnSpecificMetadata["coordinates"]
+confidenceThreshold = nnSpecificMetadata["confidence_threshold"]
+
+#The label map of the model
+labelMap = data["mappings"]["labels"]
+
+nnPathDefault = "../shaves/FSN2022_openvino_2021.4_6shave.blob"
 parser = argparse.ArgumentParser()
 parser.add_argument('nnPath', nargs='?',
-                    help="Path to mobilenet detection network blob", default=nnPathDefault)
+                    help="Path to YOLO detection network blob", default=nnPathDefault)
 parser.add_argument('-ff', '--full_frame', action="store_true",
                     help="Perform tracking on full RGB frame", default=False)
 
@@ -22,13 +46,19 @@ args = parser.parse_args()
 
 fullFrameTracking = args.full_frame
 
+syncNN = True
+
 # Create pipeline
 pipeline = dai.Pipeline()
 
 # Define sources and outputs
 camRgb = pipeline.create(dai.node.ColorCamera)
-spatialDetectionNetwork = pipeline.create(
-    dai.node.YoloSpatialDetectionNetwork)
+if familiy == "YOLO":
+     spatialDetectionNetwork = pipeline.create(
+     dai.node.YoloSpatialDetectionNetwork)
+else:
+     spatialDetectionNetwork = pipeline.create(
+     dai.node.MobileNetSpatialDetectionNetwork)
 monoLeft = pipeline.create(dai.node.MonoCamera)
 monoRight = pipeline.create(dai.node.MonoCamera)
 stereo = pipeline.create(dai.node.StereoDepth)
@@ -41,7 +71,7 @@ xoutRgb.setStreamName("preview")
 trackerOut.setStreamName("tracklets")
 
 # Properties
-camRgb.setPreviewSize(416, 416)
+camRgb.setPreviewSize(int(inputSize), int(inputSize))
 camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
 camRgb.setInterleaved(False)
 camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
@@ -59,62 +89,32 @@ stereo.setOutputSize(monoLeft.getResolutionWidth(),
                      monoLeft.getResolutionHeight())
 
 spatialDetectionNetwork.setBlobPath(args.nnPath)
-spatialDetectionNetwork.setConfidenceThreshold(0.5)
+spatialDetectionNetwork.setConfidenceThreshold(confidenceThreshold)
 spatialDetectionNetwork.input.setBlocking(False)
 spatialDetectionNetwork.setBoundingBoxScaleFactor(0.5)
 spatialDetectionNetwork.setDepthLowerThreshold(100)
 spatialDetectionNetwork.setDepthUpperThreshold(5000)
+spatialDetectionNetwork.setIouThreshold(iouThreshold)
 
-spatialDetectionNetwork.setNumClasses(2)
-spatialDetectionNetwork.setCoordinateSize(4)
-spatialDetectionNetwork.setAnchors(
-    [
-        2.6171875,
-        6.7734375,
-        4.28125,
-        9.484375,
-        6.53515625,
-        14.109375,
-        9.5625,
-        19.484375,
-        12.7578125,
-        26.0625,
-        17.640625,
-        35.46875,
-        23.0,
-        43.90625,
-        27.8125,
-        57.5,
-        40.25,
-        78.0
-    ])
-spatialDetectionNetwork.setAnchorMasks(
-    {"side52": [
-        0,
-        1,
-        2
-    ],
-     "side26": [
-     3,
-     4,
-     5
-    ],
-     "side13": [
-     6,
-     7,
-     8
-    ]})
+spatialDetectionNetwork.setNumClasses(numberOfClasses)
+spatialDetectionNetwork.setCoordinateSize(numberOfCoordonates)
+spatialDetectionNetwork.setAnchors(anchors)
+spatialDetectionNetwork.setAnchorMasks(anchorsMarks)
 
-objectTracker.setDetectionLabelsToTrack([1])  # track only person
+objectTracker.setDetectionLabelsToTrack([0, 1])  
 # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
 objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
 # take the smallest ID when new object is tracked, possible options: SMALLEST_ID, UNIQUE_ID
-objectTracker.setTrackerIdAssignmentPolicy(
-    dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
+objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
 # Linking
 monoLeft.out.link(stereo.left)
 monoRight.out.link(stereo.right)
+
+if syncNN:
+     spatialDetectionNetwork.passthrough.link(xoutRgb.input)
+else:
+     camRgb.preview.link(xoutRgb.input)
 
 camRgb.preview.link(spatialDetectionNetwork.input)
 objectTracker.passthroughTrackerFrame.link(xoutRgb.input)

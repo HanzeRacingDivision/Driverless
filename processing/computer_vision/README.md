@@ -1,60 +1,57 @@
+# How to use the computer vision module
 
+## 1. Installing the dependencies
 
-# Computer Vision docs
+Refer to the DepthAI docs: https://docs.luxonis.com/en/latest/pages/tutorials/first_steps/#first-steps-with-depthai
 
-# Overview
-Python code for a car sim <br/>
-Moving_car: Code that simulates a self-driving car, aiming to travel along a line of cones <br/>
-coneconnecting: Code that holds math for finding cones that 'connect' to form the track boundry <br/>
+## 2. Running the module by itself
 
-# How to use Cone_Detection_Module 
+```
+$ cd Driverless/processing/computer_vision/YOLOv5/scripts
+$ python3 cvReworked.py
+```
 
-## Implementation of Cone_Detection_Module using YOLOV5 (Current version used for HRD05):
+## 3. Understanding the folder configuration
 
-### 1. Make sure you have installed the following:
+We currently work on the files in the folder "Yolov5."
 ```
-1: Python (At least 3.5)
-2: pip
-3: CUDA and CUDNN ~If a Nvidia GPU is used to run the model~ (Which is recomended)
-4: PyTorch for GPU (https://pytorch.org/get-started/locally/)
-5: OpenCV
-6: Pandas
-7: Various packages may need to be installed 
+$ cd Driverless/processing/computer_vision/YOLOv5
 ```
-### 2. Open the YOLOv5 folder within the Cone_Detection_Module
-Make sure you have the *best.pt* file in the same folder
-#### Run the command: 
-```
-python YOLOv5_Detection.py
-```
-Happy detection! 🏎️ 
 
-## In case YOLOV4 implementation of the Cone_Detection_Module is wanted follow these steps:  
-  
-For proper use of the Object_Detection_Module you need to follow these steps:
+Here we have the following structure:
 
-### 1. Download the configurations and the weights from the HARD Google Drive:
 ```
-https://drive.google.com/drive/folders/16qPjcqzjfw3wzPSjmJlqCNKbgekR5UpY?usp=sharing
+|YOLOv5
+|-details
+|-pts
+|-scripts
+|-shaves
 ```
-### 2. Make the following 2 directories:
-```
-Configurations
-```
-Where all the contents of the Configurations folder from drive should be in. </br>
 
-And
-```
-Weights
-```
-Where the contents of YOLO_V4 Tiny Weights.zip should be in. </br>
+### "details" folder
+We store the JSON files of the models we test in the details folder. You can find some examples of "detail" files at the moment.
 
-In the end you should end up with this folder structure:
+### "pts" folder
+In the pts folder, we store the .pt files. These files are the raw file that results from a training session for a model.
+To train a model, we use the following jupiter notebook: https://github.com/luxonis/depthai-ml-training/blob/master/colab-notebooks/YoloV5_training.ipynb.
+
+For training a model on a local machine with an Nvidia GPU, refer to this doc: TBA.
+
+After the files are trained, and it results in a .pt file, we use this online transformer: http://tools.luxonis.com/.
+As the input shape, put the size of the model (The default size we use is: 416)
+
+The files resulting from the conversion are in a .zip file that will be downloaded from the site. 
+
+From all the files inside the .zip is the .json, which always goes to the "details" folder, and the .blob file, which goes to the "shaves" folder.
+
+### "scripts" folder
+Here we have all the code that we use for the model.
+
+The only file currently in use is "cvReworked.py." All other files are for reference.
+To run the code, use the following: 
 ```
-|New Version
-|-Configurations
-|-Weights
-|-coco.names
-|-detecion.py
+$ python3 cvReworked.py
 ```
-### 3. Make sure you have OpenCV built and optionally with CUDA and CuDNN.
+
+### "shaves" folder
+Here are saved all the .blob results from the conversion of the .pt file.
