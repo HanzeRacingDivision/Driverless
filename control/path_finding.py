@@ -19,14 +19,20 @@ def path_finding(triangles: np.ndarray, cones: List[dict]):
     edges = []
     for triangle in triangles:
         if cones[triangle[0]]["Label"] != cones[triangle[1]]["Label"]:
-            edges.append([[cones[triangle[0]]["Xpos"], cones[triangle[0]]["Ypos"]],
-                          [cones[triangle[1]]["Xpos"], cones[triangle[1]]["Ypos"]]])
+            edge = sorted([[cones[triangle[0]]["Xpos"], cones[triangle[0]]["Ypos"]],
+                           [cones[triangle[1]]["Xpos"], cones[triangle[1]]["Ypos"]]], key=lambda x: x[0]**2 + x[1]**2)
+            if edge not in edges:
+                edges.append(edge)
         if cones[triangle[2]]["Label"] != cones[triangle[1]]["Label"]:
-            edges.append([[cones[triangle[2]]["Xpos"], cones[triangle[2]]["Ypos"]],
-                          [cones[triangle[1]]["Xpos"], cones[triangle[1]]["Ypos"]]])
+            edge = sorted([[cones[triangle[2]]["Xpos"], cones[triangle[2]]["Ypos"]],
+                           [cones[triangle[1]]["Xpos"], cones[triangle[1]]["Ypos"]]], key=lambda x: x[0]**2 + x[1]**2)
+            if edge not in edges:
+                edges.append(edge)
         if cones[triangle[2]]["Label"] != cones[triangle[0]]["Label"]:
-            edges.append([[cones[triangle[2]]["Xpos"], cones[triangle[2]]["Ypos"]],
-                          [cones[triangle[0]]["Xpos"], cones[triangle[0]]["Ypos"]]])
+            edge = sorted([[cones[triangle[0]]["Xpos"], cones[triangle[0]]["Ypos"]],
+                           [cones[triangle[2]]["Xpos"], cones[triangle[2]]["Ypos"]]], key=lambda x: x[0]**2 + x[1]**2)
+            if edge not in edges:
+                edges.append(edge)
         if cones[triangle[0]]["Label"] == cones[triangle[1]]["Label"] == cones[triangle[2]]["Label"] == "Orange":
             ...
 
@@ -35,21 +41,32 @@ def path_finding(triangles: np.ndarray, cones: List[dict]):
 
     edges = np.array(edges)
     p1s = edges[:, 0]
-    distances = list(np.sum(p1s, axis=1))
-    idx = distances.index(min(distances))
-    current_edge = edges[idx]
-    ordered_edges = np.ndarray(edges.shape)
-    ordered_edges[0] = current_edge
+    distances1 = [p[0]**2 + p[1]**2 for p in p1s]
+    idx1 = distances1.index(min(distances1))
+    p2s = edges[:, 1]
+    distances2 = [p[0]**2 + p[1]**2 for p in p2s]
+    idx2 = distances2.index(min(distances2))
+    if distances1[idx1] < distances2[idx2]:
+        current_edge = edges[idx1]
+        used_indexes = [idx1]
+    else:
+        current_edge = edges[idx2]
+        used_indexes = [idx2]
+    ordered_edges = [current_edge]
     for i in range(1, edges.shape[0]):
+        found_next_edge = False
         for j in range(edges.shape[0]):
-            if np.all(edges[j][0] == current_edge[1]):
+            if j in used_indexes:
+                continue
+            if np.all(edges[j][0] == current_edge[1]) or np.all(edges[j][1] == current_edge[1]) \
+                    or np.all(edges[j][0] == current_edge[0]) or np.all(edges[j][0] == current_edge[0]):
                 current_edge = edges[j]
-                ordered_edges[i] = current_edge
+                ordered_edges.append(current_edge)
+                used_indexes.append(j)
+                found_next_edge = True
                 break
-            elif np.all(edges[j][1] == current_edge[1]):
-                current_edge = edges[j][::-1]
-                ordered_edges[i] = current_edge
-                break
+        if not found_next_edge:
+            break
 
     midpoints = np.average(ordered_edges, axis=1)
 
