@@ -1,13 +1,10 @@
-# [{"Label": "Yellow", "Zpos": 1838, "Ypos": 1486, "Xpos": 401, "Time": 1657531097.804826},
-#{"Label": "Blue", "Zpos": 1234, "Ypos": 16, "Xpos": 38, "Time": 1657531097.8058908}]               
-
 import numpy as np
 import time
 from scipy.spatial import Delaunay
 import matplotlib.pyplot as plt
 from sklearn.feature_extraction import DictVectorizer
 
-start_time = time.time()
+#start_time = time.time()
 def separating(coordinates): 
     
     coordinates.sort(key=lambda x:(x["Label"], x["Ypos"]**2+x["Xpos"]**2))
@@ -20,16 +17,15 @@ example = [{"Label": "Blue", "Zpos": 2, "Ypos": 3, "Xpos": 7 , "Time": 1}, {"Lab
 
 
 example.sort(key=lambda x:(x["Label"], x["Ypos"]**2+x["Xpos"]**2))
-#print(example[3]["Label"])
 output = separating(example) 
-#print(output)
 tri = Delaunay(output)
 final_triangles = tri.simplices
-for i in range(5):
+n = int(np.shape(final_triangles[0]))
+for i in range(n):
     if example[tri.simplices[i][0]]["Label"] == example[tri.simplices[i][1]]["Label"] == example[tri.simplices[i][2]]["Label"]:
         final_triangles = np.delete(final_triangles,i,0) 
 plt.triplot(output[:,0], output[:,1], final_triangles)
 plt.plot(output[:,0], output[:,1], 'o')
 plt.show()
-final_time = time.time()-start_time
-print(final_time)
+#final_time = time.time()-start_time
+#print(final_time)
