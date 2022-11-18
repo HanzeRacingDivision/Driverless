@@ -18,5 +18,5 @@ def delauney_boundary(coordinates):
     final_triangles = tri.simplices
     n = int(np.shape(final_triangles)[0])
     for i in range(n):
-        if example[tri.simplices[i][0]]["Label"] == example[tri.simplices[i][1]]["Label"] == example[tri.simplices[i][2]]["Label"]:
+        if coordinates[tri.simplices[i][0]]["Label"] == coordinates[tri.simplices[i][1]]["Label"] == coordinates[tri.simplices[i][2]]["Label"]:
             final_triangles = np.delete(final_triangles,i,0) 
