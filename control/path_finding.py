@@ -1,16 +1,36 @@
 import numpy as np
+from typing import List
 
 
-def path_finding(edges: np.ndarray):
+def path_finding(triangles: np.ndarray, cones: List[dict]):
     """
     This function will take an array of edges between cones of opposite color and first find the order in which they are
     positioned on the track. Then, it will determine the midpoints between of the edges and return them as an ordered
     list, with the first element being the closest midpoint.
 
-    :param edges: np.ndarray([[p1, p2]])
+    :param cones: ordered list of cones (ordered by colour and then distance to car)
+    :param triangles: np.ndarray([n1, n2, n3])
     :return midpoints: np.ndarray[p]
     """
 
+    edges = []
+    for triangle in triangles:
+        if cones[triangle[0]]["Label"] != cones[triangle[1]]["Label"]:
+            edges.append([[cones[triangle[0]]["Xpos"], cones[triangle[0]]["Ypos"]],
+                          [cones[triangle[1]]["Xpos"], cones[triangle[1]]["Ypos"]]])
+        if cones[triangle[2]]["Label"] != cones[triangle[1]]["Label"]:
+            edges.append([[cones[triangle[2]]["Xpos"], cones[triangle[2]]["Ypos"]],
+                          [cones[triangle[1]]["Xpos"], cones[triangle[1]]["Ypos"]]])
+        if cones[triangle[2]]["Label"] != cones[triangle[0]]["Label"]:
+            edges.append([[cones[triangle[2]]["Xpos"], cones[triangle[2]]["Ypos"]],
+                          [cones[triangle[0]]["Xpos"], cones[triangle[0]]["Ypos"]]])
+        if cones[triangle[0]]["Label"] == cones[triangle[1]]["Label"] == cones[triangle[2]]["Label"] == "Orange":
+            ...
+
+    for i in range(len(edges)):
+        edges[i] = sorted(edges[i], key=lambda x: x[0]**2 + x[1]**2)
+
+    edges = np.array(edges)
     p1s = edges[:, 0]
     distances = list(np.sum(p1s, axis=1))
     idx = distances.index(min(distances))
