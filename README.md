@@ -16,4 +16,4 @@ Summarize how the process
 ## TESTING
 explenation and results of unit testing, chain testing, and practical tests. 
 
-## Conclusion/Discussion
+## CONLCUSION/DISCUSSION
