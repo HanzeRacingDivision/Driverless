@@ -24,7 +24,7 @@ Here we have the following structure:
 |YOLOv5
 |-details
 |-pts
-|-scripts
+|-src
 |-shaves
 ```
 
@@ -44,7 +44,7 @@ The files resulting from the conversion are in a .zip file that will be download
 
 From all the files inside the .zip is the .json, which always goes to the "details" folder, and the .blob file, which goes to the "shaves" folder.
 
-### "scripts" folder
+### "src" folder
 Here we have all the code that we use for the model.
 
 The only file currently in use is "cvReworked.py." All other files are for reference.
