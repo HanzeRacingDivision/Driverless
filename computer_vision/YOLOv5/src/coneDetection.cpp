@@ -1,12 +1,15 @@
 #include <chrono>
-
-#include "utility.hpp"
+#include <fstream>
+#include <iostream>
+#include <nlohmann/json.hpp>
 
 // Includes common necessary includes for development using depthai library
 #include "depthai/depthai.hpp"
 
+#define BLOB_PATH "/home/catalinzaharia/Development/HARD/Driverless/computer_vision/YOLOv5/shaves/416_half_shave_summer_FSE2022.blob"
+
 static const std::vector<std::string> labelMap = {
-     "Blue", "Yellow"
+    "Blue", "Yellow"
 };
 
 static std::atomic<bool> syncNN{true};
@@ -38,13 +41,11 @@ int main(int argc, char **argv)
 
      auto xoutRgb = pipeline.create<dai::node::XLinkOut>();
      auto xoutNN = pipeline.create<dai::node::XLinkOut>();
-     auto xoutBoundingBoxDepthMapping = pipeline.create<dai::node::XLinkOut>();
      auto xoutDepth = pipeline.create<dai::node::XLinkOut>();
      auto nnNetworkOut = pipeline.create<dai::node::XLinkOut>();
 
      xoutRgb->setStreamName("rgb");
      xoutNN->setStreamName("detections");
-     xoutBoundingBoxDepthMapping->setStreamName("boundingBoxDepthMapping");
      xoutDepth->setStreamName("depth");
      nnNetworkOut->setStreamName("nnNetwork");
 
@@ -73,10 +74,27 @@ int main(int argc, char **argv)
      spatialDetectionNetwork->setDepthUpperThreshold(5000);
 
      // yolo specific parameters
-     spatialDetectionNetwork->setNumClasses(80);
+     spatialDetectionNetwork->setNumClasses(2);
      spatialDetectionNetwork->setCoordinateSize(4);
-     spatialDetectionNetwork->setAnchors({10, 14, 23, 27, 37, 58, 81, 82, 135, 169, 344, 319});
-     spatialDetectionNetwork->setAnchorMasks({{"side26", {1, 2, 3}}, {"side13", {3, 4, 5}}});
+     spatialDetectionNetwork->setAnchors({2.58984375,
+                                          6.26171875,
+                                          3.953125,
+                                          8.8515625,
+                                          5.53515625,
+                                          12.1015625,
+                                          7.59765625,
+                                          16.0,
+                                          10.609375,
+                                          21.578125,
+                                          15.109375,
+                                          30.046875,
+                                          21.171875,
+                                          40.53125,
+                                          27.859375,
+                                          54.0625,
+                                          39.625,
+                                          73.5});
+     spatialDetectionNetwork->setAnchorMasks({{"side52", {0, 1, 2}}, {"side26", {3, 4, 5}}, {"side13", {6, 7, 8}}});
      spatialDetectionNetwork->setIouThreshold(0.5f);
 
      // Linking
@@ -94,7 +112,6 @@ int main(int argc, char **argv)
      }
 
      spatialDetectionNetwork->out.link(xoutNN->input);
-     spatialDetectionNetwork->boundingBoxMapping.link(xoutBoundingBoxDepthMapping->input);
 
      stereo->depth.link(spatialDetectionNetwork->inputDepth);
      spatialDetectionNetwork->passthroughDepth.link(xoutDepth->input);
@@ -106,7 +123,6 @@ int main(int argc, char **argv)
      // Output queues will be used to get the rgb frames and nn data from the outputs defined above
      auto previewQueue = device.getOutputQueue("rgb", 4, false);
      auto detectionNNQueue = device.getOutputQueue("detections", 4, false);
-     auto xoutBoundingBoxDepthMappingQueue = device.getOutputQueue("boundingBoxDepthMapping", 4, false);
      auto depthQueue = device.getOutputQueue("depth", 4, false);
      auto networkQueue = device.getOutputQueue("nnNetwork", 4, false);
 
@@ -153,28 +169,20 @@ int main(int argc, char **argv)
           }
 
           auto detections = inDet->detections;
-          if (!detections.empty())
-          {
-               auto boundingBoxMapping = xoutBoundingBoxDepthMappingQueue->get<dai::SpatialLocationCalculatorConfig>();
-               auto roiDatas = boundingBoxMapping->getConfigData();
-
-               for (auto roiData : roiDatas)
-               {
-                    auto roi = roiData.roi;
-                    roi = roi.denormalize(depthFrameColor.cols, depthFrameColor.rows);
-                    auto topLeft = roi.topLeft();
-                    auto bottomRight = roi.bottomRight();
-                    auto xmin = (int)topLeft.x;
-                    auto ymin = (int)topLeft.y;
-                    auto xmax = (int)bottomRight.x;
-                    auto ymax = (int)bottomRight.y;
-
-                    cv::rectangle(depthFrameColor, cv::Rect(cv::Point(xmin, ymin), cv::Point(xmax, ymax)), color, cv::FONT_HERSHEY_SIMPLEX);
-               }
-          }
 
           for (const auto &detection : detections)
           {
+               auto roiData = detection.boundingBoxMapping;
+               auto roi = roiData.roi;
+               roi = roi.denormalize(depthFrameColor.cols, depthFrameColor.rows);
+               auto topLeft = roi.topLeft();
+               auto bottomRight = roi.bottomRight();
+               auto xmin = (int)topLeft.x;
+               auto ymin = (int)topLeft.y;
+               auto xmax = (int)bottomRight.x;
+               auto ymax = (int)bottomRight.y;
+               cv::rectangle(depthFrameColor, cv::Rect(cv::Point(xmin, ymin), cv::Point(xmax, ymax)), color, cv::FONT_HERSHEY_SIMPLEX);
+
                int x1 = detection.xmin * frame.cols;
                int y1 = detection.ymin * frame.rows;
                int x2 = detection.xmax * frame.cols;
