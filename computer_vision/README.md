@@ -7,7 +7,7 @@ Refer to the DepthAI docs: https://docs.luxonis.com/en/latest/pages/tutorials/fi
 ## 2. Running the module by itself
 
 ```
-$ cd Driverless/processing/computer_vision/YOLOv5/scripts
+$ cd Driverless/computer_vision/YOLOv5/scripts
 $ python3 cvReworked.py
 ```
 
@@ -15,7 +15,7 @@ $ python3 cvReworked.py
 
 We currently work on the files in the folder "Yolov5."
 ```
-$ cd Driverless/processing/computer_vision/YOLOv5
+$ cd Driverless/computer_vision/YOLOv5
 ```
 
 Here we have the following structure:
