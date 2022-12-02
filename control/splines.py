@@ -6,14 +6,18 @@ def generate_increment_on_path(midpoints: np.ndarray, distance_increment: float 
                                max_midpoints_considered: int = 3):
     """
     This function takes an array of midpoints and generates a new point along the path, described by these midpoints.
+    If there is at least two midpoints, then we generate a cubic spline that fits the first few midpoints and our
+    position (0,0). How many midpoints are considered is dependent on the argument max_midpoints_considered.
+    If there is exactly one visible midpoint, we try to go there in a straight line.
+    If there is no visible midpoint, we simply go straight. This case should never happen.
 
-    # TODO Do we maybe need an absolute increment (or one dependent on our speed)?
-    Currently, our 'step size' is dependent on how far the last midpoint we consider, is away.
-
-    :param midpoints:
-    :param distance_increment: float
-    :param max_midpoints_considered: int
-    :return:
+    :param midpoints: np.array([[x, y]]); the *ordered* list of midpoints (x and y coordinates) we want to follow
+    :param distance_increment: float; default = 0.05; this determines how far along the spline a point is generated;
+                               should depend on the upper bound of our speed and the lower bound of our pipeline latency
+    :param max_midpoints_considered: int; default = 3; with the midpoint method, we mostly want to maneuver the closer
+                                     midpoints and for that, taking further points into consideration when generating
+                                     the cubic spline would decrease overall accuracy
+    :return: np.array([x, y]); one pair of x-y-coordinates which represents the next point we want to steer towards
     """
 
     if midpoints.shape[0] >= 2:
