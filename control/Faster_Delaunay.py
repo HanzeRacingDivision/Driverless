@@ -5,6 +5,11 @@ from sklearn.feature_extraction import DictVectorizer
 
 
 def separating(coordinates):
+    
+    """
+    This function gets the list of dictionaries (containing the coordinates) and returns an array of [x-pos, y-pos]
+    """
+    
     # coordinates.sort(key=lambda x:(x["Label"], x["Ypos"]**2+x["Xpos"]**2))
     dictvectorizer = DictVectorizer(dtype = np.float64 ,sparse= False)
     features = dictvectorizer.fit_transform(coordinates)
@@ -13,6 +18,13 @@ def separating(coordinates):
 
 
 def delauney_boundary(coordinates):
+    
+    """
+    This function recieves the dictionary, sorts it by colour and distance form the car (blue cones first and yellow cones after). 
+    Then it outputs the delauney triangularization deleting that triangle that would be outside of the track.
+    """
+    
+    
     coordinates.sort(key=lambda x:(x["Label"], x["Ypos"]**2+x["Xpos"]**2))
     output = separating(coordinates)
     tri = Delaunay(output)
