@@ -11,3 +11,4 @@ example = [{"Label": "Blue", "Zpos": 2, "Ypos": 3, "Xpos": 7, "Time": 1},
 triangles, cones = delauney_boundary(example)
 midpoints = path_finding(triangles, cones)
 print(midpoints)
+
