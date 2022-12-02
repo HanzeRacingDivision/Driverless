@@ -11,6 +11,13 @@ project(${TARGET_NAME})
 find_package(OpenCV REQUIRED)
 find_package(nlohmann_json 3.9.1 REQUIRED)
 
+# Env for the camera
+set(test_usb_env
+    # Misc
+    "UBSAN_OPTIONS=halt_on_error=1"
+    # DepthAI
+    "DEPTHAI_PROTOCOL=usb"
+)
 
 # Add source files
 add_executable("${TARGET_NAME}"

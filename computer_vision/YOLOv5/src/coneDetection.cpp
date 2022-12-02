@@ -13,7 +13,6 @@ static std::atomic<bool> syncNN{true};
 
 int main(int argc, char **argv)
 {
-     using namespace std;
      using namespace std::chrono;
      using json = nlohmann::json;
 
@@ -188,7 +187,7 @@ int main(int argc, char **argv)
                int y2 = detection.ymax * frame.rows;
 
                uint32_t labelIndex = detection.label;
-               std::string labelStr = to_string(labelIndex);
+               std::string labelStr = std::to_string(labelIndex);
                if (labelIndex < labelMap.size())
                {
                     labelStr = labelMap[labelIndex];
