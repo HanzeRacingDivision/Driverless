@@ -20,7 +20,7 @@ Otherwise install one of the followring, depending on the machine
  - Or install from package / sources (Windows and other OSes)
 https://docs.opencv.org/master/d0/d3d/tutorial_general_install.html
 
-## Build DepthAI library
+## Build DepthAI-Core library
 ```
 cd depthai-core
 ```
