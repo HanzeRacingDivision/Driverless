@@ -1,23 +1,38 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <string.h>
 #include <nlohmann/json.hpp>
+#include <depthai/depthai.hpp>
 
 // Includes common necessary includes for development using depthai library
-#include "depthai/depthai.hpp"
 
-#define BLOB_PATH "/home/catalinzaharia/Development/HARD/Driverless/computer_vision/YOLOv5/shaves/416_half_shave_summer_FSE2022.blob"
-
-static const std::vector<std::string> labelMap = {
-    "Blue", "Yellow"
-};
+#define BLOB_PATH "../shaves/416_half_shave_summer_FSE2022.blob"
 
 static std::atomic<bool> syncNN{true};
 
 int main(int argc, char **argv)
 {
-     using namespace std;
      using namespace std::chrono;
+     using json = nlohmann::json;
+
+     std::ifstream f("../details/FSN2022.json", std::ifstream::in);
+     json j;
+     f >> j;
+
+     // Getting the labels for the model
+     std::vector<std::string> labels = j["mappings"]["labels"];
+     std::vector<std::string> labelMap = labels;
+
+     // Getting the input size 
+     std::string inputSizeStr = j["nn_config"]["input_size"];
+     inputSizeStr = inputSizeStr.substr(0, 3);
+     int inputSize = stoi(inputSizeStr);
+
+     //Getting the YOLO specific parameters (anchors & masks)
+     std::vector<float> anchors = j["nn_config"]["NN_specific_metadata"]["anchors"];
+     std::map<std::string, std::vector<int>> masks = j["nn_config"]["NN_specific_metadata"]["anchor_masks"];
+
      std::string nnPath(BLOB_PATH);
 
      // If path to blob specified, use that
@@ -50,7 +65,7 @@ int main(int argc, char **argv)
      nnNetworkOut->setStreamName("nnNetwork");
 
      // Properties
-     camRgb->setPreviewSize(416, 416);
+     camRgb->setPreviewSize(inputSize, inputSize);
      camRgb->setResolution(dai::ColorCameraProperties::SensorResolution::THE_1080_P);
      camRgb->setInterleaved(false);
      camRgb->setColorOrder(dai::ColorCameraProperties::ColorOrder::BGR);
@@ -73,28 +88,11 @@ int main(int argc, char **argv)
      spatialDetectionNetwork->setDepthLowerThreshold(100);
      spatialDetectionNetwork->setDepthUpperThreshold(5000);
 
-     // yolo specific parameters
+     // YOLO specific parameters
      spatialDetectionNetwork->setNumClasses(2);
      spatialDetectionNetwork->setCoordinateSize(4);
-     spatialDetectionNetwork->setAnchors({2.58984375,
-                                          6.26171875,
-                                          3.953125,
-                                          8.8515625,
-                                          5.53515625,
-                                          12.1015625,
-                                          7.59765625,
-                                          16.0,
-                                          10.609375,
-                                          21.578125,
-                                          15.109375,
-                                          30.046875,
-                                          21.171875,
-                                          40.53125,
-                                          27.859375,
-                                          54.0625,
-                                          39.625,
-                                          73.5});
-     spatialDetectionNetwork->setAnchorMasks({{"side52", {0, 1, 2}}, {"side26", {3, 4, 5}}, {"side13", {6, 7, 8}}});
+     spatialDetectionNetwork->setAnchors(anchors);
+     spatialDetectionNetwork->setAnchorMasks(masks);
      spatialDetectionNetwork->setIouThreshold(0.5f);
 
      // Linking
@@ -189,7 +187,7 @@ int main(int argc, char **argv)
                int y2 = detection.ymax * frame.rows;
 
                uint32_t labelIndex = detection.label;
-               std::string labelStr = to_string(labelIndex);
+               std::string labelStr = std::to_string(labelIndex);
                if (labelIndex < labelMap.size())
                {
                     labelStr = labelMap[labelIndex];

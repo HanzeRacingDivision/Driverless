@@ -1,4 +1,58 @@
-# How to use the computer vision module
+# How to use/compile/build the computer vision module (Main module)
+## Library dependencies
+- cmake >= 3.4
+- C/C++14 compiler
+
+## Submodules
+This project uses one submodule and we need to initialize and update it
+```
+git submodule update --init --recursive
+```
+
+## Prerequisites
+
+If OpenVINO is installed then no further action is required.
+
+Otherwise install one of the followring, depending on the machine 
+
+ - Ubuntu 20.04/22.04 - `sudo apt install libopencv-dev`
+ - MacOS - `brew install opencv`
+ - Or install from package / sources (Windows and other OSes)
+https://docs.opencv.org/master/d0/d3d/tutorial_general_install.html
+
+## Build DepthAI-Core library
+```
+cd depthai-core
+```
+```
+git submodule update --init --recursive
+```
+### Building the library 
+```
+cmake -S. -Bbuild
+cmake --build build
+```
+More documentation can be found at:
+https://github.com/luxonis/depthai-core
+
+Then we head back to the main directory
+```
+cd ..
+```
+
+## Building 
+```
+mkdir -p build && cd build
+cmake ..
+cmake --build . --parallel
+```
+## Runing 
+```
+./detectionModule
+```
+
+# How to use the computer vision module (Demo module)
+## !!! This module is just for demonstation purpose !!!
 
 ## 1. Installing the dependencies
 
@@ -55,3 +109,5 @@ $ python3 cvReworked.py
 
 ### "shaves" folder
 Here are saved all the .blob results from the conversion of the .pt file.
+
+
