@@ -7,7 +7,7 @@
 
 // Includes common necessary includes for development using depthai library
 
-#define BLOB_PATH "/home/catalinzaharia/Development/HARD/Driverless/computer_vision/YOLOv5/shaves/416_half_shave_summer_FSE2022.blob"
+#define BLOB_PATH "../shaves/416_half_shave_summer_FSE2022.blob"
 
 static std::atomic<bool> syncNN{true};
 
@@ -16,7 +16,7 @@ int main(int argc, char **argv)
      using namespace std::chrono;
      using json = nlohmann::json;
 
-     std::ifstream f("/home/catalinzaharia/Development/HARD/Driverless/computer_vision/YOLOv5/details/bigDataset.json", std::ifstream::in);
+     std::ifstream f("../details/FSN2022.json", std::ifstream::in);
      json j;
      f >> j;
 
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
      spatialDetectionNetwork->setDepthLowerThreshold(100);
      spatialDetectionNetwork->setDepthUpperThreshold(5000);
 
-     // yolo specific parameters
+     // YOLO specific parameters
      spatialDetectionNetwork->setNumClasses(2);
      spatialDetectionNetwork->setCoordinateSize(4);
      spatialDetectionNetwork->setAnchors(anchors);
