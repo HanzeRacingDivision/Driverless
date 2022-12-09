@@ -17,7 +17,3 @@ Rules: None
 <br/>
 Demands: the input of the function should be a list of dictionaries with each dictionary being of the form 
 {"Label": "The colour of the cone", "Zpos": position on the vertical axis, "Ypos": position y axis , "Xpos": position x axis , "Time": time at which the signal was received}
-
-
-
-
