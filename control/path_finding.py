@@ -27,6 +27,8 @@ def path_finding(triangles: np.ndarray, cones: List[dict]):
             midpoints.append([(cones[triangle[2]]["Xpos"] + cones[triangle[1]]["Xpos"]) / 2,
                              (cones[triangle[2]]["Ypos"] + cones[triangle[1]]["Ypos"]) / 2])
         if cones[triangle[2]]["Label"] != cones[triangle[0]]["Label"]:
+            midpoints.append([(cones[triangle[2]]["Xpos"] + cones[triangle[0]]["Xpos"]) / 2,
+                              (cones[triangle[2]]["Ypos"] + cones[triangle[0]]["Ypos"]) / 2])
 
     unique_midpoints = []
     for midpoint in midpoints:
