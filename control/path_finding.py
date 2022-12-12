@@ -16,44 +16,46 @@ def path_finding(triangles: np.ndarray, cones: List[dict]):
     :return midpoints: np.ndarray[p] – p = np.array([x, y]) – x, y in natural numbers
     """
 
-    edges = []
+    midpoints = []
     for triangle in triangles:
         if cones[triangle[0]]["Label"] != cones[triangle[1]]["Label"]:
-            edge = sorted([[cones[triangle[0]]["Xpos"], cones[triangle[0]]["Ypos"]],
-                           [cones[triangle[1]]["Xpos"], cones[triangle[1]]["Ypos"]]], key=lambda x: x[0]**2 + x[1]**2)
-            if edge not in edges:
-                edges.append(edge)
+            midpoints.append([(cones[triangle[0]]["Xpos"] + cones[triangle[1]]["Xpos"]) / 2,
+                             (cones[triangle[0]]["Ypos"] + cones[triangle[1]]["Ypos"]) / 2])
         if cones[triangle[2]]["Label"] != cones[triangle[1]]["Label"]:
-            edge = sorted([[cones[triangle[2]]["Xpos"], cones[triangle[2]]["Ypos"]],
-                           [cones[triangle[1]]["Xpos"], cones[triangle[1]]["Ypos"]]], key=lambda x: x[0]**2 + x[1]**2)
-            if edge not in edges:
-                edges.append(edge)
+            midpoints.append([(cones[triangle[2]]["Xpos"] + cones[triangle[1]]["Xpos"]) / 2,
+                             (cones[triangle[2]]["Ypos"] + cones[triangle[1]]["Ypos"]) / 2])
         if cones[triangle[2]]["Label"] != cones[triangle[0]]["Label"]:
-            edge = sorted([[cones[triangle[0]]["Xpos"], cones[triangle[0]]["Ypos"]],
-                           [cones[triangle[2]]["Xpos"], cones[triangle[2]]["Ypos"]]], key=lambda x: x[0]**2 + x[1]**2)
-            if edge not in edges:
-                edges.append(edge)
-        if cones[triangle[0]]["Label"] == cones[triangle[1]]["Label"] == cones[triangle[2]]["Label"] == "Orange":
-            ...
+            midpoints.append([(cones[triangle[0]]["Xpos"] + cones[triangle[2]]["Xpos"]) / 2,
+                             (cones[triangle[0]]["Ypos"] + cones[triangle[2]]["Ypos"]) / 2])
 
-    for i in range(len(edges)):
-        edges[i] = sorted(edges[i], key=lambda x: x[0]**2 + x[1]**2)
+    unique_midpoints = []
+    for midpoint in midpoints:
+        if midpoint not in unique_midpoints:
+            unique_midpoints.append(midpoint)
 
-    edges = np.array(edges)
-    p1s = edges[:, 0]
-    distances1 = [p[0]**2 + p[1]**2 for p in p1s]
-    idx1 = distances1.index(min(distances1))
-    p2s = edges[:, 1]
-    distances2 = [p[0]**2 + p[1]**2 for p in p2s]
-    idx2 = distances2.index(min(distances2))
-    if distances1[idx1] < distances2[idx2]:
-        current_edge = edges[idx1]
-        used_indexes = [idx1]
-    else:
-        current_edge = edges[idx2]
-        used_indexes = [idx2]
-    ordered_edges = [current_edge]
-    for i in range(1, edges.shape[0]):
+    midpoints = unique_midpoints
+
+    distances = [p[0]**2 + p[1]**2 for p in midpoints]
+    idx = distances.index(min(distances))
+    current_midpoint = midpoints[idx]
+    used_indexes = [idx]
+    ordered_midpoints = [current_midpoint]
+    for i in range(1, len(midpoints)):
+        next_idx = None
+        next_distance = np.infty
+        for j in range(len(midpoints)):
+            if j in used_indexes:
+                continue
+            t = np.sqrt((midpoints[j][0] - current_midpoint[0]) ** 2 + (midpoints[j][1] - current_midpoint[1]) ** 2)
+            if t < next_distance:
+                next_distance = t
+                next_idx = j
+        if next_idx is not None:
+            current_midpoint = midpoints[next_idx]
+            ordered_midpoints.append(current_midpoint)
+            used_indexes.append(next_idx)
+
+    """for i in range(1, midpoints.shape[0]):
         found_next_edge = False
         for j in range(edges.shape[0]):
             if j in used_indexes:
@@ -68,6 +70,6 @@ def path_finding(triangles: np.ndarray, cones: List[dict]):
         if not found_next_edge:
             break
 
-    midpoints = np.average(ordered_edges, axis=1)
+    midpoints = np.average(ordered_edges, axis=1)"""
 
-    return midpoints
+    return np.array(ordered_midpoints)
