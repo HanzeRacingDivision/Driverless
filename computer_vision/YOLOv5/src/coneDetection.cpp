@@ -7,7 +7,7 @@
 
 // Includes common necessary includes for development using depthai library
 
-#define BLOB_PATH "../shaves/416_half_shave_summer_FSE2022.blob"
+#define BLOB_PATH "../shaves/bestFSN_openvino_2021.4_6shave.blob"
 
 static std::atomic<bool> syncNN{true};
 
@@ -16,7 +16,7 @@ int main(int argc, char **argv)
      using namespace std::chrono;
      using json = nlohmann::json;
 
-     std::ifstream f("../details/FSN2022.json", std::ifstream::in);
+     std::ifstream f("../details/bestFSN.json", std::ifstream::in);
      json j;
      f >> j;
 
@@ -127,7 +127,7 @@ int main(int argc, char **argv)
      auto startTime = steady_clock::now();
      int counter = 0;
      float fps = 0;
-     auto color = cv::Scalar(255, 255, 255);
+     auto color = cv::Scalar(0, 255, 0);
      bool printOutputLayersOnce = true;
 
      while (true)
@@ -192,22 +192,24 @@ int main(int argc, char **argv)
                {
                     labelStr = labelMap[labelIndex];
                }
-               cv::putText(frame, labelStr, cv::Point(x1 + 10, y1 + 20), cv::FONT_HERSHEY_TRIPLEX, 0.5, 255);
+               cv::putText(frame, labelStr, cv::Point(x1 + 10, y1 + 20), cv::FONT_HERSHEY_TRIPLEX, 0.5, color);
                std::stringstream confStr;
                confStr << std::fixed << std::setprecision(2) << detection.confidence * 100;
-               cv::putText(frame, confStr.str(), cv::Point(x1 + 10, y1 + 35), cv::FONT_HERSHEY_TRIPLEX, 0.5, 255);
+               cv::putText(frame, confStr.str(), cv::Point(x1 + 10, y1 + 35), cv::FONT_HERSHEY_TRIPLEX, 0.5, color);
 
                std::stringstream depthX;
                depthX << "X: " << (int)detection.spatialCoordinates.x << " mm";
-               cv::putText(frame, depthX.str(), cv::Point(x1 + 10, y1 + 50), cv::FONT_HERSHEY_TRIPLEX, 0.5, 255);
+               cv::putText(frame, depthX.str(), cv::Point(x1 + 10, y1 + 50), cv::FONT_HERSHEY_TRIPLEX, 0.5, color);
                std::stringstream depthY;
                depthY << "Y: " << (int)detection.spatialCoordinates.y << " mm";
-               cv::putText(frame, depthY.str(), cv::Point(x1 + 10, y1 + 65), cv::FONT_HERSHEY_TRIPLEX, 0.5, 255);
+               cv::putText(frame, depthY.str(), cv::Point(x1 + 10, y1 + 65), cv::FONT_HERSHEY_TRIPLEX, 0.5, color);
                std::stringstream depthZ;
                depthZ << "Z: " << (int)detection.spatialCoordinates.z << " mm";
-               cv::putText(frame, depthZ.str(), cv::Point(x1 + 10, y1 + 80), cv::FONT_HERSHEY_TRIPLEX, 0.5, 255);
+               cv::putText(frame, depthZ.str(), cv::Point(x1 + 10, y1 + 80), cv::FONT_HERSHEY_TRIPLEX, 0.5, color);
 
                cv::rectangle(frame, cv::Rect(cv::Point(x1, y1), cv::Point(x2, y2)), color, cv::FONT_HERSHEY_SIMPLEX);
+
+               std::cout << "New cone:" << std::endl << "X:" << (int)detection.spatialCoordinates.x << std::endl << "Y:" << (int)detection.spatialCoordinates.y << std::endl << "Z:" << (int)detection.spatialCoordinates.z << std::endl << "Lable:" << labelStr << std::endl << std::endl;
           }
 
           std::stringstream fpsStr;

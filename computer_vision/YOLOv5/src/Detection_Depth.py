@@ -19,7 +19,7 @@ Spatial Tiny-yolo example
 
 # Get argument first
 #nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/custom_model.blob"
-nnBlobPath = "D:/Development/HARD/Car_Simulation/processing/computer_vision/YOLOv5/yolo-v4-tiny-tf_openvino_2021.4_6shave.blob"
+nnBlobPath = "/home/catalinzaharia/Development/HARD/Driverless/computer_vision/YOLOv5/shaves/bestFSN_openvino_2021.4_6shave.blob"
 
 if not Path(nnBlobPath).exists():
     import sys
@@ -56,7 +56,7 @@ xoutDepth.setStreamName("depth")
 nnNetworkOut.setStreamName("nnNetwork")
 
 # Properties
-camRgb.setPreviewSize(resolution_x, resolution_y)
+camRgb.setPreviewSize(416, 416)
 camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
 camRgb.setInterleaved(False)
 camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
@@ -83,26 +83,40 @@ spatialDetectionNetwork.setDepthUpperThreshold(5000)
 # Yolo specific parameters
 spatialDetectionNetwork.setNumClasses(2)
 spatialDetectionNetwork.setCoordinateSize(4)
-spatialDetectionNetwork.setAnchors([10.0,
-                                    13.0,
+spatialDetectionNetwork.setAnchors([2.58984375,
+                                    6.26171875,
+                                    3.953125,
+                                    8.8515625,
+                                    5.53515625,
+                                    12.1015625,
+                                    7.59765625,
                                     16.0,
-                                    30.0,
-                                    33.0,
-                                    23.0,
-                                    30.0,
-                                    61.0,
-                                    62.0,
-                                    45.0,
-                                    59.0,
-                                    119.0,
-                                    116.0,
-                                    90.0,
-                                    156.0,
-                                    198.0,
-                                    373.0,
-                                    326.0])
+                                    10.609375,
+                                    21.578125,
+                                    15.109375,
+                                    30.046875,
+                                    21.171875,
+                                    40.53125,
+                                    27.859375,
+                                    54.0625,
+                                    39.625,
+                                    73.5])
 spatialDetectionNetwork.setAnchorMasks(
-    {"side160": [0, 1, 2], "side80": [3, 4, 5], "side40": [6, 7, 8]})
+    {"side52": [
+        0,
+        1,
+        2
+    ],
+        "side26": [
+        3,
+        4,
+        5
+    ],
+        "side13": [
+        6,
+        7,
+        8
+    ]})
 spatialDetectionNetwork.setIouThreshold(0.5)
 
 # Linking
