@@ -1,4 +1,5 @@
 from scipy.interpolate import splprep, splev
+from scipy.signal import bspline
 import numpy as np
 
 
@@ -20,13 +21,23 @@ def generate_increment_on_path(midpoints: np.ndarray, distance_increment: float 
     :return: np.array([x, y]); one pair of x-y-coordinates which represents the next point we want to steer towards
     """
 
-    if midpoints.shape[0] >= 2:
+    if midpoints.shape[0] > 2:
         # we only care about the first few midpoints to fit our line, and we add our current position to the array
         midpoints = np.concatenate([[[0, 0]], midpoints[: max_midpoints_considered]])
 
         mytck, myu = splprep([midpoints[:, 0], midpoints[:, 1]])
         xnew, ynew = splev([distance_increment], mytck)
         xnew, ynew = xnew[0], ynew[0]
+    elif midpoints.shape[0] == 2:
+        # x = a * (y ** 2) + b * y
+
+        p1 = midpoints[0]
+        p2 = midpoints[1]
+        a = (p1[0] / p1[1] - p2[0] / p2[1]) / (p1[1] - p2[1])
+        b = (p1[0] / p1[1]) - a * p1[1]
+
+        ynew = distance_increment
+        xnew = a * (ynew ** 2) + b * ynew
     elif midpoints.shape[0] == 1:
         # we move an incremental step on the line towards the point
         x, y = midpoints[1][0], midpoints[1][1]
