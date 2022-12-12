@@ -9,11 +9,13 @@ def path_finding(triangles: np.ndarray, cones: List[dict]):
     are positioned on the track. Secondly, it will determine the midpoints between of the edges and return them
     as an ordered list, with the first element being the first upcoming midpoint.
 
-    :param triangles: np.ndarray([n1, n2, n3]) – n1, n2, n3 in natural numbers; numbers represent position in list cones
+    :param triangles: np.ndarray([n1, n2, n3]); n1, n2 and n3 is integers; numbers represent position in the list cones
     :param cones: ordered list of dictionaries describing cones (ordered by colour and then distance to car);
-                  dictionary entries:
-                    ...
-    :return midpoints: np.ndarray[p] – p = np.array([x, y]) – x, y in natural numbers
+                  dictionary key-value pairs:
+                    "Label": str ("Yellow" or "Blue")
+                    "Xpos": float
+                    "Ypos": float
+    :return midpoints: np.ndarray[[x, y]]; x and y as floats
     """
 
     midpoints = []
@@ -25,8 +27,6 @@ def path_finding(triangles: np.ndarray, cones: List[dict]):
             midpoints.append([(cones[triangle[2]]["Xpos"] + cones[triangle[1]]["Xpos"]) / 2,
                              (cones[triangle[2]]["Ypos"] + cones[triangle[1]]["Ypos"]) / 2])
         if cones[triangle[2]]["Label"] != cones[triangle[0]]["Label"]:
-            midpoints.append([(cones[triangle[0]]["Xpos"] + cones[triangle[2]]["Xpos"]) / 2,
-                             (cones[triangle[0]]["Ypos"] + cones[triangle[2]]["Ypos"]) / 2])
 
     unique_midpoints = []
     for midpoint in midpoints:
