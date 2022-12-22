@@ -10,9 +10,13 @@ def separating(coordinates):
     """
 
     # coordinates.sort(key=lambda x:(x["Label"], x["Ypos"]**2+x["Xpos"]**2))
-    dictvectorizer = DictVectorizer(dtype=np.float64, sparse=False)
-    features = dictvectorizer.fit_transform(coordinates)
-    final_data = np.delete(features, (0, 1, 2, 5), axis=1)
+    # dictvectorizer = DictVectorizer(dtype=np.float64, sparse=False)
+    # features = dictvectorizer.fit_transform(coordinates)
+    # final_data = np.delete(features, (0, 1, 2, 5), axis=1)
+    final_data = np.ndarray((len(coordinates),2), dtype=np.float64)
+    for i in range(len(coordinates)):
+        final_data[i][0] = coordinates[i]["Xpos"]
+        final_data[i][1] = coordinates[i]["Ypos"]
     return final_data
 
 
@@ -27,9 +31,11 @@ def delauney_boundary(coordinates):
     tri = Delaunay(output)
     final_triangles = tri.simplices
     n = int(np.shape(final_triangles)[0])
+    n_deleted = 0
     for i in range(n):
-        if coordinates[tri.simplices[i][0]]["Label"] == coordinates[tri.simplices[i][1]]["Label"] == \
-                coordinates[tri.simplices[i][2]]["Label"]:
-            final_triangles = np.delete(final_triangles, i, 0)
+        if coordinates[tri.simplices[i - n_deleted][0]]["Label"] == coordinates[tri.simplices[i - n_deleted][1]]["Label"] == \
+                coordinates[tri.simplices[i - n_deleted][2]]["Label"]:
+            final_triangles = np.delete(final_triangles, i - n_deleted, 0)
+            n_deleted += 1
 
     return final_triangles, coordinates
