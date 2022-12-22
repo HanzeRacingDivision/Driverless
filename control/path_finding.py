@@ -37,12 +37,15 @@ def path_finding(triangles: np.ndarray, cones: List[dict]):
 
     midpoints = unique_midpoints
 
+    if len(midpoints) == 0:
+        return np.array([])
+
     distances = [p[0]**2 + p[1]**2 for p in midpoints]
     idx = distances.index(min(distances))
     current_midpoint = midpoints[idx]
     used_indexes = [idx]
     ordered_midpoints = [current_midpoint]
-    for i in range(1, len(midpoints)):
+    for _ in range(1, len(midpoints)):
         next_idx = None
         next_distance = np.infty
         for j in range(len(midpoints)):
@@ -56,22 +59,5 @@ def path_finding(triangles: np.ndarray, cones: List[dict]):
             current_midpoint = midpoints[next_idx]
             ordered_midpoints.append(current_midpoint)
             used_indexes.append(next_idx)
-
-    """for i in range(1, midpoints.shape[0]):
-        found_next_edge = False
-        for j in range(edges.shape[0]):
-            if j in used_indexes:
-                continue
-            if np.all(edges[j][0] == current_edge[1]) or np.all(edges[j][1] == current_edge[1]) \
-                    or np.all(edges[j][0] == current_edge[0]) or np.all(edges[j][0] == current_edge[0]):
-                current_edge = edges[j]
-                ordered_edges.append(current_edge)
-                used_indexes.append(j)
-                found_next_edge = True
-                break
-        if not found_next_edge:
-            break
-
-    midpoints = np.average(ordered_edges, axis=1)"""
 
     return np.array(ordered_midpoints)
