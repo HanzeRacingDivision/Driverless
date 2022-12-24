@@ -9,6 +9,8 @@ project(${TARGET_NAME})
 
 # Dependencies (optional, only used for example)
 find_package(OpenCV REQUIRED)
+find_package(roscpp REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(nlohmann_json 3.9.1 REQUIRED)
 
 # Env for the camera
@@ -27,8 +29,10 @@ add_executable("${TARGET_NAME}"
 # Link with libraries
 target_link_libraries(${TARGET_NAME}
     PUBLIC
-        depthai::opencv
         ${OpenCV_LIBS} # optional, used for example
+        depthai::opencv
+        ${roscpp_LIBRARIES} 
+        ${std_msgs_LIBRARIES}
         nlohmann_json::nlohmann_json
 )
 
