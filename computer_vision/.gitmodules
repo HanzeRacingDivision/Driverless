@@ -1,4 +1,0 @@
-[submodule "depthai-core"]
-	path = computer_vision/YOLOv5/depthai-core
-	url = https://github.com/luxonis/depthai-core.git
-	branch = main
