@@ -2,8 +2,8 @@
 //import board
 #include <Adafruit_I2CDevice.h> //why don't this appear as suggestions even though they are installed and sparkfun's do
 #include <Adafruit_BusIO_Register.h>
-#include <Adafruit_BNO08x.h>
-//#include <blinka.h> Not necessary yet since i found adafruit's
+#include <Adafruit_BNO08x.h> // shouldn't this be sparkfun one 
+#include <blinka.h> //Not necessary yet since i found adafruit's
 #define I2C_ADDRESS 0x60
 #define BNO08X_CS 10
 #define BNO08X_INT 9
