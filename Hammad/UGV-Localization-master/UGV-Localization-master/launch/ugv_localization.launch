@@ -1,0 +1,40 @@
+<?xml version='1.0'?>
+<launch>
+
+	<!-- Arguments -->
+	<arg name="data" default="real"/>
+
+	<!-- Replay bag data -->
+	<group if="$(eval arg('data')!='real')">
+		<param name="use_sim_time" value="true"/>
+		<node pkg="rosbag" type="play" name="rosbag_play" args="$(find ugv_localization)/bag/$(arg data).bag --clock" output="screen"/>
+	</group>
+
+	<!-- Pre-process sensor input messages altogether -->
+	<node pkg="ugv_localization" type="localization_preprocess" name="localization_preprocess" output="screen">
+		<rosparam command="load" file="$(find ugv_localization)/params/localization_preprocess.yaml"/>
+	</node>	
+
+	<!-- Fusion by robot_localization package -->
+ 	<node pkg="ugv_localization" type="global_filter_wrapper.py" name="global_filter_wrapper" args="/odometry/wheel /odometry/gps /gps/navheading/new" output="screen">
+		<param name="filter_node_name" value="ekf_odom_gps_imu"/>
+		<param name="topic_out" value="odometry/filtered"/>
+		<param name="config_file" value="$(find ugv_localization)/params/ekf_odom_imu_gps.yaml"/>
+	</node>
+
+    <!-- Publish required static tfs (transformation) -->
+	<include file="$(find ugv_localization)/launch/static_tfs.launch"/>
+	
+	<!-- Publish /world/fix and visualize with rviz_satellite -->
+	<include file="$(find ugv_localization)/launch/world_frame_gps_publisher.launch"/>
+
+	<!-- Rviz with rviz_sattellite -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find ugv_localization)/launch/rviz_satellite.rviz"/>
+
+	<!-- Visualize map with mapviz -->
+	<include file="$(find ugv_localization)/launch/mapviz.launch"/>
+
+	<!-- Click waypoints and generate trajectory -->
+	<include file="$(find ugv_localization)/launch/gen_traj.launch"/>
+
+</launch>

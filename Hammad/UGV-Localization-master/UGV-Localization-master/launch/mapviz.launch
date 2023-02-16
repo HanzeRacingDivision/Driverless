@@ -1,0 +1,15 @@
+<?xml version='1.0'?>
+<launch>
+
+	<!-- Visualize map with mapviz -->
+	<node pkg="swri_transform_util" type="initialize_origin.py" name="initialize_origin" >
+		<param name="local_xy_frame" value="map"/>
+    	<param name="local_xy_origin" value="map"/>
+    	<rosparam param="local_xy_origins">[{ name: map, latitude: 39.326465, longitude: -76.621554, altitude: 0, heading: 0.0}]</rosparam>
+  	</node>
+
+	<node pkg="mapviz" type="mapviz" name="mapviz">
+		<param name="config" value="$(find ugv_localization)/launch/mapviz.mvc"/>
+	</node>
+
+</launch>

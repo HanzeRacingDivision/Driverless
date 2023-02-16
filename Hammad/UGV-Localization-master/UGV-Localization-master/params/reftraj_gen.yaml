@@ -1,0 +1,22 @@
+# maximum number of clicked points (if exceeds, extra points will not be recorded)
+maxnum_clicked_waypoints: 60
+
+# velocity in m/s
+velocity: 1
+
+# acceleration in m/s^-2
+acceleration: 1
+
+# topic to subscribe for clicked waypoints (message type: PointStamped)
+topic_in: mapviz/clicked_point
+
+# topic to publish generated trajectory (message type: RefTrajAxyt)
+topic_out: reftraj
+
+# file name to save the generated trajectory message and its plot (if "None", nothing will be saved)
+save_traj_file: None
+
+# enable_refine will allow using interactive markers in Rviz to refine clicked points
+enable_refine: True
+
+

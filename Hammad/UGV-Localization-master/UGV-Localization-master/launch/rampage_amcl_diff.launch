@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  
+	<node pkg="amcl" type="amcl" name="amcl" output="screen">
+    	<remap from="/scan" to="/scan"/> 
+    	<remap from="/initialpose" to="/amcl_initialpose"/>
+    	<rosparam command="load" file="$(find ugv_localization)/params/rampage_amcl_diff.yaml" />  	
+  	</node>
+	
+</launch>

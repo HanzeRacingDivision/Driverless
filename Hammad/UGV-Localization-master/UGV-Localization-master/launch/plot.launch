@@ -1,0 +1,17 @@
+<?xml version='1.0'?>
+<launch>
+
+	<!-- Plot simple odometry in python -->
+    <!-- node pkg="ugv_localization" type="plot_traj.py" name="plot_traj_odom" args="/odometry/filtered odom" output="screen"/ -->
+
+    <!--node pkg="ugv_localization" type="plot_traj.py" name="plot_traj_imu" args="/imu_3dm/imu imu" output="screen"/-->
+
+	<!--node pkg="ugv_localization" type="plot_traj.py" name="plot_traj_gps" args="/gps/fix gps" output="screen"/-->
+	
+	<!-- Plot curves for analysis -->
+	<!-- node pkg="ugv_localization" type="plot_curve.py" name="plot_curve" output="screen">
+		<param name="mode" value="global"/>
+		<param name="name" value="test_00"/>
+	</node -->
+
+</launch>

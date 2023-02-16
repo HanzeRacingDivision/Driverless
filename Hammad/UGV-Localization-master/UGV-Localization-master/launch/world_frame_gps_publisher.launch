@@ -1,0 +1,8 @@
+<?xml version='1.0'?>
+<launch>
+
+	<node pkg="ugv_localization" type="world_frame_gps_publisher.py" name="world_frame_gps_publisher">
+		<param name="strfile_params" type="str" value="$(find ugv_localization)/params/world_frame_origin_gps.yaml"/>
+	</node>
+
+</launch>

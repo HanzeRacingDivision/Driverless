@@ -1,0 +1,68 @@
+<?xml version='1.0'?>
+<launch>
+
+	<!-- Arguments -->
+	<arg name="data" default="real"/>
+
+	<!-- Replay bag data -->
+	<group if="$(eval arg('data')!='real')">
+		<param name="use_sim_time" value="true"/>
+		<node pkg="rosbag" type="play" name="rosbag_play" args="$(find ugv_localization)/bag/$(arg data).bag --clock" output="screen"/>
+	</group>
+
+	<!-- Convert imu message into conventional frame -->
+	<node pkg="ugv_localization" type="imu_combine.py" name="imu_refine" output="screen">
+		<param name="mode" value="refine"/>
+		<param name="sensor" value="3dm"/>
+		<!-- param name="sensor" value="t265"/ -->
+	</node>
+
+	<!-- Get 2D baseline odometry using wheel encoder and converted imu -->
+	<node pkg="ugv_localization" type="wheel_imu_odom.py" name="wheel_imu_odom" args="/wheel_odometry /imu/refined /odometry/wheel_imu" output="screen"/>
+
+	<!-- Convert GPS into map frame -->
+	<node pkg="ugv_localization" type="gps_odom_node" name="gps_odom_node" output="screen">
+		<param name="coordinate_system" type="string" value="wgs84"/>
+		<param name="topic_gps" type="string" value="/gps/fix"/>
+		<param name="topic_odom" type="string" value="/odometry/gps"/>
+		<param name="latitude" type="double" value="39.326465"/>
+		<param name="longitude" type="double" value="-76.621554"/>
+		<param name="frame_id" type="string" value="map"/>
+		<param name="child_frame_id" type="string" value="base_link"/>
+		<param name="cov_threshold" type="double" value="1"/>
+		<param name="cov_scale" type="double" value="100"/>
+	</node>
+
+	<!-- Re-model GPS heading -->
+	<node pkg="ugv_localization" type="gps_navheading_node" name="gps_navheading_node" output="screen">
+		<param name="topic_out" type="string" value="/gps/navheading/new"/>
+		<param name="cov_thresh" type="double" value="1000"/>
+	</node>
+
+	<!-- Re-scale GPS cov -->
+	<!-- node pkg="ugv_localization" type="gps_cov_handler.py" name="gps_cov_handler" output="screen"/ -->
+
+
+	<!-- fusion by robot_localization package -->
+ 	<node pkg="ugv_localization" type="global_filter_wrapper.py" name="global_filter_wrapper" args="/odometry/wheel_imu /odometry/gps /gps/navheading" output="screen">
+		<param name="filter_node_name" value="ekf_odom_gps_imu"/>
+		<param name="topic_out" value="odometry/filtered"/>
+		<param name="config_file" value="$(find ugv_localization)/params/ekf_odom_imu_gps_old.yaml"/>
+	</node>
+
+	<!-- Publish required static tfs (transformation) -->
+	<include file="$(find ugv_localization)/launch/static_tfs.launch"/>
+	
+	<!-- Publish /world/fix and visualize with rviz_satellite -->
+	<include file="$(find ugv_localization)/launch/world_frame_gps_publisher.launch"/>
+
+	<!-- Rviz with rviz_sattellite -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find ugv_localization)/launch/rviz_satellite.rviz"/>
+
+	<!-- Visualize map with mapviz -->
+	<include file="$(find ugv_localization)/launch/mapviz.launch"/>
+
+	<!-- Click waypoints and generate trajectory -->
+	<include file="$(find ugv_localization)/launch/gen_traj.launch"/>
+
+</launch>

@@ -1,0 +1,14 @@
+world2og_org:
+  transform:
+    translation:
+      x: 29.636190777507405
+      y: 231.0806045561551
+      z: 0.0
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.71921891
+      w: 0.69478353
+  header:
+    frame_id: "world"
+  child_frame_id: "og_org"

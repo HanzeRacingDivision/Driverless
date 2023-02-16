@@ -1,0 +1,17 @@
+<?xml version='1.0'?>
+<launch>
+  <arg name="lidarmap" default="invalid"/>
+
+  <!-- run the map server-->
+  <node name='map_og_original_server' pkg='map_server' type='map_server' args='$(find ugv_localization)/map/map_$(arg lidarmap).yaml' output="screen">
+    <param name='frame_id' value='og_org'/>
+  </node> 
+
+  <!-- load the transformation between world and occupancy grid origin so that static_transform_publisher can publish it-->
+  <rosparam command="load" file='$(find ugv_localization)/map/w2o_$(arg lidarmap).yaml'/> 
+ 
+  <!-- Publish transformation between world and occupancy grid origin(og_org) basically map origin -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="world_to_og_org" args="world2og_org" output="screen"/>
+
+  <!-- include file = "$(find ugv_localization)/launch/static_tfs.launch"/ --> 
+</launch>

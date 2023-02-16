@@ -1,0 +1,82 @@
+capture_directory: ~
+fixed_frame: map
+target_frame: map
+fix_orientation: false
+rotate_90: false
+enable_antialiasing: true
+show_displays: true
+show_status_bar: true
+show_capture_tools: true
+window_width: 1301
+window_height: 744
+view_scale: 0.2075014
+offset_x: -14.89815
+offset_y: -16.4275
+use_latest_transforms: true
+background: "#a0a0a4"
+displays:
+  - type: mapviz_plugins/tile_map
+    name: new display
+    config:
+      visible: true
+      collapsed: true
+      custom_sources:
+        - base_url: http://localhost:8080/wmts/gm_layer/gm_grid/{level}/{x}/{y}.png
+          max_zoom: 19
+          name: google_map
+          type: wmts
+        - base_url: https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{level}/{x}/{y}?access_token=pk.eyJ1IjoiYXNjbyIsImEiOiJjaWoyNGs4NTgwMGZqdTJtNGlhc3B3NmtqIn0.WP8vbTLKNgtgcE_foUvS1Q
+          max_zoom: 19
+          name: mapbox
+          type: wmts
+      bing_api_key: ""
+      source: mapbox
+  - type: mapviz_plugins/navsat
+    name: new display
+    config:
+      visible: false
+      collapsed: true
+      topic: /gps/fix
+      color: "#ffff00"
+      draw_style: lines
+      position_tolerance: 0
+      buffer_size: 0
+  - type: mapviz_plugins/odometry
+    name: new display
+    config:
+      visible: true
+      collapsed: true
+      topic: /odometry/gps
+      color: "#00ff00"
+      draw_style: lines
+      position_tolerance: 0
+      buffer_size: 0
+      show_laps: false
+      show_covariance: true
+      show_all_covariances: false
+      static_arrow_sizes: false
+      arrow_size: 25
+      show_timestamps: 0
+  - type: mapviz_plugins/odometry
+    name: new display
+    config:
+      visible: true
+      collapsed: true
+      topic: /odometry/filtered
+      color: "#ff0000"
+      draw_style: lines
+      position_tolerance: 0
+      buffer_size: 0
+      show_laps: false
+      show_covariance: true
+      show_all_covariances: false
+      static_arrow_sizes: false
+      arrow_size: 25
+      show_timestamps: 0
+  - type: mapviz_plugins/point_click_publisher
+    name: new display
+    config:
+      visible: true
+      collapsed: false
+      topic: clicked_point
+      output_frame: world

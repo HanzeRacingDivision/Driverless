@@ -1,0 +1,19 @@
+<?xml version='1.0'?>
+<launch>
+
+	<!-- Make sure that the map tile server is running -->
+	<!--$sudo docker run -p 8080:8080 -d -t -v ~/mapproxy:/mapproxy danielsnider/mapproxy -->
+
+	<!-- Publish static tfs --> 
+	<include file="$(find ugv_localization)/launch/static_tfs.launch"/>
+
+	<!-- Visualize map with mapviz to click points -->
+	<include file="$(find ugv_localization)/launch/mapviz.launch"/>
+
+	<!-- Visualize markers and generated trajectory in rviz -->	
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find ugv_localization)/launch/rviz_satellite.rviz"/>
+
+	<!-- Click waypoints and generate trajectory -->
+	<include file="$(find ugv_localization)/launch/gen_traj.launch"/>
+
+</launch>

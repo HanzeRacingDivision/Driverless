@@ -1,0 +1,9 @@
+<?xml version='1.0'?>
+<launch>
+
+	<arg name="traj_name" default="traj"/>
+
+    <!-- Send the reference trajectory message to every new subscriber.-->
+    <node pkg="rostopic" type="rostopic" name="reftraj_pub" args="pub /reftraj rampage_msgs/RefTrajAxyt --file=$(find ugv_localization)/traj/$(arg traj_name).yaml" />
+
+</launch>

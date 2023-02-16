@@ -1,0 +1,16 @@
+<?xml version='1.0'?>
+<launch>
+  
+	<!-- Publish transformation between base_link and imu -->
+  	<node pkg="tf2_ros" type="static_transform_publisher" name="base_link2imu" args="0 0 0 1 0 0 0 base_link imu_3dm"/>
+
+	<!-- Publish transformation between base_link and gps -->
+	<node pkg="tf2_ros" type="static_transform_publisher" name="base_link2gps" args="0 0 0 0 0 0 base_link gps"/>
+
+	<!-- Publish transformation between map and world -->
+	<node pkg="tf2_ros" type="static_transform_publisher" name="world2map" args="0 0 0 0 0 0 map world"/>
+
+  	<!-- Publish transformation between base_link and lidar -->
+  	<node pkg="tf2_ros" type="static_transform_publisher" name="base_link2lidar" args="0.45 0 0 0 0 0 1 base_link lidar"/>
+  
+</launch>

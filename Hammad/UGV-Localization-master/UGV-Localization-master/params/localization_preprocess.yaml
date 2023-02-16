@@ -1,0 +1,43 @@
+# topic to subscribe for generating wheel odometry from wheel encoder
+wheel_odom_topic_in: /wheel_odometry
+
+# topic to publish generated wheel odometry (only with linear velocity)
+wheel_odom_topic_out: /odometry/wheel
+
+# topic to publish GPS heading
+gps_navheading_topic_out: /gps/navheading/new
+
+# covariance threshold to reject bad GPS heading
+gps_navheading_cov_thresh: 1000
+
+# coordinate system used for conversion from lat / lon to local world frame ("wgs84" or "utm")
+gps_odom_coord_sys: wgs84
+
+# topic to subscribe for generating GPS odometry
+gps_odom_topic_in: /gps/fix
+
+# topic to publish generated GPS odometry
+gps_odom_topic_out: /odometry/gps
+
+# latitude for local world frame
+world_origin_latitude: 39.326465
+
+# longitude for local world frame
+world_origin_longitude: -76.621554
+
+# orientation for local world frame
+world_frame_yaw: 0
+
+# parent frame for generated GPS odometry
+gps_odom_frame_id: map
+
+# child frame for generated GPS odometry
+gps_odom_child_frame_id: base_link
+
+# covariance threshold to reject bad GPS position
+gps_odom_cov_thresh: 1
+
+# scaler to multiply with GPS position covariance
+gps_odom_cov_scale: 100
+
+

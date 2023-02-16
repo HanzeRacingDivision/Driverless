@@ -1,0 +1,8 @@
+<?xml version='1.0'?>
+<launch>
+
+	<node pkg="ugv_localization" type="gen_traj.py" name="gen_traj" output="screen">
+		<rosparam command="load" file="$(find ugv_localization)/params/reftraj_gen.yaml"/>
+	</node>
+
+</launch>
