@@ -1,20 +1,20 @@
 [submodule "Computer-Vision"]
-	path = Computer-Vision
+	path = Modules/Computer-Vision
 	url = https://github.com/HanzeRacingDivision/Computer-Vision.git
 	branch = main
 
 [submodule "Control"]
-	path = Control
+	path = Modules/Control
 	url = https://github.com/HanzeRacingDivision/Control.git
 	branch = main
 
 [submodule "Emergency-System"]
-	path = Emergency-System
+	path = Modules/Emergency-System
 	url = https://github.com/HanzeRacingDivision/Emergency-System.git
 	branch = main
 
 [submodule "Simulator"]
-	path = Simulator
+	path = Modules/Simulator
 	url = https://github.com/HanzeRacingDivision/Simulator.git
 	branch = main
 
