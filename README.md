@@ -1,3 +1,8 @@
+# How to clone the repository
+```
+git submodule update --init --recursive
+``` 
+
 # Driverless Code Design Report
 
 ## INTRODUCTION
