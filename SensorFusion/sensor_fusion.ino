@@ -1,4 +1,3 @@
-
 #include <Wire.h> //used in BN080
 #include "SparkFun_BNO080_Arduino_Library.h" // https://github.com/sparkfun/SparkFun_BNO080_Arduino_Library
 #include "Streaming.h" 		// needed for the Serial output https://github.com/geneReeves/ArduinoStreaming
