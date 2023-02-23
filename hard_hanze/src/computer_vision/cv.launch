@@ -1,0 +1,4 @@
+<launch>
+  <node name="mouth" pkg="hard_hanze" type="talker.py" output="screen"/>
+  <node name="eyes" pkg="hard_hanze" type="listener.py" output="screen"/>
+</launch>
