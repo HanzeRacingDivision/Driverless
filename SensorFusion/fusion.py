@@ -12,12 +12,14 @@ def prediction(X_hat_t_1, P_t_1, F_t, B_t, U_t, Q_t):
     X_hat_t = F_t.dot(X_hat_t_1) + (B_t.dot(U_t))
     P_t = np.diag(np.diag(F_t.dot(P_t_1).dot(F_t.transpose()))) + Q_t
     return X_hat_t, P_t
+
 def update(X_hat_t, P_t, Z_t, R_t, H_t):
     K_prime = P_t.dot(H_t.transpose()).dot(np.linalg.inv(H_t.dot(P_t).dot(H_t.transpose()) + R_t))
     X_t = X_hat_t + K_prime.dot(Z_t - H_t.dot(X_hat_t))
     P_t = P_t - K_prime.dot(H_t).dot(P_t)
     return X_t, P_t
-def rotaitonMatrix(heading, attitude, bank):
+
+def rotationMatrix(heading, attitude, bank):
     '''
     :returns: rotation array in numpy format
     [m00 m01 m02]
