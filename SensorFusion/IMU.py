@@ -11,9 +11,8 @@ from adafruit_bno08x import (
     BNO_REPORT_ACCELEROMETER,
     BNO_REPORT_GYROSCOPE,
     BNO_REPORT_MAGNETOMETER,
-    BNO_REPORT_ROTATION_VECTOR,
     BNO_REPORT_GAME_ROTATION_VECTOR,
-    BNO_REPORT_SHAKE_DETECTOR
+    QuaternionToEuler
 )
 from adafruit_bno08x.i2c import BNO08X_I2C
 
@@ -46,16 +45,16 @@ class hello:
         gyro = '"gyro":[%0.6f,%0.6f,%0.6f]' % (gyro_x, gyro_y, gyro_z)
         mag_x, mag_y, mag_z = bno.magnetic  # pylint:disable=no-member
         magnetometer = '"mag":[%0.6f,%0.6f,%0.6f]' % (mag_x, mag_y, mag_z)
-        # quat_i, quat_j, quat_k, quat_real = bno.quaternion  # pylint:disable=no-member
+        qi, qj, qk, qr = bno.quaternion  # pylint:disable=no-member
         # quaternione = '"quat":[%0.6f,%0.6f,%0.6f,%0.6f]' % (quat_i, quat_j, quat_k, quat_real)
 
         (game_quat_i, game_quat_j, game_quat_k, game_quat_real) = bno.game_quaternion  # pylint:disable=no-member
 
         game_quaternione = '"game_quat":[%0.6f,%0.6f,%0.6f,%0.6f]' % (
             game_quat_i, game_quat_j, game_quat_k, game_quat_real)
-        deltat = fusion.deltatUpdate();
+        deltat = fusion.deltatUpdate()
         #fusion.MahonyUpdate(gx, gy, gz, ax, ay, az, mx, my, mz, deltat);  //mahony is suggested if there isn't the mag
-        fusion.MadgwickUpdate(gyro_x, gyro_y, gyro_z, accel_x, accel_y, accel_z, mag_x, mag_y, mag_z, deltat);  //else use the magwick
+        fusion.MadgwickUpdate(gyro_x, gyro_y, gyro_z, accel_x, accel_y, accel_z, mag_x, mag_y, mag_z, deltat);  # else use the magwick
 
         if bno.shake:
             shake = '"shake": true'
@@ -63,7 +62,7 @@ class hello:
             shake = '"shake": false'
 
         #print('game_quaternione: %s, shake: %s ' % (game_quaternione, shake))
-        return '{%s,%s,%s,%s,%s}' % (acceleration, gyro, magnetometer, game_quaternione, shake)
+        # return '{%s,%s,%s,%s,%s}' % (acceleration, gyro, magnetometer, game_quaternione, shake)
         # return '{"quaternione":[%f,%f,%f]}'%(1.0,1.0,1.0)
 
 

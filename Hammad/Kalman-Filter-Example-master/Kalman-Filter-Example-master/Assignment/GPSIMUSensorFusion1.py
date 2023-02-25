@@ -169,7 +169,7 @@ for i in range(len(dt)):
     Xfilter.append(X_t[0, 0])
     Yfilter.append(X_t[1, 0])
 
-"""
+
 # reducing data points to 100 for plotting on google maps
 dtReduced = np.linspace(gpsTimeStamp[0], gpsTimeStamp[len(gpsTimeStamp) - 1], 100)
 XfilterInterp = np.interp(dtReduced, gpsTimeStampInterp, Xfilter)
@@ -181,7 +181,7 @@ gmap1.apikey = "AIzaSyDvvwPIEA8T9IUxPKaRZ6gp2f6xRtBYICU"
 gmap1.scatter(gpsLatitude, gpsLongitude, color='r', size=0.3, marker=False)
 gmap1.scatter(YfilterInterp, XfilterInterp, color='g', size=0.6, marker=False)
 gmap1.draw("results.html")
-"""
+
 
 print("Done...")
 
