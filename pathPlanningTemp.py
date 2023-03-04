@@ -176,7 +176,7 @@ def calcAutoDriving(mapToUse: Map, saveOutput=True, printDebug=True):
                 if(printDebug):
                     print("cant predict target (for steering in early)???", i, nextTarget, lastPredictTarget, predictTarget)
                 desired_velocity = MINIMUM_VELOCITY
-                break;
+                break
         desired_steering = min(max(desired_steering,-mapToUse.car.maxSteeringAngle),mapToUse.car.maxSteeringAngle) #constrain one more time
 
         if(saveOutput):
@@ -193,7 +193,7 @@ def calcAutoDriving(mapToUse: Map, saveOutput=True, printDebug=True):
                     if(printDebug):
                         print("target rollover, laps done:", mapToUse.car.pathFolData.laps)
                     if(not mapToUse.car.pathFolData._useSplineTargets): # when the first lap is completed, we can switch to driving along the spline instead
-                        mapToUse.car.pathFolData._useSplineTargets = True
+                        mapToUse.car.pathFolData._useSplineTargets = False  # True
                         print("about to crash:", len(mapToUse.pathFolData.targetSpline), mapToUse.car.pathFolData.nextTarget, type(mapToUse.car.pathFolData.nextTarget))
                         mapToUse.car.pathFolData.nextTarget = mapToUse.pathFolData.targetSpline[0] # switch target object for one from the splinelist (note: index stays 0)
                         print("switching to spline target list!") # debug
@@ -303,7 +303,7 @@ class pathPlanner():
     targetPassedAngleThreshold = np.deg2rad(75) #if it passes a target (without hitting it perfectly), the angle to target will probably be more than this
     targetMissedAngleThreshold = np.deg2rad(140) #if the angle to target is larger than this, (panic, and) move on to the next target (or something)
 
-    steeringPredictDepth = 2 #how many targets to predictively steer towards
+    steeringPredictDepth = 1 #how many targets to predictively steer towards
     steeringPredictDepthStrength = 1.6 #(higher = stronger)
     steeringPredictDepthCurve = lambda depth : (pathPlanner.steeringPredictDepthStrength / (max(depth, 1)**2)) #inverse exponential, starting at a depth of 1 (0 depth would be the current target)
     ##a distance-based steering power curve may be useful (especially for predictive steering)
